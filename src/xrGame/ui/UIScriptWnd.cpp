@@ -86,6 +86,10 @@ bool CUIDialogWndEx::OnKeyboardAction(int dik, EUIMessages keyboard_action)
 
 bool CUIDialogWndEx::OnMouseAction(float x, float y, EUIMessages mouse_action)
 {
+	// The wheel: the dialog's own callback first (AddCallback with the dialog's window name),
+	// so a script screen gets it wherever the cursor is, whatever its children do with it.
+	if (mouse_action == WINDOW_MOUSE_WHEEL_UP || mouse_action == WINDOW_MOUSE_WHEEL_DOWN)
+		RunCallback(this, s16(mouse_action));
 	return inherited::OnMouseAction(x, y, mouse_action);
 }
 
