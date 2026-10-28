@@ -16,6 +16,8 @@
 
 #include "NewZoomFlag.h"
 
+#include "gunsmith_tree.h"
+
 class CEntity;
 class ENGINE_API CMotionDef;
 class CSE_ALifeItemWeapon;
@@ -347,7 +349,21 @@ public:
 	{
 		m_flagsAddOnState = st;
 	} //dont use!!! for buy menu only!!!
-	
+
+	// Gunsmith part tree. The server entity owns the saved copy; this mirror is
+	// filled in net_Spawn and pushed back after every client-side change.
+	const gunsmith::CTree& gs_tree() const { return m_gs_tree; }
+	CSE_ALifeItemWeapon* gs_server_entity() const;
+	void gs_sync_to_server();
+
+protected:
+	gunsmith::CTree m_gs_tree;
+
+	// Mirrors an attach (part != null) or detach of an old-style addon into the tree.
+	void gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition);
+	// Makes the tree's scope part match the scope the weapon actually uses (m_cur_scope).
+	void gs_match_scope_part();
+
 protected:
 	//ñîñòîÿíèå ïîäêëþ÷åííûõ àääîíîâ
 	u8 m_flagsAddOnState;

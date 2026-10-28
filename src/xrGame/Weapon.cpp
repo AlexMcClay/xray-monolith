@@ -39,6 +39,8 @@
 #include "pch_script.h"
 #include "script_game_object.h"
 #include "ai/stalker/ai_stalker.h"
+#include "xrServer.h"
+#include "game_sv_base.h"
 
 #define WEAPON_REMOVE_TIME		60000
 #define ROTATION_TIME			0.25f
@@ -1001,8 +1003,10 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 	CSE_ALifeItemWeapon* E = smart_cast<CSE_ALifeItemWeapon*>(e);
 	
 	iAmmoElapsed = E->a_elapsed;
+	E->gs_ensure_tree();
+	m_gs_tree = E->m_gs_tree;
 	m_flagsAddOnState = E->m_addon_flags.get();
-	
+
 	if (m_modular_attachments && m_cur_scope == 0 && (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) != 0 && m_scopes.size() > 1)
 	{
 		m_cur_scope = ::Random.randI(1, m_scopes.size());
@@ -1014,6 +1018,8 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 			m_scopeItem->Load(m_scopes[m_cur_scope].c_str());
 		}
 	}
+
+	gs_match_scope_part();
 
 	m_ammoType = E->ammo_type;
 	SetState(E->wpn_state);
@@ -1095,6 +1101,8 @@ void CWeapon::net_Import(NET_Packet& P)
 	u8 NewAddonState;
 	P.r_u8(NewAddonState);
 
+	if (NewAddonState != m_flagsAddOnState)
+		m_gs_tree.sync_legacy_flags(NewAddonState, GetCondition()); // remote copy only, multiplayer
 	m_flagsAddOnState = NewAddonState;
 	UpdateAddonsVisibility();
 
@@ -1164,6 +1172,50 @@ void CWeapon::load(IReader& input_packet)
 	load_data(m_bRememberActorNVisnStatus, input_packet);
 }
 
+CSE_ALifeItemWeapon* CWeapon::gs_server_entity() const
+{
+	if (!OnServer() || !Level().Server || !Level().Server->game)
+		return nullptr;
+	return smart_cast<CSE_ALifeItemWeapon*>(Level().Server->game->get_entity_from_eid(ID()));
+}
+
+void CWeapon::gs_sync_to_server()
+{
+	CSE_ALifeItemWeapon* se = gs_server_entity();
+	if (!se)
+		return;
+	se->m_gs_tree = m_gs_tree;
+	se->m_addon_flags.flags = m_flagsAddOnState;
+}
+
+void CWeapon::gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition)
+{
+	// Phase 1 note: on detach, the spawned addon item keeps its section's default
+	// condition; copying the node's condition onto it comes with the Lua gs_detach.
+	m_gs_tree.set_legacy_addon(legacy_addon, part, condition);
+	gs_sync_to_server();
+}
+
+void CWeapon::gs_match_scope_part()
+{
+	if (m_eScopeStatus != ALife::eAddonAttachable || m_scopes.empty() || m_cur_scope >= m_scopes.size() ||
+		!(m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope))
+		return;
+
+	const shared_str scope = GetScopeName();
+	if (!scope.size())
+		return;
+
+	const int node = m_gs_tree.find_legacy(gunsmith::eLegacyScope);
+	if (node >= 0 && m_gs_tree.node(u8(node)).section == scope)
+		return;
+
+	// Trees rebuilt from old saves guess the first scope; the saved scope index wins.
+	const float condition = node >= 0 ? m_gs_tree.node(u8(node)).condition : GetCondition();
+	m_gs_tree.set_legacy_addon(gunsmith::eLegacyScope, scope.c_str(), condition);
+	gs_sync_to_server();
+}
+
 void CWeapon::OnEvent(NET_Packet& P, u16 type)
 {
 	switch (type)
@@ -1171,6 +1223,7 @@ void CWeapon::OnEvent(NET_Packet& P, u16 type)
 	case GE_ADDON_CHANGE:
 		{
 			P.r_u8(m_flagsAddOnState);
+			m_gs_tree.sync_legacy_flags(m_flagsAddOnState, GetCondition()); // multiplayer buy menu only
 			InitAddons();
 			UpdateAddonsVisibility();
 		}

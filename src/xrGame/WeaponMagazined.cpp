@@ -1381,6 +1381,7 @@ bool CWeaponMagazined::Attach(PIItem pIItem, bool b_send_event)
 			}
 		}
 		m_flagsAddOnState |= CSE_ALifeItemWeapon::eWeaponAddonScope;
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonScope, pIItem->object().cNameSect().c_str(), pIItem->GetCondition());
 		if (m_modular_attachments) {
 			LoadScopeKoeffs();
 			m_scopeItem = xr_new<CAnonHudItem>();
@@ -1398,6 +1399,7 @@ bool CWeaponMagazined::Attach(PIItem pIItem, bool b_send_event)
 		(m_sSilencerName == pIItem->object().cNameSect()))
 	{
 		m_flagsAddOnState |= CSE_ALifeItemWeapon::eWeaponAddonSilencer;
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonSilencer, pIItem->object().cNameSect().c_str(), pIItem->GetCondition());
 		result = true;
 	}
 	else if (pGrenadeLauncher &&
@@ -1406,6 +1408,7 @@ bool CWeaponMagazined::Attach(PIItem pIItem, bool b_send_event)
 		(m_sGrenadeLauncherName == pIItem->object().cNameSect()))
 	{
 		m_flagsAddOnState |= CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher;
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, pIItem->object().cNameSect().c_str(), pIItem->GetCondition());
 		result = true;
 	}
 
@@ -1462,6 +1465,7 @@ bool CWeaponMagazined::Detach(const char* item_section_name, bool b_spawn_item)
 			return true;
 		}
 		m_flagsAddOnState &= ~CSE_ALifeItemWeapon::eWeaponAddonScope;
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonScope, nullptr, 0.f);
 
 		if (m_scopeItem) {
 			g_player_hud->detach_item(m_scopeItem);
@@ -1486,6 +1490,7 @@ bool CWeaponMagazined::Detach(const char* item_section_name, bool b_spawn_item)
 			return true;
 		}
 		m_flagsAddOnState &= ~CSE_ALifeItemWeapon::eWeaponAddonSilencer;
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonSilencer, nullptr, 0.f);
 
 		UpdateAddonsVisibility();
 		InitAddons();
@@ -1500,6 +1505,7 @@ bool CWeaponMagazined::Detach(const char* item_section_name, bool b_spawn_item)
 			return true;
 		}
 		m_flagsAddOnState &= ~CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher;
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, nullptr, 0.f);
 
 		UpdateAddonsVisibility();
 		InitAddons();
