@@ -39,6 +39,12 @@ namespace gunsmith
 			return crc;
 		}
 
+		// A live gun's cell key: its object and its build.
+		void object_key(const CWeapon* weapon, string128& key)
+		{
+			xr_sprintf(key, "o%u:%08x", u32(weapon->ID()), tree_crc(weapon->gs_tree()));
+		}
+
 		// The inventory cell's aspect, fitted into an icon cell.
 		void icon_size(LPCSTR section, u32& w, u32& h)
 		{
@@ -122,7 +128,7 @@ namespace gunsmith
 		if (!weapon || !weapon->gs_full_mode())
 			return false;
 		string128 key;
-		xr_sprintf(key, "o%u:%08x", u32(id), tree_crc(weapon->gs_tree()));
+		object_key(weapon, key);
 		return icon_request(key, id, weapon->cNameSect().c_str(), rect);
 	}
 
@@ -369,6 +375,24 @@ namespace gunsmith
 	{
 		if (!available() || !g_pGameLevel)
 			return;
+		// A gun whose build changed is redrawn in its cell, whether or not the UI asks again
+		// (the inventory doesn't refresh a cell when a part is swapped from its menu).
+		for (SCell& c : m_cells)
+		{
+			if (c.id == u16(-1) || c.dirty)
+				continue;
+			CWeapon* weapon = smart_cast<CWeapon*>(Level().Objects.net_Find(c.id));
+			if (!weapon)
+				continue;
+			string128 key;
+			object_key(weapon, key);
+			if (c.key != key)
+			{
+				c.key = key;
+				c.dirty = true;
+			}
+		}
+
 		u32 drawn = 0;
 		for (u32 i = 0; i < m_cells.size() && drawn < ICONS_PER_FRAME && !m_failed; ++i)
 		{

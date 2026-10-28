@@ -126,6 +126,8 @@ bool CRender::PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, 
 	vp.MaxDepth = 1.f;
 	HW.pContext->RSSetViewports(1, &vp);
 
+	// The scene's camera is set before the frame renders (CRenderDevice::UpdateCamera); keep it.
+	const Fmatrix saved_w = RCache.xforms.m_w, saved_v = RCache.xforms.m_v, saved_p = RCache.xforms.m_p;
 	RCache.set_xform_view(view);
 	RCache.set_xform_project(proj);
 	for (u32 i = 0; i < count; ++i)
@@ -147,6 +149,9 @@ bool CRender::PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, 
 	box.back = 1;
 	HW.pContext->CopySubresourceRegion(rt->pSurface, 0, x, y, 0, P.scratch->pSurface, 0, &box);
 
+	RCache.set_xform_world(saved_w);
+	RCache.set_xform_view(saved_v);
+	RCache.set_xform_project(saved_p);
 	RCache.set_RT(HW.pBaseRT);
 	RCache.set_ZB(HW.pBaseZB);
 	vp.Width = float(Device.dwWidth);
