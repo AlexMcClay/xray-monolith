@@ -193,6 +193,7 @@
     }
 
     alife() {
+        cse_alife_item_weapon create_weapon_with_build(string section, table build, Fvector position, number level_vertex_id, number game_vertex_id, number parent_id) -- spawns a weapon with a finished gunsmith part tree, set before it registers, online or offline. build: array of { section, parent, slot, condition = 1 }; element 1 is the weapon itself. nil (logged) on a bad build
         number object_count()
         void iterate_objects(function(se_obj))
         void iterate_level_objects_of_clsid(number script_clsid, function(se_obj)) -- walks actor's current-level CSE registry filtered by m_script_clsid; functor returns true to stop early; must not release the currently iterated entity
@@ -239,6 +240,8 @@
 
     // MT only
     class cse_alife_item_weapon {
+        table gs_get_tree() -- gunsmith part tree, same format as game_object:gs_get_tree()
+        bool gs_set_tree(table build) -- replaces the tree, same build format as alife():create_weapon_with_build; for offline weapons (an online weapon keeps its own copy until it next goes offline)
         function clone_upgrades(cse_alife_item_weapon*)
     }
 
@@ -1166,6 +1169,26 @@
 		get_legs_shaders(), set_legs_shader(id, shader, texture), reset_legs_shader(id)
 		actor only, same as get_shaders, set_shader and reset_shader but for the first person legs model
 		does nothing when the legs are not shown
+
+        // Gunsmith part tree (weapons). Node and slot numbers are 0-based; node 0 is the gun itself.
+        // Tree table: array, element n + 1 is node n:
+        //   { index, section, parent, slot, condition, kind, legacy_addon, slots = { { index, section, accepts = {tags},
+        //     required, field_swappable, implicit, legacy_addon, occupant, blocked }, ... } }
+        //   parent and slot are absent on node 0; legacy_addon ("scope"/"silencer"/"launcher") and occupant (node number) when set
+        // Stats table: { ergonomics, weight, cost, parts_weight, parts_cost, can_fire, suppressed, suppressor_worn, muzzle_condition,
+        //   barrel_wear_mul, sight_sway, jammed, jam_type, jam_node, stats = { <name> = { base, add, mul, value } } }
+        //   stat names: fire_dispersion, cam_dispersion, cam_dispersion_inc, cam_horz (degrees), hit_power, hit_impulse, bullet_speed,
+        //   rpm (rounds per minute), pdm_base, pdm_accel, pdm_vel, crosshair_inertion, zoom_rotate_time, condition_shot_dec, ergonomics
+        table gs_get_tree()
+        bool gs_can_attach(string section, number parent, number slot) -- free slot, not blocked, tags fit; addon slots take only what weapon_addon_attach would
+        string gs_can_attach_reason(string section, number parent, number slot) -- "" when it fits, else no_weapon, no_tree, no_such_node, no_such_slot, no_such_section, slot_taken, slot_blocked, does_not_fit, tree_full
+        bool gs_attach(game_object item, number parent, number slot) -- moves an inventory item into the tree with its condition; addon slots go through the weapon's own attach
+        bool gs_attach_section(string section, number parent, number slot, number condition) -- fits a part without an item (non-addon slots only)
+        number gs_detach(number node, bool spawn = true) -- removes the part and its children; with spawn each becomes an inventory item with its condition. Returns the first item's id, -1 when no item was spawned, nil on failure. Fails with spawn when a part has no class key (not an item)
+        bool gs_set_condition(number node, number condition) -- node 0 sets the weapon's condition
+        table gs_get_stats()
+        table gs_preview_stats(table changes) -- changes: array of { parent, slot, section ("none" empties the slot), condition = 1 }, applied in order to a copy, each replacing what's in the slot. Returns a stats table plus errors = { "<index>: <reason>" }
+        callbacks (see gunsmith_callbacks.script): on_gs_part_attached(weapon, node, section), on_gs_part_detached(weapon, section, item_id), on_gs_part_failed(weapon, node, failure_type)
     }
 
     class CActorCondition : CEntityCondition {

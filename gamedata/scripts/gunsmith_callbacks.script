@@ -1,0 +1,36 @@
+--[[
+	Gunsmith part tree callbacks.
+	The engine calls the _G.CWeapon_gs_* functions below; they forward to script
+	callbacks that any script can register with RegisterScriptCallback.
+
+	on_gs_part_attached(weapon, node, section)
+		A part went into the weapon's tree: through game_object:gs_attach,
+		gs_attach_section, or the inventory (scopes, silencers, launchers).
+		node is its 0-based node number.
+
+	on_gs_part_detached(weapon, section, item_id)
+		A part left the tree. item_id is the spawned inventory item's id, or -1
+		when no item was spawned or its id isn't known yet (inventory detach of
+		an old-style addon spawns the item asynchronously).
+
+	on_gs_part_failed(weapon, node, failure_type)
+		The weapon jammed, and this part caused it. failure_type is "misfire"
+		(node 0, the gun's own curve), "extraction", "feed" or "barrel".
+		Fires for the player and NPCs, before the existing weapon_jammed callback.
+--]]
+
+AddScriptCallback("on_gs_part_attached")
+AddScriptCallback("on_gs_part_detached")
+AddScriptCallback("on_gs_part_failed")
+
+_G.CWeapon_gs_part_attached = function(weapon, node, section)
+	SendScriptCallback("on_gs_part_attached", weapon, node, section)
+end
+
+_G.CWeapon_gs_part_detached = function(weapon, section, item_id)
+	SendScriptCallback("on_gs_part_detached", weapon, section, item_id)
+end
+
+_G.CWeapon_gs_part_failed = function(weapon, node, failure_type)
+	SendScriptCallback("on_gs_part_failed", weapon, node, failure_type)
+end
