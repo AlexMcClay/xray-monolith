@@ -2034,6 +2034,9 @@ void CWeapon::renderable_Render()
 	inherited::renderable_Render();
 }
 
+// gs_aim_debug 1: log the sight calibration twice a second while aiming.
+int g_gs_aim_debug = 0;
+
 void CWeapon::RenderAttachments()
 {
 	inherited::RenderAttachments();
@@ -3245,16 +3248,26 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 				curr_offs.x += m_gs_aim_corr.x;
 				curr_offs.y += m_gs_aim_corr.y;
 
-				// Refine once the HUD has settled at the aim position, not while firing.
-				if (m_zoom_params.m_fZoomRotationFactor >= 1.f && GetState() == eIdle &&
-					m_hud_offset[0].similar(curr_offs, 0.003f))
+				// Refine once fully aimed and roughly settled, not while firing. The HUD follows
+				// the offset with a lag (InterpolateOffset); a gain well below that keeps it stable.
+				Fvector s;
+				hi->m_item_transform.transform_tiny(s, sight);
+				cam_inv.transform_tiny(s); // camera space: x right, y up, z forward
+				const bool aimed = m_zoom_params.m_fZoomRotationFactor >= 0.99f;
+				const bool idle = GetState() == eIdle;
+				const bool settled = m_hud_offset[0].similar(curr_offs, 0.01f);
+				if (aimed && idle && settled)
 				{
-					Fvector s;
-					hi->m_item_transform.transform_tiny(s, sight);
-					cam_inv.transform_tiny(s); // camera space: x right, y up, z forward
-					const float k = _min(1.f, Device.fTimeDelta * 4.f);
+					const float k = _min(1.f, Device.fTimeDelta * 1.5f);
 					m_gs_aim_corr.x -= s.x * k;
 					m_gs_aim_corr.y -= s.y * k;
+				}
+				static u32 s_gs_aim_log = 0;
+				if (g_gs_aim_debug && Device.dwTimeGlobal > s_gs_aim_log + 500)
+				{
+					s_gs_aim_log = Device.dwTimeGlobal;
+					Msg("- gs_aim: sight [%s] off axis x=%.4f y=%.4f (dist %.3f), correction x=%.4f y=%.4f, aimed=%d idle=%d settled=%d",
+						key.c_str(), s.x, s.y, s.z, m_gs_aim_corr.x, m_gs_aim_corr.y, aimed, idle, settled);
 				}
 			}
 		}

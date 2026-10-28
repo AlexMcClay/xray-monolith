@@ -20,6 +20,7 @@
 #include "gunsmith_visuals.h"
 
 class CEntity;
+extern int g_gs_aim_debug;
 class ENGINE_API CMotionDef;
 class CSE_ALifeItemWeapon;
 class CSE_ALifeItemWeaponAmmo;
