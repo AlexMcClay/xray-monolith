@@ -41,10 +41,15 @@ namespace gunsmith
 			return shared_str();
 		}
 
+		// `visual` keys may or may not carry the extension (vanilla world visuals usually do).
 		bool model_file_exists(const shared_str& path)
 		{
 			string_path fn;
-			xr_strconcat(fn, path.c_str(), ".ogf");
+			const size_t len = xr_strlen(path.c_str());
+			if (len > 4 && !_stricmp(path.c_str() + len - 4, ".ogf"))
+				xr_strcpy(fn, path.c_str());
+			else
+				xr_strconcat(fn, path.c_str(), ".ogf");
 			return !!FS.exist("$game_meshes$", fn);
 		}
 
