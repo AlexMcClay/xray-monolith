@@ -49,6 +49,8 @@
 #include "character_hit_animations_params.h"
 #include "inventory_upgrade_manager.h"
 #include "Weapon.h"
+#include "player_hud.h"
+#include "ActorEffector.h"
 #include "inventory.h"
 #include "xrServer_Objects_ALife_Items.h"
 
@@ -438,6 +440,40 @@ public:
 			Msg("- gs_dump_tree: server addon flags=0x%02x", u32(se->m_addon_flags.get()));
 			se->m_gs_tree.dump("server");
 		}
+	}
+};
+
+// Gunsmith: where the eye is, in the first-person model's space (following the HUD section's
+// gs_aim_bone), for tuning gs_aim_point. Run it while fully aimed with the plain receiver
+// (no sight part fitted); the printed line can go into the HUD section as it is.
+class CCC_GsAimEye : public IConsole_Command
+{
+public:
+	CCC_GsAimEye(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
+
+	virtual void Execute(LPCSTR args)
+	{
+		CActor* actor = Actor();
+		CWeapon* wpn = actor ? smart_cast<CWeapon*>(actor->inventory().ActiveItem()) : nullptr;
+		attachable_hud_item* hi = wpn && wpn->GetHUDmode() ? wpn->HudItemData() : nullptr;
+		if (!hi || !hi->m_model)
+		{
+			Msg("! gs_aim_eye: hold a weapon in first person");
+			return;
+		}
+		LPCSTR bone = READ_IF_EXISTS(pSettings, r_string, wpn->HudSection(), "gs_aim_bone", (LPCSTR)nullptr);
+		u16 id = bone ? hi->m_model->LL_BoneID(bone) : BI_NONE;
+		if (id == BI_NONE)
+			id = hi->m_model->LL_GetBoneRoot();
+		Fmatrix cam, model, inv;
+		actor->Cameras().hud_camera_Matrix(cam);
+		model.mul_43(hi->m_item_transform, hi->m_model->LL_GetTransform_R(id));
+		inv.invert(model);
+		Fvector eye;
+		inv.transform_tiny(eye, cam.c);
+		Msg("- gs_aim_eye: [%s] %s, eye in model space (bone %s):", wpn->HudSection().c_str(),
+			wpn->IsZoomed() ? "aimed" : "NOT aimed", hi->m_model->LL_BoneName_dbg(id));
+		Msg("gs_aim_point    = %.4f, %.4f, %.4f", eye.x, eye.y, eye.z);
 	}
 };
 
@@ -2600,6 +2636,7 @@ void CCC_RegisterCommands()
 
 	CMD1(CCC_MemStats, "stat_memory");
 	CMD1(CCC_GsDumpTree, "gs_dump_tree");
+	CMD1(CCC_GsAimEye, "gs_aim_eye");
 	CMD1(CCC_GsSetCondition, "gs_set_condition");
 	CMD1(CCC_GsSetPart, "gs_set_part");
 #ifdef DEBUG

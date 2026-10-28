@@ -18,6 +18,8 @@ namespace gunsmith
 	//   mount_offset_pos, mount_offset_rot applied after the mount (metres; degrees H,P,B)
 	//   aim_bone, aim_point                the part is a sight: the point the eye lines up with when
 	//                                      aiming (model space, moving with that bone, default the root)
+	//   aim_priority                       when several sights are fitted, the highest wins (ties: the
+	//                                      last in the tree); e.g. optics 1 over iron sights 0
 	//   fire_bone, fire_point              the part is on the muzzle chain: shots and flash start
 	//                                      there when it is the last such part in the tree
 	// All positions are in the model's own space (as exported) and follow the named bone's
@@ -27,6 +29,7 @@ namespace gunsmith
 		shared_str visual, hud_visual;
 		Fmatrix offset;
 		bool has_aim;
+		int aim_priority;
 		shared_str aim_bone;
 		Fvector aim_point;
 		bool has_fire;

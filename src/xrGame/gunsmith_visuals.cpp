@@ -73,6 +73,7 @@ namespace gunsmith
 		v.offset = make_xform(read_vec(section, "mount_offset_pos"), read_vec(section, "mount_offset_rot"));
 		v.has_aim = section && (pSettings->line_exist(section, "aim_bone") || pSettings->line_exist(section, "aim_point"));
 		v.aim_bone = read_str(section, "aim_bone");
+		v.aim_priority = section ? READ_IF_EXISTS(pSettings, r_s32, section, "aim_priority", 0) : 0;
 		v.aim_point = read_vec(section, "aim_point");
 		v.has_fire = section && (pSettings->line_exist(section, "fire_bone") || pSettings->line_exist(section, "fire_point"));
 		v.fire_bone = read_str(section, "fire_bone");
@@ -331,8 +332,8 @@ namespace gunsmith
 			return false;
 		const SChild* sight = nullptr;
 		for (const SChild& ch : c.children)
-			if (ch.pv->has_aim)
-				sight = &ch; // the last sight in the tree: the one mounted highest up the chain
+			if (ch.pv->has_aim && (!sight || ch.pv->aim_priority >= sight->pv->aim_priority))
+				sight = &ch; // highest aim_priority; among equals the last in the tree
 		if (!sight)
 			return false;
 		update_local(c, root);
