@@ -119,6 +119,8 @@ public:
 	u8 m_ammoType2;
 
 	int iMagazineSize2;
+	// Gunsmith magazine parts size the rifle magazine, also while the launcher is selected.
+	virtual void gs_apply_mag_size(int size, bool live);
 	xr_vector<CCartridge> m_magazine2;
 
 	bool m_bGrenadeMode;

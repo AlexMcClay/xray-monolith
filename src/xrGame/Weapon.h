@@ -365,6 +365,9 @@ public:
 
 	// A silencer is attached and not worn below its suppression threshold.
 	bool IsSuppressed() const;
+	// A suppressor is fitted, worn or not: a silencer addon, or a part with `suppressor = true`.
+	// Gameplay checks (shot sound, AI hearing) use this; IsSilencerAttached() stays the addon flag.
+	bool IsSuppressorFitted() const { return IsSilencerAttached() || m_gs_stats.suppressor_part; }
 
 	float gs_pdm_base() const;
 	float gs_pdm_vel() const;
@@ -416,6 +419,12 @@ public:
 protected:
 	gunsmith::CVisuals m_gs_visuals;
 	bool m_gs_full_mode = false;
+
+	// Magazine parts (`ammo_mag_size`) set the magazine size; the weapon's own comes back when
+	// none is fitted. `live`: a change in play, so rounds that no longer fit are returned.
+	int m_gs_base_mag_size = -1;
+	int m_gs_applied_mag_size = -1;
+	virtual void gs_apply_mag_size(int size, bool live) { iMagazineSize = size; }
 
 protected:
 	bool m_gs_api_detach = false; // gs_detach_part fires the detach callback itself

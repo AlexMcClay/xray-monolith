@@ -151,7 +151,9 @@ void CWeaponMagazined::Load(LPCSTR section)
 	m_sSndShotCurrent = IsSuppressed() ? "sndSilencerShot" : "sndShot";
 
 	//звуки и партиклы глушителя, еслит такой есть
-	if (m_eSilencerStatus == ALife::eAddonAttachable || m_eSilencerStatus == ALife::eAddonPermanent)
+	// (also for guns without a silencer addon that may take a suppressor part)
+	if (m_eSilencerStatus == ALife::eAddonAttachable || m_eSilencerStatus == ALife::eAddonPermanent ||
+		(pSettings->line_exist(section, "gs_slots") && WeaponSoundExist(section, "snd_silncer_shot")))
 	{
 		if (pSettings->line_exist(section, "silencer_flame_particles"))
 			m_sSilencerFlameParticles = pSettings->r_string(section, "silencer_flame_particles");
@@ -1574,6 +1576,25 @@ void CWeaponMagazined::InitAddons()
 		ResetSilencerKoeffs();
 
 	inherited::InitAddons();
+}
+
+void CWeaponMagazined::gs_apply_mag_size(int size, bool live)
+{
+	inherited::gs_apply_mag_size(size, live);
+	if (!live || iAmmoElapsed <= size)
+		return;
+
+	// A smaller magazine: the rounds that no longer fit go back to the inventory.
+	xr_map<shared_str, u32> back;
+	while (iAmmoElapsed > size && !m_magazine.empty())
+	{
+		back[m_magazine.back().m_ammoSect] += 1;
+		m_magazine.pop_back();
+		--iAmmoElapsed;
+	}
+	for (auto& it : back)
+		SpawnAmmo(it.second, it.first.c_str());
+	m_BriefInfo_CalcFrame = 0;
 }
 
 void CWeaponMagazined::gs_on_suppression_changed()

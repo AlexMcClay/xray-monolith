@@ -1540,7 +1540,7 @@ bool CScriptGameObject::Weapon_IsSilencerAttached()
 		                                "CWeapon : cannot access class member Weapon_IsSilencerAttached!");
 		return (false);
 	}
-	return weapon->IsSilencerAttached();
+	return weapon->IsSuppressorFitted(); // gunsmith: suppressor parts count too
 }
 
 void CScriptGameObject::AllowSprint(bool b)

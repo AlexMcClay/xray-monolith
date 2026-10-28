@@ -172,7 +172,7 @@ bool CScriptGameObject::gs_set_condition(u8 node, float value)
 	CWeapon* weapon = gs_weapon(self, "gs_get_stats");
 	if (!weapon)
 		return ::luabind::newtable(L);
-	return stats_to_lua(L, weapon, weapon->gs_stats(), weapon->IsSilencerAttached(), weapon->gs_jam_type(),
+	return stats_to_lua(L, weapon, weapon->gs_stats(), weapon->IsSuppressorFitted(), weapon->gs_jam_type(),
 	                    weapon->gs_jam_node(), weapon->IsMisfire());
 }
 
@@ -244,7 +244,7 @@ bool CScriptGameObject::gs_set_condition(u8 node, float value)
 	gunsmith::SWeaponStats stats;
 	weapon->gs_compute_stats(tree, stats);
 	const bool has_silencer = (tree.legacy_addon_flags() & gunsmith::eLegacySilencer) ||
-		(weapon->IsSilencerAttached() && !(tree.legacy_mask() & gunsmith::eLegacySilencer));
+		(weapon->IsSilencerAttached() && !(tree.legacy_mask() & gunsmith::eLegacySilencer)) || stats.suppressor_part;
 	::luabind::object result = stats_to_lua(L, weapon, stats, has_silencer, 0, 0, false);
 	result["errors"] = errors;
 	return result;

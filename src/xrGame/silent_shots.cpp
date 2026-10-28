@@ -36,7 +36,7 @@ namespace award_system
 		if (!shoot_weapon || (sender_weapon_id != shoot_weapon->ID()))
 			return;
 
-		if (shoot_weapon->IsSilencerAttached())
+		if (shoot_weapon->IsSuppressorFitted())
 		{
 			m_last_shoot_weapon = sender_weapon_id;
 			return;

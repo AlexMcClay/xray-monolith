@@ -119,6 +119,7 @@ public:
 
 	virtual void InitAddons();
 	virtual void gs_on_suppression_changed();
+	virtual void gs_apply_mag_size(int size, bool live);
 
 	virtual bool Action(u16 cmd, u32 flags);
 	bool IsAmmoAvailable();

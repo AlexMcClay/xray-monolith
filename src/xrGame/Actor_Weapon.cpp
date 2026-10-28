@@ -251,7 +251,7 @@ void CActor::HitSector(CObject* who, CObject* weapon)
 		CWeapon* pWeapon = smart_cast<CWeapon*>(weapon);
 		if (pWeapon)
 		{
-			if (pWeapon->IsSilencerAttached())
+			if (pWeapon->IsSuppressorFitted())
 			{
 				bShowHitSector = false;
 			}

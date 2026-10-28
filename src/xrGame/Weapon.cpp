@@ -615,6 +615,7 @@ void CWeapon::Load(LPCSTR section)
 
 	iAmmoElapsed = pSettings->r_s32(section, "ammo_elapsed");
 	iMagazineSize = pSettings->r_s32(section, "ammo_mag_size");
+	m_gs_base_mag_size = iMagazineSize;
 
 	////////////////////////////////////////////////////
 	// дисперсия стрельбы
@@ -1270,6 +1271,19 @@ void CWeapon::gs_rebuild_stats(bool notify)
 	const bool was_suppressed = IsSuppressed();
 	gs_compute_stats(m_gs_tree, m_gs_stats);
 
+	// Magazine parts set the magazine size; without one the weapon's own size comes back.
+	// Guns that never had one are left alone, so upgrades that change the size keep working.
+	if (m_gs_stats.mag_size >= 0 && m_gs_stats.mag_size != m_gs_applied_mag_size)
+	{
+		m_gs_applied_mag_size = m_gs_stats.mag_size;
+		gs_apply_mag_size(m_gs_stats.mag_size, notify);
+	}
+	else if (m_gs_stats.mag_size < 0 && m_gs_applied_mag_size >= 0)
+	{
+		m_gs_applied_mag_size = -1;
+		gs_apply_mag_size(m_gs_base_mag_size, notify);
+	}
+
 	if (m_gs_stats.can_fire)
 		m_gs_cant_fire_logged = false;
 	if (notify && was_suppressed != IsSuppressed())
@@ -1278,7 +1292,7 @@ void CWeapon::gs_rebuild_stats(bool notify)
 
 bool CWeapon::IsSuppressed() const
 {
-	return IsSilencerAttached() && !m_gs_stats.suppressor_worn;
+	return IsSuppressorFitted() && !m_gs_stats.suppressor_worn;
 }
 
 float CWeapon::gs_pdm_base() const

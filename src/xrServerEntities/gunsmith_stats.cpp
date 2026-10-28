@@ -59,6 +59,11 @@ namespace gunsmith
 				out.cost_add += p.cost;
 			}
 
+			if (p.suppressor)
+				out.suppressor_part = true;
+			if (p.ammo_mag_size >= 0)
+				out.mag_size = p.ammo_mag_size;
+
 			if (p.condition_dispersion_factor > 0.f)
 				out.mul[eStatFireDispersion] *= 1.f + p.condition_dispersion_factor * (1.f - condition);
 
@@ -91,6 +96,8 @@ namespace gunsmith
 		suppressor_worn = false;
 		sight_sway = 1.f;
 		can_fire = true;
+		suppressor_part = false;
+		mag_size = -1;
 	}
 
 	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out)

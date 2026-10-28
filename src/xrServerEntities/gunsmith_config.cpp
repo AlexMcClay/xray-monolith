@@ -419,6 +419,9 @@ namespace gunsmith
 				read_list(section, "blocks_slots", d.blocks_slots);
 			}
 
+			d.suppressor = exists && d.declared && !!READ_IF_EXISTS(pSettings, r_bool, section, "suppressor", FALSE);
+			d.ammo_mag_size = exists && d.declared ? READ_IF_EXISTS(pSettings, r_s32, section, "ammo_mag_size", -1) : -1;
+
 			d.wears_on_shot = k.wears_on_shot;
 			d.wear_per_shot = k.wear_per_shot;
 			d.condition_dispersion_factor = k.condition_dispersion_factor;

@@ -158,6 +158,11 @@ namespace gunsmith
 		float suppression_min_condition;
 
 		xr_vector<shared_str> blocks_slots;
+
+		// Need part_kind set:
+		bool suppressor; // `suppressor = true`: the gun is suppressed while this part is fitted and not
+						 // worn below its suppression_min_condition, as with a silencer addon
+		int ammo_mag_size; // `ammo_mag_size`: the gun's magazine size while this part is fitted, -1 if unset
 	};
 
 	const SPartData& part_data(LPCSTR section);

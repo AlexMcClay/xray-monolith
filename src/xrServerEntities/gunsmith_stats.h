@@ -34,6 +34,8 @@ namespace gunsmith
 		bool suppressor_worn; // a muzzle part is below its suppression_min_condition
 		float sight_sway; // zoomed movement sway multiplier from worn sights, 1 if none
 		bool can_fire; // every required slot is filled
+		bool suppressor_part; // a part with `suppressor = true` is fitted
+		int mag_size; // magazine size from the fitted magazine part (`ammo_mag_size`), -1 if none
 
 		SWeaponStats() { reset(); }
 		void reset();
