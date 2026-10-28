@@ -93,6 +93,11 @@ namespace gunsmith
 		// recalculated first (the model may not have been drawn), e.g. for inventory icons.
 		void layout(int ctx, IKinematics* root, xr_vector<std::pair<u8, Fmatrix>>& out);
 
+		// Appends each child's model and transform in the root model's space, children's bones
+		// recalculated, for drawing the build elsewhere (gunsmith_preview). The caller calculates
+		// the root's bones.
+		void draw_list(int ctx, IKinematics* root, xr_vector<std::pair<IRenderVisual*, Fmatrix>>& out);
+
 		bool has_children(int ctx) const { return !m_ctx[ctx].children.empty(); }
 
 	private:

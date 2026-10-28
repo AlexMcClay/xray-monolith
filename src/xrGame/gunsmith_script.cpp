@@ -5,6 +5,7 @@
 
 #include "pch_script.h"
 #include "gunsmith_script.h"
+#include "gunsmith_preview.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "../Include/xrRender/Kinematics.h"
@@ -169,6 +170,59 @@ namespace gunsmith
 		}
 		return true;
 	}
+}
+
+namespace
+{
+	::luabind::object rect_to_lua(lua_State* L, bool ok, const Frect& r)
+	{
+		if (!ok)
+			return ::luabind::object();
+		::luabind::object t = ::luabind::newtable(L);
+		t["x1"] = r.x1;
+		t["y1"] = r.y1;
+		t["x2"] = r.x2;
+		t["y2"] = r.y2;
+		return t;
+	}
+}
+
+::luabind::object gs_icon_rect_script(lua_State* L, u16 id)
+{
+	Frect r;
+	const bool ok = gunsmith::CPreview::instance().icon_rect(id, r);
+	return rect_to_lua(L, ok, r);
+}
+
+::luabind::object gs_icon_rect_section_script(lua_State* L, LPCSTR section)
+{
+	Frect r;
+	const bool ok = gunsmith::CPreview::instance().icon_rect(section, r);
+	return rect_to_lua(L, ok, r);
+}
+
+::luabind::object gs_preview_size_script(lua_State* L)
+{
+	::luabind::object t = ::luabind::newtable(L);
+	t["w"] = int(gunsmith::CPreview::VIEW_W);
+	t["h"] = int(gunsmith::CPreview::VIEW_H);
+	return t;
+}
+
+LPCSTR gs_icon_texture() { return "$user$gs_icons"; }
+LPCSTR gs_preview_texture() { return "$user$gs_view"; }
+bool gs_preview_available() { return gunsmith::CPreview::instance().available(); }
+void gs_preview_object(u16 id) { gunsmith::CPreview::instance().view_object(id); }
+void gs_preview_section(LPCSTR section) { gunsmith::CPreview::instance().view_section(section); }
+void gs_preview_clear() { gunsmith::CPreview::instance().view_clear(); }
+void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pan_y)
+{
+	gunsmith::CPreview::instance().view_camera(yaw, pitch, zoom, pan_x, pan_y);
+}
+void gs_preview_tick() { gunsmith::CPreview::instance().view_tick(); }
+bool gs_is_full_mode(LPCSTR section)
+{
+	return section && pSettings->section_exist(section) && gunsmith::is_full_mode(section);
 }
 
 ::luabind::object gs_model_bones_script(lua_State* L, LPCSTR path)

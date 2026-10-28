@@ -1,0 +1,88 @@
+////////////////////////////////////////////////////////////////////////////
+//	Module 		: gunsmith_preview.h
+//	Description : Gunsmith previews - weapons drawn with their part models into
+//	              textures that 2D UI shows (inventory icons, the workbench view)
+////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include "../xrEngine/pure.h"
+
+class CWeapon;
+class IRenderVisual;
+
+namespace gunsmith
+{
+	// Two $user$ textures, drawn by IRender_interface::PreviewRender (DX10/11 only):
+	//   $user$gs_icons  inventory icons: an atlas of side views, muzzle to the right like
+	//                   vanilla icons, one cell per build, redrawn when the build changes
+	//   $user$gs_view   the workbench view: a perspective the player orbits
+	// A live weapon is drawn from its own models; a section from its gs_default_build.
+	class CPreview : public pureRender
+	{
+	public:
+		enum
+		{
+			ICON_W = 500, // a cell: twice a 5x2 inventory icon, so the UI's filtering smooths it
+			ICON_H = 200,
+			ATLAS_W = 2048,
+			ATLAS_H = 2048,
+			VIEW_W = 1024,
+			VIEW_H = 512,
+		};
+
+		CPreview(); // use instance()
+		~CPreview();
+
+		static CPreview& instance();
+		static void destroy(); // level unload: frees the section models
+
+		// Whether previews can be drawn (DX10/11 renderer, preview shader present).
+		bool available() const;
+
+		// The icon of a weapon object, or of a section's default build: a rect in the atlas
+		// (pixels) with the section's inventory aspect. A new or changed build is drawn on the
+		// next frame. False when previews aren't available or the gun isn't gs_mode = full.
+		bool icon_rect(u16 id, Frect& rect);
+		bool icon_rect(LPCSTR section, Frect& rect);
+
+		// Workbench view: what it shows, its camera, and view_tick() every frame it is shown.
+		void view_object(u16 id);
+		void view_section(LPCSTR section);
+		void view_clear();
+		void view_camera(float yaw_deg, float pitch_deg, float zoom, float pan_x, float pan_y);
+		void view_tick();
+
+		virtual void OnRender();
+
+	private:
+		typedef xr_vector<std::pair<IRenderVisual*, Fmatrix>> DRAW_LIST;
+
+		struct SScene; // a section's default build, loaded once
+		struct SCell
+		{
+			shared_str key; // "o<id>:<build crc>" or "s<section>"
+			u16 id = u16(-1);
+			shared_str section;
+			u32 used = 0; // frame last asked for
+			u32 w = 0, h = 0; // drawn area, from the cell's top left
+			bool dirty = false;
+		};
+
+		bool icon_request(LPCSTR key, u16 id, LPCSTR section, Frect& rect);
+		bool draw_list(u16 id, LPCSTR section, DRAW_LIST& out);
+		SScene* scene(LPCSTR section);
+		void draw_icon(u32 index);
+		void draw_view();
+
+		xr_vector<SCell> m_cells;
+		xr_map<shared_str, SScene*> m_scenes;
+		bool m_failed = false;
+
+		u16 m_view_id = u16(-1);
+		shared_str m_view_section;
+		u32 m_view_tick = 0;
+		float m_yaw = 0.f, m_pitch = 10.f, m_zoom = 1.f, m_pan_x = 0.f, m_pan_y = 0.f;
+		Fmatrix m_view_view, m_view_proj; // of the last view drawn, for projecting slot points
+	};
+}

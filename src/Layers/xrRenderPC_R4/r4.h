@@ -441,6 +441,9 @@ public:
 	virtual void rmNormal();
 	virtual u32 active_phase() { return phase; }; //Swartz: actor shadow
 	void RenderToTarget(RRT target) override;
+	bool PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const Fmatrix& view,
+					   const Fmatrix& proj, IRenderVisual* const* visuals, const Fmatrix* xforms, u32 count) override;
+	void PreviewRelease(); // dx10PreviewRender.cpp
 	// Constructor/destructor/loader
 	CRender();
 	virtual ~CRender();

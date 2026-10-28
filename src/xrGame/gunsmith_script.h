@@ -44,3 +44,21 @@ class CScriptGameObject;
 // the file is missing or not skeletal. Loads the model as a world model, so don't pass a
 // first-person (hud_visual) path: a model's HUD shaders are fixed when its path first loads.
 ::luabind::object gs_model_bones_script(lua_State* L, LPCSTR path);
+
+// Previews (gunsmith_preview.h): inventory icons and the workbench view.
+//   gunsmith.icon_rect(id) / icon_rect_section(section)  {x1, y1, x2, y2} in icon_texture(), or nil
+//   gunsmith.preview_object(id) / preview_section(section) / preview_clear()
+//   gunsmith.preview_camera(yaw, pitch, zoom, pan_x, pan_y), preview_tick() every frame shown
+//   gunsmith.preview_texture(), preview_size() -> {w, h}, preview_available()
+::luabind::object gs_icon_rect_script(lua_State* L, u16 id);
+::luabind::object gs_icon_rect_section_script(lua_State* L, LPCSTR section);
+::luabind::object gs_preview_size_script(lua_State* L);
+LPCSTR gs_icon_texture();
+LPCSTR gs_preview_texture();
+bool gs_preview_available();
+void gs_preview_object(u16 id);
+void gs_preview_section(LPCSTR section);
+void gs_preview_clear();
+void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pan_y);
+void gs_preview_tick();
+bool gs_is_full_mode(LPCSTR section);

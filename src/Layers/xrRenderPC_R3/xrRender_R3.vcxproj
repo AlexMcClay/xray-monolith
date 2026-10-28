@@ -521,6 +521,7 @@
     <ClCompile Include="..\xrRenderDX10\dx10r_constants.cpp" />
     <ClCompile Include="..\xrRenderDX10\dx10r_constants_cache.cpp" />
     <ClCompile Include="..\xrRenderDX10\dx10SH_RT.cpp" />
+    <ClCompile Include="..\xrRenderDX10\dx10PreviewRender.cpp" />
     <ClCompile Include="..\xrRenderDX10\dx10SH_Texture.cpp" />
     <ClCompile Include="..\xrRenderDX10\dx10StateUtils.cpp" />
     <ClCompile Include="..\xrRenderDX10\dx10Texture.cpp" />

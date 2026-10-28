@@ -486,6 +486,7 @@ void CRender::create()
 void CRender::destroy()
 {
 	m_bMakeAsyncSS = false;
+	PreviewRelease();
 	FluidManager.Destroy();
 	::PortalTraverser.destroy();
 	//_RELEASE					(q_sync_point[1]);

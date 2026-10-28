@@ -49,6 +49,7 @@
 #include "character_hit_animations_params.h"
 #include "inventory_upgrade_manager.h"
 #include "Weapon.h"
+extern int g_gs_preview_debug; // gunsmith_preview.cpp
 #include "player_hud.h"
 #include "ActorEffector.h"
 #include "inventory.h"
@@ -2638,6 +2639,7 @@ void CCC_RegisterCommands()
 	CMD1(CCC_GsDumpTree, "gs_dump_tree");
 	CMD1(CCC_GsAimEye, "gs_aim_eye");
 	CMD4(CCC_Integer, "gs_aim_debug", &g_gs_aim_debug, 0, 1);
+	CMD4(CCC_Integer, "gs_preview_debug", &g_gs_preview_debug, 0, 1);
 	CMD1(CCC_GsSetCondition, "gs_set_condition");
 	CMD1(CCC_GsSetPart, "gs_set_part");
 #ifdef DEBUG
