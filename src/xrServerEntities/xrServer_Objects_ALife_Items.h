@@ -14,6 +14,7 @@
 
 #include "character_info_defs.h"
 #include "infoportiondefs.h"
+#include "gunsmith_tree.h"
 
 #pragma warning(push)
 #pragma warning(disable:4005)
@@ -185,6 +186,14 @@ SERVER_ENTITY_DECLARE_BEGIN(CSE_ALifeItemWeapon, CSE_ALifeItem)
 	u8 m_bZoom;
 	u32 m_ef_main_weapon_type;
 	u32 m_ef_weapon_type;
+
+	// Gunsmith part tree, saved after the legacy fields (SPAWN_VERSION > 128).
+	// m_addon_flags stays as a cache of the tree's legacy slots.
+	gunsmith::CTree m_gs_tree;
+
+	// Builds the tree from the addon flags if it is empty, otherwise brings its
+	// legacy slots in line with the flags. Keeps the receiver's condition current.
+	void gs_ensure_tree();
 
 	CSE_ALifeItemWeapon(LPCSTR caSection);
 	virtual ~CSE_ALifeItemWeapon();

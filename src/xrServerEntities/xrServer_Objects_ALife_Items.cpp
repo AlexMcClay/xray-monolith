@@ -548,6 +548,20 @@ void CSE_ALifeItemWeapon::UPDATE_Read(NET_Packet& tNetPacket)
 void CSE_ALifeItemWeapon::clone_addons(CSE_ALifeItemWeapon* parent)
 {
 	m_addon_flags = parent->m_addon_flags;
+	m_gs_tree = parent->m_gs_tree;
+	// The clone may be a different weapon section: re-root the tree and drop parts that no longer fit.
+	m_gs_tree.validate(*s_name);
+}
+
+void CSE_ALifeItemWeapon::gs_ensure_tree()
+{
+	if (m_gs_tree.empty())
+		m_gs_tree.build_default(*s_name, m_addon_flags.get(), m_fCondition);
+	else
+		m_gs_tree.sync_legacy_flags(m_addon_flags.get(), m_fCondition);
+
+	// The receiver is the gun: its condition is the weapon's condition.
+	m_gs_tree.set_condition(0, m_fCondition);
 }
 
 void CSE_ALifeItemWeapon::UPDATE_Write(NET_Packet& tNetPacket)
@@ -578,6 +592,25 @@ void CSE_ALifeItemWeapon::STATE_Read(NET_Packet& tNetPacket, u16 size)
 
 	if (m_wVersion > 122)
 		a_elapsed_grenades.unpack_from_byte(tNetPacket.r_u8());
+
+	// Gunsmith part tree. Older packets, and hand-built script packets that stop
+	// after the grenades byte, have none: the tree is then built from the addon
+	// flags on the next write or spawn.
+	if (m_wVersion > 128 && !tNetPacket.r_eof())
+	{
+		gunsmith::CTree tree;
+		if (tree.read(tNetPacket))
+		{
+			m_gs_tree = tree;
+			m_gs_tree.validate(*s_name);
+			m_gs_tree.set_condition(0, m_fCondition);
+
+			// Flags the tree has slots for follow the tree (a part whose pack was
+			// removed clears its flag). Other flags are kept as saved.
+			const u8 mask = m_gs_tree.legacy_mask();
+			m_addon_flags.flags = u8((m_addon_flags.flags & ~mask) | (m_gs_tree.legacy_addon_flags() & mask));
+		}
+	}
 }
 
 void CSE_ALifeItemWeapon::STATE_Write(NET_Packet& tNetPacket)
@@ -589,6 +622,9 @@ void CSE_ALifeItemWeapon::STATE_Write(NET_Packet& tNetPacket)
 	tNetPacket.w_u8(m_addon_flags.get());
 	tNetPacket.w_u8(ammo_type);
 	tNetPacket.w_u8(a_elapsed_grenades.pack_to_byte());
+
+	gs_ensure_tree();
+	m_gs_tree.write(tNetPacket);
 }
 
 void CSE_ALifeItemWeapon::OnEvent(NET_Packet& tNetPacket, u16 type, u32 time, ClientID sender)
