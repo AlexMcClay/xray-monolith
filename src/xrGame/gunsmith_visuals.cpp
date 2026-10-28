@@ -274,10 +274,12 @@ namespace gunsmith
 		{
 			IKinematics* parentK = ch.parent < 0 ? root : c.children[ch.parent].K;
 			Fmatrix t;
+			// Model space, following the bone's motion: LL_GetTransform_R is the bone's pose times its
+			// inverse bind pose, so mounts don't depend on how the bone itself is oriented at rest.
 			if (ch.parent < 0)
-				t.set(parentK->LL_GetTransform(ch.mount_bone));
+				t.set(parentK->LL_GetTransform_R(ch.mount_bone));
 			else
-				t.mul_43(c.children[ch.parent].local, parentK->LL_GetTransform(ch.mount_bone));
+				t.mul_43(c.children[ch.parent].local, parentK->LL_GetTransform_R(ch.mount_bone));
 			ch.local.mul_43(t, ch.mount);
 		}
 	}
@@ -316,7 +318,7 @@ namespace gunsmith
 			return false;
 		update_local(c, root);
 		Fvector p;
-		muzzle->K->LL_GetTransform(muzzle->fire_bone).transform_tiny(p, muzzle->pv->fire_point);
+		muzzle->K->LL_GetTransform_R(muzzle->fire_bone).transform_tiny(p, muzzle->pv->fire_point);
 		muzzle->local.transform_tiny(p);
 		root_xform.transform_tiny(pos, p);
 		return true;
@@ -336,8 +338,8 @@ namespace gunsmith
 		update_local(c, root);
 
 		Fvector receiver_aim, sight_aim;
-		root->LL_GetTransform(c.root_aim_bone).transform_tiny(receiver_aim, c.root_aim);
-		sight->K->LL_GetTransform(sight->aim_bone).transform_tiny(sight_aim, sight->pv->aim_point);
+		root->LL_GetTransform_R(c.root_aim_bone).transform_tiny(receiver_aim, c.root_aim);
+		sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(sight_aim, sight->pv->aim_point);
 		sight->local.transform_tiny(sight_aim);
 		delta.sub(receiver_aim, sight_aim);
 		return true;

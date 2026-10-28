@@ -16,10 +16,12 @@ namespace gunsmith
 	// Visual keys of a part section, cached per section.
 	//   visual, hud_visual                 model paths without .ogf (world, first person)
 	//   mount_offset_pos, mount_offset_rot applied after the mount (metres; degrees H,P,B)
-	//   aim_bone, aim_point                the part is a sight: the point (in that bone's space,
-	//                                      default the root bone) the eye lines up with when aiming
+	//   aim_bone, aim_point                the part is a sight: the point the eye lines up with when
+	//                                      aiming (model space, moving with that bone, default the root)
 	//   fire_bone, fire_point              the part is on the muzzle chain: shots and flash start
 	//                                      there when it is the last such part in the tree
+	// All positions are in the model's own space (as exported) and follow the named bone's
+	// motion; how a bone is oriented at rest doesn't matter.
 	struct SPartVisual
 	{
 		shared_str visual, hud_visual;
@@ -35,9 +37,9 @@ namespace gunsmith
 	const SPartVisual& part_visual(LPCSTR section);
 
 	// A virtual mount on a model that has no bone of that name, from keys on `section`:
-	//   gs_mount_<name>_pos, gs_mount_<name>_rot   relative to the bone below (metres; degrees H,P,B)
-	//   gs_mount_<name>_bone                        bone it follows (default the root bone), e.g. the
-	//                                               magazine bone an animation moves
+	//   gs_mount_<name>_pos, gs_mount_<name>_rot   in the model's space (metres; degrees H,P,B)
+	//   gs_mount_<name>_bone                        bone whose motion it follows (default the root
+	//                                               bone), e.g. the magazine bone an animation moves
 	//   gs_mount_<name>_scale                       uniform scale for the part and everything on it
 	//                                               (default 1), for HUD models not at true scale
 	// False when the section has neither pos nor rot.
