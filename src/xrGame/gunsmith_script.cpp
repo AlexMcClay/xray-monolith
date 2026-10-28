@@ -7,6 +7,8 @@
 #include "gunsmith_script.h"
 #include "ai_space.h"
 #include "script_engine.h"
+#include "../Include/xrRender/Kinematics.h"
+#include "../Include/xrRender/RenderVisual.h"
 
 namespace gunsmith
 {
@@ -167,4 +169,27 @@ namespace gunsmith
 		}
 		return true;
 	}
+}
+
+::luabind::object gs_model_bones_script(lua_State* L, LPCSTR path)
+{
+	if (!path || !*path)
+		return ::luabind::object();
+	string_path fn;
+	xr_strconcat(fn, path, ".ogf");
+	if (!FS.exist("$game_meshes$", fn))
+		return ::luabind::object();
+
+	IRenderVisual* visual = ::Render->model_Create(path);
+	IKinematics* K = visual ? visual->dcast_PKinematics() : nullptr;
+	::luabind::object result;
+	if (K)
+	{
+		result = ::luabind::newtable(L);
+		for (u16 i = 0; i < K->LL_BoneCount(); ++i)
+			result[i + 1] = K->LL_BoneName_dbg(i);
+	}
+	if (visual)
+		::Render->model_Delete(visual);
+	return result;
 }

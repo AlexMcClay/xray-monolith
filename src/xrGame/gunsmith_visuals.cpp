@@ -80,16 +80,27 @@ namespace gunsmith
 		return cache.insert(mk_pair(key, v)).first->second;
 	}
 
-	bool read_virtual_mount(LPCSTR section, LPCSTR name, Fmatrix& out)
+	bool read_virtual_mount(LPCSTR section, LPCSTR name, Fmatrix& out, shared_str* bone)
 	{
 		if (!section || !name || !pSettings->section_exist(section))
 			return false;
-		string256 pos_key, rot_key;
+		string256 pos_key, rot_key, bone_key, scale_key;
 		xr_sprintf(pos_key, "gs_mount_%s_pos", name);
 		xr_sprintf(rot_key, "gs_mount_%s_rot", name);
+		xr_sprintf(bone_key, "gs_mount_%s_bone", name);
+		xr_sprintf(scale_key, "gs_mount_%s_scale", name);
 		if (!pSettings->line_exist(section, pos_key) && !pSettings->line_exist(section, rot_key))
 			return false;
 		out = make_xform(read_vec(section, pos_key), read_vec(section, rot_key));
+		const float scale = READ_IF_EXISTS(pSettings, r_float, section, scale_key, 1.f);
+		if (!fsimilar(scale, 1.f))
+		{
+			Fmatrix s;
+			s.scale(scale, scale, scale);
+			out.mulB_43(s);
+		}
+		if (bone)
+			*bone = read_str(section, bone_key);
 		return true;
 	}
 
@@ -198,11 +209,16 @@ namespace gunsmith
 			{
 				const bool on_receiver = n.parent == 0;
 				LPCSTR owner = on_receiver ? receiver : tree.node(n.parent).section.c_str();
-				const bool found = (on_receiver && ctx == eHud && read_virtual_mount(hud_sect, slot.mount_bone.c_str(), mount)) ||
-					read_virtual_mount(owner, slot.mount_bone.c_str(), mount);
+				shared_str follow;
+				const bool found = (on_receiver && ctx == eHud && read_virtual_mount(hud_sect, slot.mount_bone.c_str(), mount, &follow)) ||
+					read_virtual_mount(owner, slot.mount_bone.c_str(), mount, &follow);
 				if (!found)
 					warn_once(owner, "has no mount bone or gs_mount_<name>_pos for", slot.mount_bone.c_str());
-				bone = parentK->LL_GetBoneRoot();
+				bone = follow.size() ? parentK->LL_BoneID(follow) : BI_NONE;
+				if (follow.size() && bone == BI_NONE)
+					warn_once(owner, "has no bone for gs_mount_<name>_bone", follow.c_str());
+				if (bone == BI_NONE)
+					bone = parentK->LL_GetBoneRoot();
 			}
 
 			const bool was_hud = ::Render->hud_loading;

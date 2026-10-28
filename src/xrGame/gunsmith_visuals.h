@@ -34,10 +34,14 @@ namespace gunsmith
 
 	const SPartVisual& part_visual(LPCSTR section);
 
-	// A virtual mount on a model that has no bone of that name:
-	// gs_mount_<name>_pos / gs_mount_<name>_rot on `section`, relative to the model's root bone.
-	// False when the section has neither key.
-	bool read_virtual_mount(LPCSTR section, LPCSTR name, Fmatrix& out);
+	// A virtual mount on a model that has no bone of that name, from keys on `section`:
+	//   gs_mount_<name>_pos, gs_mount_<name>_rot   relative to the bone below (metres; degrees H,P,B)
+	//   gs_mount_<name>_bone                        bone it follows (default the root bone), e.g. the
+	//                                               magazine bone an animation moves
+	//   gs_mount_<name>_scale                       uniform scale for the part and everything on it
+	//                                               (default 1), for HUD models not at true scale
+	// False when the section has neither pos nor rot.
+	bool read_virtual_mount(LPCSTR section, LPCSTR name, Fmatrix& out, shared_str* bone = nullptr);
 
 	// Whether a slot's mount resolves on a model: a real bone, or a virtual mount on one of
 	// the sections (either may be null).

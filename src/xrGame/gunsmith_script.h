@@ -38,3 +38,8 @@ class CScriptGameObject;
 ::luabind::object gs_preview_stats_script(lua_State* L, CScriptGameObject* self, ::luabind::object changes);
 ::luabind::object gs_detach_script(lua_State* L, CScriptGameObject* self, u8 node);
 ::luabind::object gs_detach_spawn_script(lua_State* L, CScriptGameObject* self, u8 node, bool spawn);
+
+// gunsmith.model_bones(path): the bone names of a model (path without .ogf), or nil when
+// the file is missing or not skeletal. Loads the model as a world model, so don't pass a
+// first-person (hud_visual) path: a model's HUD shaders are fixed when its path first loads.
+::luabind::object gs_model_bones_script(lua_State* L, LPCSTR path);

@@ -7,6 +7,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "pch_script.h"
+#include "gunsmith_script.h"
 #include "level.h"
 #include "actor.h"
 #include "script_game_object.h"
@@ -2930,6 +2931,11 @@ void CLevel::script_register(lua_State* L)
 		def("set_vector", hud_adj_offs),
 		def("set_value", hud_adj_value),
 		def("remove_hud_model", remove_hud_model)
+	];
+
+	module(L, "gunsmith")
+		[
+		def("model_bones", &gs_model_bones_script, raw<1>())
 	];
 
 	module(L, "relation_registry")
