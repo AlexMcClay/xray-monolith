@@ -1194,8 +1194,12 @@ void CWeapon::gs_sync_to_server()
 
 void CWeapon::gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition)
 {
-	// Phase 1 note: on detach, the spawned addon item keeps its section's default
-	// condition; copying the node's condition onto it comes with the Lua gs_detach.
+	// On detach, the item CInventoryItem::Detach spawns next takes the part's condition.
+	if (!part || !*part)
+	{
+		const int node = m_gs_tree.find_legacy(legacy_addon);
+		m_detach_condition = node >= 0 ? m_gs_tree.node(u8(node)).condition : -1.f;
+	}
 	m_gs_tree.set_legacy_addon(legacy_addon, part, condition);
 	gs_sync_to_server();
 	gs_rebuild_stats(false); // callers run InitAddons next

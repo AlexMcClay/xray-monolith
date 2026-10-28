@@ -294,6 +294,9 @@ void CInventoryItem::OnEvent(NET_Packet& P, u16 type)
 //объекте, поэтому функция должна быть переопределена
 bool CInventoryItem::Detach(const char* item_section_name, bool b_spawn_item)
 {
+	const float detach_condition = m_detach_condition;
+	m_detach_condition = -1.f;
+
 	if (OnClient()) return true;
 	if (b_spawn_item)
 	{
@@ -327,6 +330,10 @@ bool CInventoryItem::Detach(const char* item_section_name, bool b_spawn_item)
 		D->o_Position = object().Position();
 		D->s_flags.assign(M_SPAWN_OBJECT_LOCAL);
 		D->RespawnTime = 0;
+		// Gunsmith: the detached part keeps the condition it had on the weapon.
+		if (detach_condition >= 0.f)
+			if (CSE_ALifeInventoryItem* item = smart_cast<CSE_ALifeInventoryItem*>(D))
+				item->m_fCondition = _min(detach_condition, 1.f);
 		// Send
 		NET_Packet P;
 		D->Spawn_Write(P,TRUE);

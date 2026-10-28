@@ -214,6 +214,9 @@ protected:
 	float m_weight;
 	float m_fCondition;
 	shared_str m_Description;
+	// Condition for the item the next Detach spawns (gunsmith: the detached part's
+	// condition). Negative: the item keeps its section default. Reset by Detach.
+	float m_detach_condition = -1.f;
 protected:
 	ALife::_TIME_ID m_dwItemIndependencyTime;
 
