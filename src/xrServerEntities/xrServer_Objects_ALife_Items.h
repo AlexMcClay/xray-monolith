@@ -195,6 +195,10 @@ SERVER_ENTITY_DECLARE_BEGIN(CSE_ALifeItemWeapon, CSE_ALifeItem)
 	// legacy slots in line with the flags. Keeps the receiver's condition current.
 	void gs_ensure_tree();
 
+	// Installs a tree (from a save or a script): validates it against this weapon's
+	// section, sets the receiver's condition, and makes the addon flags follow it.
+	void gs_set_tree(const gunsmith::CTree& tree);
+
 	CSE_ALifeItemWeapon(LPCSTR caSection);
 	virtual ~CSE_ALifeItemWeapon();
 	virtual void OnEvent(NET_Packet& P, u16 type, u32 time, ClientID sender);

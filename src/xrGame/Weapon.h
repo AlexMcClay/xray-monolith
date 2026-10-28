@@ -380,6 +380,32 @@ public:
 	bool gs_debug_set_part(u8 parent, u8 slot, LPCSTR section);
 	void gs_dump_stats() const;
 
+	// Lua API support (script_game_object_gunsmith.cpp).
+	// Why `section` can't go into `slot` of node `parent` of `tree`, or "" when it can.
+	// In an addon slot only what this weapon's addon code accepts fits, unless
+	// `preview` (stats only), where any old-style addon of that type fits.
+	LPCSTR gs_check_place(const gunsmith::CTree& tree, LPCSTR section, u8 parent, u8 slot, bool preview) const;
+	// Puts a part into a free non-addon slot and fires on_gs_part_attached.
+	bool gs_attach_part(LPCSTR section, u8 parent, u8 slot, float condition);
+	// Removes a part and its children. With `spawn`, each comes back as an inventory
+	// item with its condition; `item_id` is the first one, or 0xffff.
+	bool gs_detach_part(u8 node, bool spawn, u16& item_id);
+	// Spawns a part section as an item next to (or in the inventory of) the weapon's
+	// owner, with the given condition. Returns its id, or 0xffff.
+	u16 gs_spawn_part_item(LPCSTR section, float condition);
+	// Stats a tree would give this weapon (the live tree, or a preview copy).
+	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out) const;
+	// One stat in display units (degrees for angles, rounds per minute for rpm):
+	// the weapon's own value, the parts' add, and the effective value.
+	void gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float& base, float& add, float& value) const;
+
+protected:
+	bool m_gs_api_detach = false; // gs_detach_part fires the detach callback itself
+	bool gs_legacy_accepts(u8 legacy_addon, LPCSTR section) const;
+	void gs_callback_attached(u8 node, LPCSTR section);
+	void gs_callback_detached(LPCSTR section, int item_id);
+	void gs_callback_failed(u8 node, u8 failure);
+
 protected:
 	gunsmith::CTree m_gs_tree;
 	gunsmith::SWeaponStats m_gs_stats;

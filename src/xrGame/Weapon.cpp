@@ -41,6 +41,8 @@
 #include "ai/stalker/ai_stalker.h"
 #include "xrServer.h"
 #include "game_sv_base.h"
+#include "alife_simulator.h"
+#include "xrMessages.h"
 
 #define WEAPON_REMOVE_TIME		60000
 #define ROTATION_TIME			0.25f
@@ -1194,29 +1196,43 @@ void CWeapon::gs_sync_to_server()
 
 void CWeapon::gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition)
 {
-	// On detach, the item CInventoryItem::Detach spawns next takes the part's condition.
-	if (!part || !*part)
+	const bool detach = !part || !*part;
+	shared_str detached_section;
+	if (detach)
 	{
+		// The item CInventoryItem::Detach spawns next takes the part's condition.
 		const int node = m_gs_tree.find_legacy(legacy_addon);
 		m_detach_condition = node >= 0 ? m_gs_tree.node(u8(node)).condition : -1.f;
+		if (node >= 0)
+			detached_section = m_gs_tree.node(u8(node)).section;
 	}
 	m_gs_tree.set_legacy_addon(legacy_addon, part, condition);
 	gs_sync_to_server();
 	gs_rebuild_stats(false); // callers run InitAddons next
+
+	if (detach)
+	{
+		// The item spawns asynchronously here, so its id isn't known (-1).
+		if (detached_section.size() && !m_gs_api_detach)
+			gs_callback_detached(detached_section.c_str(), -1);
+	}
+	else
+	{
+		const int node = m_gs_tree.find_legacy(legacy_addon);
+		if (node >= 0)
+			gs_callback_attached(u8(node), part);
+	}
 }
 
-void CWeapon::gs_rebuild_stats(bool notify)
+void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out) const
 {
-	if (!m_gs_tree.empty())
-		m_gs_tree.set_condition(0, GetCondition()); // the receiver is the gun
-
 	// Attached old-style addons the tree has no slot for (e.g. made attachable by
 	// an upgrade) still count, as they did before the tree.
 	xr_vector<gunsmith::SExtraPart> extra;
-	const u8 tree_flags = m_gs_tree.legacy_addon_flags();
+	const u8 mask = tree.legacy_mask();
 	auto add_extra = [&](u8 addon, ALife::EWeaponAddonStatus status, const shared_str& section)
 	{
-		if (status == ALife::eAddonAttachable && (m_flagsAddOnState & addon) && !(tree_flags & addon) && section.size())
+		if (status == ALife::eAddonAttachable && (m_flagsAddOnState & addon) && !(mask & addon) && section.size())
 		{
 			gunsmith::SExtraPart e;
 			e.section = section;
@@ -1228,8 +1244,16 @@ void CWeapon::gs_rebuild_stats(bool notify)
 	add_extra(gunsmith::eLegacySilencer, m_eSilencerStatus, m_sSilencerName);
 	add_extra(gunsmith::eLegacyLauncher, m_eGrenadeLauncherStatus, m_sGrenadeLauncherName);
 
+	gunsmith::compute(tree, extra, out);
+}
+
+void CWeapon::gs_rebuild_stats(bool notify)
+{
+	if (!m_gs_tree.empty())
+		m_gs_tree.set_condition(0, GetCondition()); // the receiver is the gun
+
 	const bool was_suppressed = IsSuppressed();
-	gunsmith::compute(m_gs_tree, extra, m_gs_stats);
+	gs_compute_stats(m_gs_tree, m_gs_stats);
 
 	if (m_gs_stats.can_fire)
 		m_gs_cant_fire_logged = false;
@@ -1383,6 +1407,257 @@ void CWeapon::gs_dump_stats() const
 	    fOneShotTime > 0.f ? 60.f / gs_shot_time(fOneShotTime) : 0.f, fOneShotTime > 0.f ? 60.f / fOneShotTime : 0.f);
 	Msg("-   suppressed=%s jammed=%s jam=%s node=%u", IsSuppressed() ? "yes" : "no", IsMisfire() ? "yes" : "no",
 	    IsMisfire() ? gunsmith::failure_name(m_gs_jam_type) : "none", u32(m_gs_jam_node));
+}
+
+bool CWeapon::gs_legacy_accepts(u8 legacy_addon, LPCSTR section) const
+{
+	// Mirrors CWeaponMagazined::CanAttach for each addon type.
+	switch (legacy_addon)
+	{
+	case gunsmith::eLegacySilencer:
+		return m_eSilencerStatus == ALife::eAddonAttachable && !xr_strcmp(m_sSilencerName.c_str(), section);
+	case gunsmith::eLegacyLauncher:
+		return m_eGrenadeLauncherStatus == ALife::eAddonAttachable && !xr_strcmp(m_sGrenadeLauncherName.c_str(), section);
+	case gunsmith::eLegacyScope:
+		if (m_eScopeStatus != ALife::eAddonAttachable)
+			return false;
+		for (const shared_str& scope : m_scopes)
+		{
+			if (m_modular_attachments)
+			{
+				if (!xr_strcmp(scope.c_str(), section))
+					return true;
+			}
+			else if (pSettings->line_exist(scope, "scope_name") && !xr_strcmp(pSettings->r_string(scope, "scope_name"), section))
+				return true;
+		}
+		return false;
+	default:
+		return false;
+	}
+}
+
+LPCSTR CWeapon::gs_check_place(const gunsmith::CTree& tree, LPCSTR section, u8 parent, u8 slot, bool preview) const
+{
+	if (tree.empty())
+		return "no_tree";
+	if (parent >= tree.size())
+		return "no_such_node";
+	gunsmith::SLOTS slots;
+	tree.node_slots(parent, slots);
+	if (slot >= slots.size())
+		return "no_such_slot";
+	if (!section || !*section || !pSettings->section_exist(section))
+		return "no_such_section";
+	if (tree.find_in_slot(parent, slot) >= 0)
+		return "slot_taken";
+	if (tree.is_slot_blocked(slots[slot].section))
+		return "slot_blocked";
+
+	LPCSTR receiver = tree.node(0).section.c_str();
+	const u8 legacy = slots[slot].legacy_addon;
+	if (legacy != gunsmith::eLegacyNone)
+	{
+		const bool fits = preview
+			? (gunsmith::part_fits_slot(section, slots[slot], receiver, true) || gunsmith::is_legacy_part(receiver, legacy, section))
+			: gs_legacy_accepts(legacy, section);
+		if (!fits)
+			return "does_not_fit";
+	}
+	else if (!gunsmith::part_fits_slot(section, slots[slot], receiver, true))
+		return "does_not_fit";
+
+	if (tree.size() >= gunsmith::GS_MAX_NODES)
+		return "tree_full";
+	return "";
+}
+
+bool CWeapon::gs_attach_part(LPCSTR section, u8 parent, u8 slot, float condition)
+{
+	LPCSTR reason = gs_check_place(m_gs_tree, section, parent, slot, false);
+	if (*reason)
+	{
+		Msg("! [gunsmith] [%s] cannot attach [%s] to node %u slot %u: %s", cNameSect().c_str(), section ? section : "", u32(parent), u32(slot), reason);
+		return false;
+	}
+	gunsmith::SLOTS slots;
+	m_gs_tree.node_slots(parent, slots);
+	if (slots[slot].legacy_addon != gunsmith::eLegacyNone)
+	{
+		Msg("! [gunsmith] [%s] slot %u is an addon slot (%s): attach the item itself", cNameSect().c_str(), u32(slot), gunsmith::legacy_addon_name(slots[slot].legacy_addon));
+		return false;
+	}
+
+	const int node = m_gs_tree.add_node(section, parent, slot, condition);
+	if (node < 0)
+		return false;
+	gs_rebuild_stats();
+	gs_sync_to_server();
+	gs_callback_attached(u8(node), section);
+	return true;
+}
+
+u16 CWeapon::gs_spawn_part_item(LPCSTR section, float condition)
+{
+	if (!OnServer() || !ai().get_alife())
+		return u16(-1);
+	if (!pSettings->section_exist(section) || !pSettings->line_exist(section, "class"))
+		return u16(-1);
+
+	// Same as alife():create(section, ..., parent): build the server object, set its
+	// condition, then spawn it through the server so the id is known right away.
+	CALifeSimulator& alife = const_cast<CALifeSimulator&>(ai().alife());
+	const u16 parent_id = H_Parent() ? H_Parent()->ID() : u16(-1);
+	CSE_Abstract* item = alife.spawn_item(section, Position(), ai_location().level_vertex_id(),
+	                                      ai_location().game_vertex_id(), parent_id, false);
+	if (!item)
+		return u16(-1);
+	if (CSE_ALifeInventoryItem* inv = smart_cast<CSE_ALifeInventoryItem*>(item))
+		inv->m_fCondition = clampr(condition, 0.f, 1.f);
+
+	NET_Packet packet;
+	packet.w_begin(M_SPAWN);
+	packet.w_stringZ(item->s_name);
+	item->Spawn_Write(packet, FALSE);
+	alife.server().FreeID(item->ID, 0);
+	F_entity_Destroy(item);
+
+	ClientID clientID;
+	clientID.set(0xffff);
+	u16 dummy;
+	packet.r_begin(dummy);
+	CSE_Abstract* spawned = alife.server().Process_spawn(packet, clientID);
+	return spawned ? spawned->ID : u16(-1);
+}
+
+bool CWeapon::gs_detach_part(u8 node, bool spawn, u16& item_id)
+{
+	item_id = u16(-1);
+	if (node == 0 || node >= m_gs_tree.size())
+	{
+		Msg("! [gunsmith] [%s] gs_detach: there is no part node %u", cNameSect().c_str(), u32(node));
+		return false;
+	}
+
+	// The part and everything mounted on it, in tree order (parents come first).
+	struct SRemoved
+	{
+		shared_str section;
+		float condition;
+	};
+	xr_vector<SRemoved> removed;
+	xr_vector<u8> in_subtree;
+	in_subtree.resize(m_gs_tree.size(), 0);
+	for (u32 i = node; i < m_gs_tree.size(); ++i)
+	{
+		const gunsmith::SNode& n = m_gs_tree.node(u8(i));
+		in_subtree[i] = u8(i == node || in_subtree[n.parent]);
+		if (in_subtree[i])
+			removed.push_back({ n.section, n.condition });
+	}
+
+	if (spawn)
+		for (const SRemoved& r : removed)
+			if (!pSettings->line_exist(r.section, "class"))
+			{
+				Msg("! [gunsmith] [%s] gs_detach: [%s] is not an inventory item; detach with spawn = false to discard it", cNameSect().c_str(), r.section.c_str());
+				return false;
+			}
+
+	const u8 legacy = m_gs_tree.node_legacy_addon(node);
+	if (legacy != gunsmith::eLegacyNone)
+	{
+		// Old-style addon: the weapon's own detach code clears the flag, visuals and
+		// stats; the item is spawned below so its id is known.
+		m_gs_api_detach = true;
+		Detach(removed[0].section.c_str(), false);
+		m_gs_api_detach = false;
+		if (m_gs_tree.find_legacy(legacy) >= 0)
+		{
+			Msg("! [gunsmith] [%s] gs_detach: the weapon refused to detach [%s]", cNameSect().c_str(), removed[0].section.c_str());
+			return false;
+		}
+	}
+	else
+	{
+		m_gs_tree.remove_subtree(node);
+		gs_rebuild_stats();
+		gs_sync_to_server();
+	}
+
+	for (const SRemoved& r : removed)
+	{
+		const u16 id = spawn ? gs_spawn_part_item(r.section.c_str(), r.condition) : u16(-1);
+		if (item_id == u16(-1))
+			item_id = id;
+		gs_callback_detached(r.section.c_str(), id == u16(-1) ? -1 : int(id));
+	}
+	return true;
+}
+
+void CWeapon::gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float& base, float& add, float& value) const
+{
+	float b = 0.f;
+	bool angle = false;
+	switch (stat)
+	{
+	case gunsmith::eStatFireDispersion: b = fireDispersionBase; angle = true; break;
+	case gunsmith::eStatCamDispersion: b = cam_recoil.Dispersion; angle = true; break;
+	case gunsmith::eStatCamDispersionInc: b = cam_recoil.DispersionInc; angle = true; break;
+	case gunsmith::eStatCamHorz: b = cam_recoil.StepAngleHorz; angle = true; break;
+	case gunsmith::eStatHitPower: b = fvHitPower[g_SingleGameDifficulty]; break;
+	case gunsmith::eStatHitImpulse: b = fHitImpulse; break;
+	case gunsmith::eStatBulletSpeed: b = m_fStartBulletSpeed; break;
+	case gunsmith::eStatRpm: b = fOneShotTime > 0.f ? 60.f / fOneShotTime : 0.f; break;
+	case gunsmith::eStatPdmBase: b = m_pdm.m_fPDM_disp_base; break;
+	case gunsmith::eStatPdmAccel: b = m_pdm.m_fPDM_disp_accel_factor; break;
+	case gunsmith::eStatPdmVel: b = m_pdm.m_fPDM_disp_vel_factor; break;
+	case gunsmith::eStatCrosshairInertion: b = m_crosshair_inertion; break;
+	case gunsmith::eStatZoomRotateTime: b = m_zoom_params.m_fZoomRotateTime; break;
+	case gunsmith::eStatConditionShotDec: b = conditionDecreasePerShot; break;
+	case gunsmith::eStatErgonomics: b = READ_IF_EXISTS(pSettings, r_float, cNameSect(), "ergonomics", gunsmith::settings().ergo_base); break;
+	default: break;
+	}
+
+	float v;
+	if (stat == gunsmith::eStatCamHorz)
+		v = b * stats.mul[stat]; // horizontal recoil only uses the multiplier
+	else if (stat == gunsmith::eStatErgonomics)
+		v = stats.ergonomics;
+	else
+		v = stats.apply(stat, b);
+	float a = stat < gunsmith::eStatCount ? stats.add[stat] : 0.f;
+
+	if (angle)
+	{
+		b = rad2deg(b);
+		v = rad2deg(v);
+		a = rad2deg(a);
+	}
+	base = b;
+	add = a;
+	value = v;
+}
+
+void CWeapon::gs_callback_attached(u8 node, LPCSTR section)
+{
+	::luabind::functor<void> funct;
+	if (ai().script_engine().functor("_G.CWeapon_gs_part_attached", funct))
+		funct(lua_game_object(), int(node), section);
+}
+
+void CWeapon::gs_callback_detached(LPCSTR section, int item_id)
+{
+	::luabind::functor<void> funct;
+	if (ai().script_engine().functor("_G.CWeapon_gs_part_detached", funct))
+		funct(lua_game_object(), section, item_id);
+}
+
+void CWeapon::gs_callback_failed(u8 node, u8 failure)
+{
+	::luabind::functor<void> funct;
+	if (ai().script_engine().functor("_G.CWeapon_gs_part_failed", funct))
+		funct(lua_game_object(), int(node), gunsmith::failure_name(failure));
 }
 
 void CWeapon::gs_match_scope_part()
@@ -2105,6 +2380,7 @@ BOOL CWeapon::CheckForMisfire()
 	m_gs_jam_node = candidates[culprit].node;
 	StopShooting();
 	bMisfire = true;
+	gs_callback_failed(m_gs_jam_node, m_gs_jam_type);
 	return TRUE;
 }
 

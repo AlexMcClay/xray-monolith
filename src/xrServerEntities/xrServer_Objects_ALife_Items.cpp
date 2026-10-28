@@ -600,17 +600,20 @@ void CSE_ALifeItemWeapon::STATE_Read(NET_Packet& tNetPacket, u16 size)
 	{
 		gunsmith::CTree tree;
 		if (tree.read(tNetPacket))
-		{
-			m_gs_tree = tree;
-			m_gs_tree.validate(*s_name);
-			m_gs_tree.set_condition(0, m_fCondition);
-
-			// Flags the tree has slots for follow the tree (a part whose pack was
-			// removed clears its flag). Other flags are kept as saved.
-			const u8 mask = m_gs_tree.legacy_mask();
-			m_addon_flags.flags = u8((m_addon_flags.flags & ~mask) | (m_gs_tree.legacy_addon_flags() & mask));
-		}
+			gs_set_tree(tree);
 	}
+}
+
+void CSE_ALifeItemWeapon::gs_set_tree(const gunsmith::CTree& tree)
+{
+	m_gs_tree = tree;
+	m_gs_tree.validate(*s_name);
+	m_gs_tree.set_condition(0, m_fCondition);
+
+	// Flags the tree has slots for follow the tree (a part whose pack was
+	// removed clears its flag). Other flags are kept as they were.
+	const u8 mask = m_gs_tree.legacy_mask();
+	m_addon_flags.flags = u8((m_addon_flags.flags & ~mask) | (m_gs_tree.legacy_addon_flags() & mask));
 }
 
 void CSE_ALifeItemWeapon::STATE_Write(NET_Packet& tNetPacket)
