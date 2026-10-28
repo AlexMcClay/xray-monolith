@@ -551,6 +551,17 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		//For Weapons
 		.def("weapon_addon_attach", SAFE_WRAP(&CScriptGameObject::Weapon_AddonAttach))
 		.def("weapon_addon_detach", SAFE_WRAP(&CScriptGameObject::Weapon_AddonDetach))
+		// Gunsmith part tree
+		.def("gs_get_tree", SAFE_WRAP(&CScriptGameObject::gs_get_tree))
+		.def("gs_can_attach", SAFE_WRAP(&CScriptGameObject::gs_can_attach))
+		.def("gs_can_attach_reason", SAFE_WRAP(&CScriptGameObject::gs_can_attach_reason))
+		.def("gs_attach", SAFE_WRAP(&CScriptGameObject::gs_attach))
+		.def("gs_attach_section", SAFE_WRAP(&CScriptGameObject::gs_attach_section))
+		.def("gs_detach", SAFE_WRAP(&CScriptGameObject::gs_detach))
+		.def("gs_detach", SAFE_WRAP(&CScriptGameObject::gs_detach_spawn))
+		.def("gs_set_condition", SAFE_WRAP(&CScriptGameObject::gs_set_condition))
+		.def("gs_get_stats", SAFE_WRAP(&CScriptGameObject::gs_get_stats))
+		.def("gs_preview_stats", SAFE_WRAP(&CScriptGameObject::gs_preview_stats))
 		//For Weapon & Outfit
 		.def("install_upgrade", SAFE_WRAP(&CScriptGameObject::InstallUpgrade))
 		.def("has_upgrade", SAFE_WRAP(&CScriptGameObject::HasUpgrade))

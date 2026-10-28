@@ -1284,6 +1284,18 @@ public:
 	// demonized: get and set scope UI
 	::luabind::object get_scope_ui();
 	void set_scope_ui(LPCSTR scope_texture);
+
+	// Gunsmith part tree (script_game_object_gunsmith.cpp). Node and slot numbers are 0-based.
+	::luabind::object gs_get_tree();
+	bool gs_can_attach(LPCSTR section, u8 parent, u8 slot);
+	LPCSTR gs_can_attach_reason(LPCSTR section, u8 parent, u8 slot);
+	bool gs_attach(CScriptGameObject* part, u8 parent, u8 slot);
+	bool gs_attach_section(LPCSTR section, u8 parent, u8 slot, float condition);
+	::luabind::object gs_detach(u8 node);
+	::luabind::object gs_detach_spawn(u8 node, bool spawn);
+	bool gs_set_condition(u8 node, float value);
+	::luabind::object gs_get_stats();
+	::luabind::object gs_preview_stats(::luabind::object changes);
 #endif
 	//-Alundaio
 

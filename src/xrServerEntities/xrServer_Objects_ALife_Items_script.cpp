@@ -9,6 +9,9 @@
 #include "pch_script.h"
 #include "xrServer_Objects_ALife_Items.h"
 #include "xrServer_script_macroses.h"
+#ifdef XRGAME_EXPORTS
+#	include "gunsmith_script.h"
+#endif
 
 void add_upgrade_script(CSE_ALifeInventoryItem* ta, LPCSTR str)
 {
@@ -36,6 +39,29 @@ void set_condition_script(CSE_ALifeInventoryItem* item, float value)
 
 	item->m_fCondition = value;
 }
+
+#ifdef XRGAME_EXPORTS
+// Gunsmith: part tree access on a weapon's server object, for guns that are
+// offline (NPC loadouts, traders, stashes). Same table format as game_object:gs_get_tree.
+::luabind::object gs_get_tree_script(CSE_ALifeItemWeapon* weapon)
+{
+	weapon->gs_ensure_tree();
+	return gunsmith::tree_to_lua(weapon->m_gs_tree);
+}
+
+bool gs_set_tree_script(CSE_ALifeItemWeapon* weapon, ::luabind::object nodes)
+{
+	gunsmith::CTree tree;
+	xr_string error;
+	if (!gunsmith::tree_from_lua(nodes, weapon->s_name.c_str(), weapon->m_fCondition, tree, error))
+	{
+		Msg("! cse_alife_item_weapon:gs_set_tree [%s]: %s", weapon->s_name.c_str(), error.c_str());
+		return false;
+	}
+	weapon->gs_set_tree(tree);
+	return true;
+}
+#endif
 
 using namespace luabind;
 
@@ -99,6 +125,10 @@ void CSE_ALifeItemWeapon::script_register(lua_State* L)
 		.def("set_ammo_elapsed", &CSE_ALifeItemWeapon::set_ammo_elapsed)
 		.def("get_ammo_elapsed", &CSE_ALifeItemWeapon::get_ammo_elapsed)
 		.def("get_ammo_magsize", &CSE_ALifeItemWeapon::get_ammo_magsize)
+#ifdef XRGAME_EXPORTS
+		.def("gs_get_tree", &gs_get_tree_script)
+		.def("gs_set_tree", &gs_set_tree_script)
+#endif
 	];
 }
 

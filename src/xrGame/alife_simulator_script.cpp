@@ -22,6 +22,8 @@
 #include "game_graph.h"
 #include "level_graph.h"
 #include "game_level_cross_table.h"
+#include "xrServer_Objects_ALife_Items.h"
+#include "gunsmith_script.h"
 
 #include <luabind/iterator_policy.hpp>
 #include <luabind/iterator_pair_policy.hpp>
@@ -476,7 +478,7 @@ CSE_Abstract* try_to_clone_object(CALifeSimulator* self, CSE_Abstract* object, L
 			return (0);
 
 		clone->wpn_flags = wpnmag->wpn_flags;
-		clone->m_addon_flags = wpnmag->m_addon_flags;
+		clone->clone_addons(wpnmag); // addon flags and the gunsmith part tree
 		clone->m_fCondition = wpnmag->m_fCondition;
 		clone->ammo_type = wpnmag->ammo_type;
 		clone->m_upgrades = wpnmag->m_upgrades;
@@ -487,6 +489,63 @@ CSE_Abstract* try_to_clone_object(CALifeSimulator* self, CSE_Abstract* object, L
 	}
 
 	return (0);
+}
+
+// Gunsmith: spawns a weapon with a finished part tree (see gunsmith_script.h for the
+// build format). The tree is set before the object registers, so NPCs, traders and
+// stashes get finished guns, online or offline.
+CSE_Abstract* CALifeSimulator__create_weapon_with_build(CALifeSimulator* self, LPCSTR section, ::luabind::object build,
+                                                        const Fvector& position, u32 level_vertex_id,
+                                                        GameGraph::_GRAPH_ID game_vertex_id, ALife::_OBJECT_ID id_parent)
+{
+	THROW(self);
+	if (!section || !pSettings->section_exist(section))
+	{
+		Msg("! alife():create_weapon_with_build: section [%s] does not exist", section ? section : "");
+		return (0);
+	}
+
+	CSE_ALifeDynamicObject* parent = nullptr;
+	if (id_parent != ALife::_OBJECT_ID(-1))
+	{
+		parent = ai().alife().objects().object(id_parent, true);
+		if (!parent)
+		{
+			Msg("! alife():create_weapon_with_build: invalid parent id [%d]", id_parent);
+			return (0);
+		}
+	}
+
+	CSE_Abstract* abs = self->spawn_item(section, position, level_vertex_id, game_vertex_id, id_parent, false);
+	CSE_ALifeItemWeapon* weapon = smart_cast<CSE_ALifeItemWeapon*>(abs);
+	if (!weapon)
+	{
+		Msg("! alife():create_weapon_with_build: [%s] is not a weapon", section);
+		self->server().FreeID(abs->ID, 0);
+		F_entity_Destroy(abs);
+		return (0);
+	}
+
+	gunsmith::CTree tree;
+	xr_string error;
+	if (!gunsmith::tree_from_lua(build, section, weapon->m_fCondition, tree, error))
+	{
+		Msg("! alife():create_weapon_with_build [%s]: %s", section, error.c_str());
+		self->server().FreeID(abs->ID, 0);
+		F_entity_Destroy(abs);
+		return (0);
+	}
+	weapon->gs_set_tree(tree);
+
+	if (!parent || !parent->m_bOnline)
+	{
+		self->register_object(weapon, true);
+		return (weapon);
+	}
+
+	// Online parent: spawn through the server, as alife():create(..., parent) does.
+	// STATE_Write carries the tree across.
+	return reprocess_spawn(self, weapon);
 }
 
 void set_objects_per_update(CALifeSimulator* self, u32 count)
@@ -693,6 +752,7 @@ void CALifeSimulator::script_register(lua_State* L)
 		.def("teleport_object", &teleport_object)
 		.def("iterate_info", &IterateInfo)
 		.def("clone_weapon", &try_to_clone_object)
+		.def("create_weapon_with_build", &CALifeSimulator__create_weapon_with_build)
 		.def("register", &reprocess_spawn)
 		.def("set_objects_per_update", &set_objects_per_update)
 		.def("set_process_time", &set_process_time)
