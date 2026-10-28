@@ -311,6 +311,19 @@ namespace gunsmith
 		}
 	}
 
+	void CVisuals::layout(int ctx, IKinematics* root, xr_vector<std::pair<u8, Fmatrix>>& out)
+	{
+		out.clear();
+		SContext& c = m_ctx[ctx];
+		if (c.children.empty() || c.root != root)
+			return;
+		root->CalculateBones_Invalidate();
+		root->CalculateBones(TRUE);
+		update_local(c, root);
+		for (const SChild& ch : c.children)
+			out.push_back(std::make_pair(ch.node, ch.local));
+	}
+
 	bool CVisuals::fire_point(int ctx, IKinematics* root, const Fmatrix& root_xform, Fvector& pos)
 	{
 		SContext& c = m_ctx[ctx];

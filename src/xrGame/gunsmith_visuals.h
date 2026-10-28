@@ -89,6 +89,10 @@ namespace gunsmith
 		// when a different sight (or the same sight elsewhere) is fitted.
 		bool sight_point(IKinematics* root, Fvector& point, shared_str& key);
 
+		// Each child's tree node and transform in the root model's space, with the root's bones
+		// recalculated first (the model may not have been drawn), e.g. for inventory icons.
+		void layout(int ctx, IKinematics* root, xr_vector<std::pair<u8, Fmatrix>>& out);
+
 		bool has_children(int ctx) const { return !m_ctx[ctx].children.empty(); }
 
 	private:

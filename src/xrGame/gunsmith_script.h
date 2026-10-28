@@ -35,6 +35,7 @@ namespace gunsmith
 class CScriptGameObject;
 ::luabind::object gs_get_tree_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_get_stats_script(lua_State* L, CScriptGameObject* self);
+::luabind::object gs_part_layout_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_preview_stats_script(lua_State* L, CScriptGameObject* self, ::luabind::object changes);
 ::luabind::object gs_detach_script(lua_State* L, CScriptGameObject* self, u8 node);
 ::luabind::object gs_detach_spawn_script(lua_State* L, CScriptGameObject* self, u8 node, bool spawn);

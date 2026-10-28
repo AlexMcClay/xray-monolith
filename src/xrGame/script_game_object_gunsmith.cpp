@@ -176,6 +176,33 @@ bool CScriptGameObject::gs_set_condition(u8 node, float value)
 	                    weapon->gs_jam_node(), weapon->IsMisfire());
 }
 
+// The part models on a gs_mode = full weapon's world model: { {node, parent, section, i, j, k, c}, ... }
+// in tree order, i/j/k/c being the part model's axes and origin in the receiver model's space.
+::luabind::object gs_part_layout_script(lua_State* L, CScriptGameObject* self)
+{
+	::luabind::object t = ::luabind::newtable(L);
+	CWeapon* weapon = gs_weapon(self, "gs_part_layout");
+	if (!weapon)
+		return t;
+	xr_vector<std::pair<u8, Fmatrix>> layout;
+	weapon->gs_world_layout(layout);
+	int count = 0;
+	for (const auto& l : layout)
+	{
+		const gunsmith::SNode& n = weapon->gs_tree().node(l.first);
+		::luabind::object row = ::luabind::newtable(L);
+		row["node"] = int(l.first);
+		row["parent"] = int(n.parent);
+		row["section"] = n.section.c_str();
+		row["i"] = l.second.i;
+		row["j"] = l.second.j;
+		row["k"] = l.second.k;
+		row["c"] = l.second.c;
+		t[++count] = row;
+	}
+	return t;
+}
+
 ::luabind::object gs_preview_stats_script(lua_State* L, CScriptGameObject* self, ::luabind::object changes)
 {
 	CWeapon* weapon = gs_weapon(self, "gs_preview_stats");

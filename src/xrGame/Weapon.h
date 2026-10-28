@@ -412,6 +412,8 @@ public:
 	// slot has a mount_bone is drawn as its own model on its parent, in the world and on the HUD.
 	bool gs_full_mode() const { return m_gs_full_mode; }
 	gunsmith::CVisuals& gs_visuals() { return m_gs_visuals; }
+	// The world model's part models: tree node and transform in the receiver model's space.
+	void gs_world_layout(xr_vector<std::pair<u8, Fmatrix>>& out);
 	virtual void RenderAttachments();
 	virtual void render_hud_attachments(IKinematics* model, const Fmatrix& xform);
 	virtual bool hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos);

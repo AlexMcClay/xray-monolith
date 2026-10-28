@@ -2047,6 +2047,16 @@ void CWeapon::RenderAttachments()
 	m_gs_visuals.render(gunsmith::CVisuals::eWorld, K, XFORM());
 }
 
+void CWeapon::gs_world_layout(xr_vector<std::pair<u8, Fmatrix>>& out)
+{
+	out.clear();
+	IKinematics* K = m_gs_full_mode && Visual() ? Visual()->dcast_PKinematics() : nullptr;
+	if (!K)
+		return;
+	m_gs_visuals.ensure(gunsmith::CVisuals::eWorld, K, m_gs_tree, cNameSect().c_str(), nullptr, true);
+	m_gs_visuals.layout(gunsmith::CVisuals::eWorld, K, out);
+}
+
 void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
 {
 	if (!m_gs_full_mode || !model)
