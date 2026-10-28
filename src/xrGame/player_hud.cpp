@@ -319,6 +319,14 @@ void attachable_hud_item::setup_firedeps(firedeps& fd)
 		m_item_transform.transform_tiny(fd.vLastSP);
 		VERIFY(_valid(fd.vLastSP));
 	}
+
+	// Gunsmith: the last part on the muzzle chain moves the fire point.
+	Fvector gs_fp;
+	if (m_parent_hud_item && m_parent_hud_item->hud_fire_point(m_model, m_item_transform, gs_fp))
+	{
+		fd.vLastFP = gs_fp;
+		fd.vLastFPSilencer = gs_fp;
+	}
 }
 
 bool attachable_hud_item::need_renderable()
@@ -332,6 +340,7 @@ void attachable_hud_item::render()
 	::Render->add_Visual(m_model->dcast_RenderVisual());
 
 	m_parent_hud_item->render_hud_mode();
+	m_parent_hud_item->render_hud_attachments(m_model, m_item_transform);
 
 	if (m_parent_hud_item->has_object() && m_parent_hud_item->object().GetAttachments()->size())
 	{

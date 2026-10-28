@@ -1,0 +1,329 @@
+////////////////////////////////////////////////////////////////////////////
+//	Module 		: gunsmith_visuals.cpp
+//	Description : Gunsmith part tree - each part rendered as its own child
+//	              model, mounted on its parent's model (world and HUD)
+////////////////////////////////////////////////////////////////////////////
+
+#include "stdafx.h"
+#include "gunsmith_visuals.h"
+#include "gunsmith_config.h"
+#include "../Include/xrRender/Kinematics.h"
+#include "../Include/xrRender/KinematicsAnimated.h"
+#include "../Include/xrRender/RenderVisual.h"
+
+namespace gunsmith
+{
+	namespace
+	{
+		Fmatrix make_xform(const Fvector& pos, const Fvector& rot_deg)
+		{
+			Fvector r = rot_deg;
+			r.mul(PI / 180.f);
+			Fmatrix m;
+			m.setHPB(r.x, r.y, r.z);
+			m.translate_over(pos);
+			return m;
+		}
+
+		Fvector read_vec(LPCSTR section, LPCSTR key)
+		{
+			Fvector v;
+			v.set(0.f, 0.f, 0.f);
+			if (section && pSettings->line_exist(section, key))
+				v = pSettings->r_fvector3(section, key);
+			return v;
+		}
+
+		shared_str read_str(LPCSTR section, LPCSTR key)
+		{
+			if (section && pSettings->line_exist(section, key))
+				return pSettings->r_string(section, key);
+			return shared_str();
+		}
+
+		bool model_file_exists(const shared_str& path)
+		{
+			string_path fn;
+			xr_strconcat(fn, path.c_str(), ".ogf");
+			return !!FS.exist("$game_meshes$", fn);
+		}
+
+		// One log line per section and message.
+		void warn_once(LPCSTR section, LPCSTR what, LPCSTR name)
+		{
+			static xr_set<shared_str> warned;
+			string512 key;
+			xr_sprintf(key, "%s|%s|%s", section ? section : "", what, name ? name : "");
+			if (warned.insert(shared_str(key)).second)
+				Msg("! [gunsmith] [%s] %s [%s]", section ? section : "?", what, name ? name : "");
+		}
+	}
+
+	const SPartVisual& part_visual(LPCSTR section)
+	{
+		static xr_map<shared_str, SPartVisual> cache;
+		const shared_str key(section ? section : "");
+		auto it = cache.find(key);
+		if (it != cache.end())
+			return it->second;
+
+		SPartVisual v;
+		v.visual = read_str(section, "visual");
+		v.hud_visual = read_str(section, "hud_visual");
+		v.offset = make_xform(read_vec(section, "mount_offset_pos"), read_vec(section, "mount_offset_rot"));
+		v.has_aim = section && (pSettings->line_exist(section, "aim_bone") || pSettings->line_exist(section, "aim_point"));
+		v.aim_bone = read_str(section, "aim_bone");
+		v.aim_point = read_vec(section, "aim_point");
+		v.has_fire = section && (pSettings->line_exist(section, "fire_bone") || pSettings->line_exist(section, "fire_point"));
+		v.fire_bone = read_str(section, "fire_bone");
+		v.fire_point = read_vec(section, "fire_point");
+		return cache.insert(mk_pair(key, v)).first->second;
+	}
+
+	bool read_virtual_mount(LPCSTR section, LPCSTR name, Fmatrix& out)
+	{
+		if (!section || !name || !pSettings->section_exist(section))
+			return false;
+		string256 pos_key, rot_key;
+		xr_sprintf(pos_key, "gs_mount_%s_pos", name);
+		xr_sprintf(rot_key, "gs_mount_%s_rot", name);
+		if (!pSettings->line_exist(section, pos_key) && !pSettings->line_exist(section, rot_key))
+			return false;
+		out = make_xform(read_vec(section, pos_key), read_vec(section, rot_key));
+		return true;
+	}
+
+	bool mount_resolves(IKinematics* model, LPCSTR name, LPCSTR section, LPCSTR section2)
+	{
+		Fmatrix m;
+		if (model && model->LL_BoneID(name) != BI_NONE)
+			return true;
+		return read_virtual_mount(section, name, m) || read_virtual_mount(section2, name, m);
+	}
+
+	void CVisuals::clear()
+	{
+		clear(eWorld);
+		clear(eHud);
+	}
+
+	void CVisuals::clear(int ctx)
+	{
+		SContext& c = m_ctx[ctx];
+		for (SChild& ch : c.children)
+			if (ch.visual)
+				::Render->model_Delete(ch.visual);
+		c = SContext();
+	}
+
+	void CVisuals::ensure(int ctx, IKinematics* root, const CTree& tree, LPCSTR receiver, LPCSTR hud_sect, bool enabled)
+	{
+		SContext& c = m_ctx[ctx];
+
+		xr_vector<SSig> sig;
+		if (enabled)
+		{
+			sig.reserve(tree.size());
+			for (u32 i = 0; i < tree.size(); ++i)
+			{
+				const SNode& n = tree.node(u8(i));
+				sig.push_back({ n.section, n.parent, n.slot });
+			}
+		}
+		if (c.built && c.root == root && c.receiver == receiver && c.sig == sig)
+			return;
+
+		clear(ctx);
+		c.built = true;
+		c.root = root;
+		c.receiver = receiver;
+		c.sig.swap(sig);
+		if (!enabled || !root || tree.size() < 2)
+			return;
+
+		// The receiver's own aim point (HUD only).
+		if (ctx == eHud && hud_sect && (pSettings->line_exist(hud_sect, "gs_aim_point") || pSettings->line_exist(hud_sect, "gs_aim_bone")))
+		{
+			c.has_root_aim = true;
+			c.root_aim = read_vec(hud_sect, "gs_aim_point");
+			const shared_str bone = read_str(hud_sect, "gs_aim_bone");
+			c.root_aim_bone = bone.size() ? root->LL_BoneID(bone) : BI_NONE;
+			if (c.root_aim_bone == BI_NONE)
+			{
+				if (bone.size())
+					warn_once(hud_sect, "has no aim bone", bone.c_str());
+				c.root_aim_bone = root->LL_GetBoneRoot();
+			}
+		}
+
+		int child_of[GS_MAX_NODES];
+		for (int& v : child_of)
+			v = -1;
+
+		SLOTS slots;
+		for (u32 i = 1; i < tree.size() && i < GS_MAX_NODES; ++i)
+		{
+			const SNode& n = tree.node(u8(i));
+			const int parent_child = n.parent == 0 ? -1 : child_of[n.parent];
+			if (n.parent != 0 && parent_child < 0)
+				continue; // the parent has no model to mount on
+			IKinematics* parentK = parent_child < 0 ? root : c.children[parent_child].K;
+
+			tree.node_slots(n.parent, slots);
+			if (n.slot >= slots.size())
+				continue;
+			const SSlotInfo& slot = slots[n.slot];
+			if (!slot.mount_bone.size())
+				continue; // drawn the old way (a baked addon bone) or not at all
+
+			const SPartVisual& pv = part_visual(n.section.c_str());
+			const shared_str& path = ctx == eHud ? pv.hud_visual : pv.visual;
+			if (!path.size())
+			{
+				if (ctx == eHud)
+					warn_once(n.section.c_str(), "has no hud_visual", "");
+				continue;
+			}
+			if (!model_file_exists(path))
+			{
+				warn_once(n.section.c_str(), "model file not found", path.c_str());
+				continue;
+			}
+
+			// The mount: a bone of that name, else a virtual mount on the owner's section.
+			Fmatrix mount;
+			mount.identity();
+			u16 bone = parentK->LL_BoneID(slot.mount_bone);
+			if (bone == BI_NONE)
+			{
+				const bool on_receiver = n.parent == 0;
+				LPCSTR owner = on_receiver ? receiver : tree.node(n.parent).section.c_str();
+				const bool found = (on_receiver && ctx == eHud && read_virtual_mount(hud_sect, slot.mount_bone.c_str(), mount)) ||
+					read_virtual_mount(owner, slot.mount_bone.c_str(), mount);
+				if (!found)
+					warn_once(owner, "has no mount bone or gs_mount_<name>_pos for", slot.mount_bone.c_str());
+				bone = parentK->LL_GetBoneRoot();
+			}
+
+			const bool was_hud = ::Render->hud_loading;
+			::Render->hud_loading = ctx == eHud;
+			IRenderVisual* visual = ::Render->model_Create(path.c_str());
+			::Render->hud_loading = was_hud;
+			IKinematics* K = visual ? visual->dcast_PKinematics() : nullptr;
+			if (!K)
+			{
+				if (visual)
+					::Render->model_Delete(visual);
+				warn_once(n.section.c_str(), "model is not skeletal", path.c_str());
+				continue;
+			}
+			K->CalculateBones_Invalidate();
+			K->CalculateBones(TRUE);
+
+			SChild ch;
+			ch.node = u8(i);
+			ch.parent = parent_child;
+			ch.visual = visual;
+			ch.K = K;
+			ch.mount_bone = bone;
+			ch.mount.mul_43(mount, pv.offset);
+			ch.local.identity();
+			ch.xform.identity();
+			ch.pv = &pv;
+			ch.aim_bone = ch.fire_bone = K->LL_GetBoneRoot();
+			if (pv.aim_bone.size())
+			{
+				const u16 b = K->LL_BoneID(pv.aim_bone);
+				if (b != BI_NONE)
+					ch.aim_bone = b;
+				else
+					warn_once(n.section.c_str(), "has no aim bone", pv.aim_bone.c_str());
+			}
+			if (pv.fire_bone.size())
+			{
+				const u16 b = K->LL_BoneID(pv.fire_bone);
+				if (b != BI_NONE)
+					ch.fire_bone = b;
+				else
+					warn_once(n.section.c_str(), "has no fire bone", pv.fire_bone.c_str());
+			}
+			child_of[i] = int(c.children.size());
+			c.children.push_back(ch);
+		}
+	}
+
+	void CVisuals::update_local(SContext& c, IKinematics* root)
+	{
+		for (SChild& ch : c.children)
+		{
+			IKinematics* parentK = ch.parent < 0 ? root : c.children[ch.parent].K;
+			Fmatrix t;
+			if (ch.parent < 0)
+				t.set(parentK->LL_GetTransform(ch.mount_bone));
+			else
+				t.mul_43(c.children[ch.parent].local, parentK->LL_GetTransform(ch.mount_bone));
+			ch.local.mul_43(t, ch.mount);
+		}
+	}
+
+	void CVisuals::render(int ctx, IKinematics* root, const Fmatrix& root_xform)
+	{
+		SContext& c = m_ctx[ctx];
+		if (c.children.empty() || c.root != root)
+			return;
+		update_local(c, root);
+		for (SChild& ch : c.children)
+		{
+			IKinematicsAnimated* ka = ch.visual->dcast_PKinematicsAnimated();
+			if (ka)
+			{
+				ka->UpdateTracks();
+				ch.K->CalculateBones_Invalidate();
+				ch.K->CalculateBones(TRUE);
+			}
+			ch.xform.mul_43(root_xform, ch.local);
+			::Render->set_Transform(&ch.xform);
+			::Render->add_Visual(ch.visual);
+		}
+	}
+
+	bool CVisuals::fire_point(int ctx, IKinematics* root, const Fmatrix& root_xform, Fvector& pos)
+	{
+		SContext& c = m_ctx[ctx];
+		if (c.children.empty() || c.root != root)
+			return false;
+		const SChild* muzzle = nullptr;
+		for (const SChild& ch : c.children)
+			if (ch.pv->has_fire)
+				muzzle = &ch; // children follow their parents, so the last one ends the chain
+		if (!muzzle)
+			return false;
+		update_local(c, root);
+		Fvector p;
+		muzzle->K->LL_GetTransform(muzzle->fire_bone).transform_tiny(p, muzzle->pv->fire_point);
+		muzzle->local.transform_tiny(p);
+		root_xform.transform_tiny(pos, p);
+		return true;
+	}
+
+	bool CVisuals::aim_delta(IKinematics* root, Fvector& delta)
+	{
+		SContext& c = m_ctx[eHud];
+		if (!c.has_root_aim || c.children.empty() || c.root != root)
+			return false;
+		const SChild* sight = nullptr;
+		for (const SChild& ch : c.children)
+			if (ch.pv->has_aim)
+				sight = &ch; // the last sight in the tree: the one mounted highest up the chain
+		if (!sight)
+			return false;
+		update_local(c, root);
+
+		Fvector receiver_aim, sight_aim;
+		root->LL_GetTransform(c.root_aim_bone).transform_tiny(receiver_aim, c.root_aim);
+		sight->K->LL_GetTransform(sight->aim_bone).transform_tiny(sight_aim, sight->pv->aim_point);
+		sight->local.transform_tiny(sight_aim);
+		delta.sub(receiver_aim, sight_aim);
+		return true;
+	}
+}

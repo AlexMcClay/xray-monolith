@@ -6,6 +6,7 @@ class NET_Packet;
 class CInventoryItem;
 class CMotionDef;
 class CUIWindow;
+class IKinematics;
 
 #include "actor_defs.h"
 #include "inventory_space.h"
@@ -221,6 +222,10 @@ public:
 	virtual void render_hud_mode()
 	{
 	};
+	// Gunsmith: draws child models on the HUD model (after the HUD model itself), and
+	// gives the fire point when a part on the muzzle chain provides one.
+	virtual void render_hud_attachments(IKinematics* model, const Fmatrix& xform) {}
+	virtual bool hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos) { return false; }
 	virtual bool need_renderable() { return true; };
 
 	virtual void render_item_3d_ui();

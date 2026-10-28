@@ -17,6 +17,7 @@
 #include "NewZoomFlag.h"
 
 #include "gunsmith_stats.h"
+#include "gunsmith_visuals.h"
 
 class CEntity;
 class ENGINE_API CMotionDef;
@@ -402,6 +403,19 @@ public:
 	// One stat in display units (degrees for angles, rounds per minute for rpm):
 	// the weapon's own value, the parts' add, and the effective value.
 	void gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float& base, float& add, float& value) const;
+
+	// Part models (gunsmith_visuals.h), for receivers with gs_mode = full: every part whose
+	// slot has a mount_bone is drawn as its own model on its parent, in the world and on the HUD.
+	bool gs_full_mode() const { return m_gs_full_mode; }
+	gunsmith::CVisuals& gs_visuals() { return m_gs_visuals; }
+	virtual void RenderAttachments();
+	virtual void render_hud_attachments(IKinematics* model, const Fmatrix& xform);
+	virtual bool hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos);
+	virtual void DeleteHudItemData();
+
+protected:
+	gunsmith::CVisuals m_gs_visuals;
+	bool m_gs_full_mode = false;
 
 protected:
 	bool m_gs_api_detach = false; // gs_detach_part fires the detach callback itself

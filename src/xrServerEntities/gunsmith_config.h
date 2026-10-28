@@ -22,7 +22,8 @@ namespace gunsmith
 	// Slot section keys:
 	//   accepts         = tag, tag, ...   parts fit when their `tags` intersect this list
 	//   required        = bool            (default false) gun cannot fire with it empty (enforced from phase 2)
-	//   mount_bone      = bone            bone on the owning part's model (used from phase 6)
+	//   mount_bone      = bone            bone on the owning node's model the part mounts to, or a
+	//                                      virtual mount (gs_mount_<name>_pos/_rot on the owner's section)
 	//   field_swappable = bool            (default false) editable outside a workbench (framework UI)
 	//   legacy_addon    = scope | silencer | launcher
 	//                                      this slot stands for one of the old addon flags
@@ -34,6 +35,7 @@ namespace gunsmith
 	{
 		shared_str section;
 		xr_vector<shared_str> accepts;
+		shared_str mount_bone;
 		bool required;
 		bool field_swappable;
 		u8 legacy_addon;

@@ -284,6 +284,19 @@ void CWeapon::UpdateFireDependencies_internal()
 
 			m_current_firedeps.m_FireParticlesXForm.set(parent);
 			VERIFY(_valid(m_current_firedeps.m_FireParticlesXForm));
+
+			// Gunsmith: the last part on the muzzle chain moves the fire point.
+			IKinematics* K = m_gs_full_mode && Visual() ? Visual()->dcast_PKinematics() : nullptr;
+			if (K)
+			{
+				Fvector gs_fp;
+				m_gs_visuals.ensure(gunsmith::CVisuals::eWorld, K, m_gs_tree, cNameSect().c_str(), nullptr, true);
+				if (m_gs_visuals.fire_point(gunsmith::CVisuals::eWorld, K, parent, gs_fp))
+				{
+					m_current_firedeps.vLastFP = gs_fp;
+					m_current_firedeps.vLastFPSilencer = gs_fp;
+				}
+			}
 		}
 	}
 }
@@ -1007,6 +1020,7 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 	iAmmoElapsed = E->a_elapsed;
 	E->gs_ensure_tree();
 	m_gs_tree = E->m_gs_tree;
+	m_gs_full_mode = gunsmith::is_full_mode(cNameSect().c_str());
 	m_flagsAddOnState = E->m_addon_flags.get();
 
 	if (m_modular_attachments && m_cur_scope == 0 && (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) != 0 && m_scopes.size() > 1)
@@ -1056,6 +1070,7 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 void CWeapon::net_Destroy()
 {
 	inherited::net_Destroy();
+	m_gs_visuals.clear();
 
 	//óäàëèòü îáúåêòû ïàðòèêëîâ
 	StopFlameParticles();
@@ -2005,6 +2020,38 @@ void CWeapon::renderable_Render()
 	inherited::renderable_Render();
 }
 
+void CWeapon::RenderAttachments()
+{
+	inherited::RenderAttachments();
+	IKinematics* K = m_gs_full_mode && Visual() ? Visual()->dcast_PKinematics() : nullptr;
+	if (!K)
+		return;
+	m_gs_visuals.ensure(gunsmith::CVisuals::eWorld, K, m_gs_tree, cNameSect().c_str(), nullptr, true);
+	m_gs_visuals.render(gunsmith::CVisuals::eWorld, K, XFORM());
+}
+
+void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
+{
+	if (!m_gs_full_mode || !model)
+		return;
+	m_gs_visuals.ensure(gunsmith::CVisuals::eHud, model, m_gs_tree, cNameSect().c_str(), HudSection().c_str(), true);
+	m_gs_visuals.render(gunsmith::CVisuals::eHud, model, xform);
+}
+
+bool CWeapon::hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos)
+{
+	if (!m_gs_full_mode || !model)
+		return false;
+	m_gs_visuals.ensure(gunsmith::CVisuals::eHud, model, m_gs_tree, cNameSect().c_str(), HudSection().c_str(), true);
+	return m_gs_visuals.fire_point(gunsmith::CVisuals::eHud, model, xform, pos);
+}
+
+void CWeapon::DeleteHudItemData()
+{
+	m_gs_visuals.clear(gunsmith::CVisuals::eHud); // the HUD model they mount on goes away
+	inherited::DeleteHudItemData();
+}
+
 void CWeapon::signal_HideComplete()
 {
 	m_fLR_ShootingFactor = 0.f;
@@ -2556,7 +2603,7 @@ void CWeapon::UpdateHUDAddonsVisibility()
 	else {
 		if (ScopeAttachable())
 		{
-			HudItemData()->set_bone_visible(wpn_scope, IsScopeAttached());
+			HudItemData()->set_bone_visible(wpn_scope, IsScopeAttached(), TRUE);
 		}
 
 		if (m_eScopeStatus == ALife::eAddonDisabled)
@@ -2569,7 +2616,7 @@ void CWeapon::UpdateHUDAddonsVisibility()
 
 	if (SilencerAttachable())
 	{
-		HudItemData()->set_bone_visible(wpn_silencer, IsSilencerAttached());
+		HudItemData()->set_bone_visible(wpn_silencer, IsSilencerAttached(), TRUE);
 	}
 	if (m_eSilencerStatus == ALife::eAddonDisabled)
 	{
@@ -2580,7 +2627,7 @@ void CWeapon::UpdateHUDAddonsVisibility()
 
 	if (GrenadeLauncherAttachable())
 	{
-		HudItemData()->set_bone_visible(wpn_grenade_launcher, IsGrenadeLauncherAttached());
+		HudItemData()->set_bone_visible(wpn_grenade_launcher, IsGrenadeLauncherAttached(), TRUE);
 	}
 	if (m_eGrenadeLauncherStatus == ALife::eAddonDisabled)
 	{
@@ -2605,7 +2652,7 @@ void CWeapon::UpdateAddonsVisibility()
 	pWeaponVisual->CalculateBones_Invalidate();
 
 	bone_id = pWeaponVisual->LL_BoneID(wpn_scope);
-    if (ScopeAttachable())
+    if (ScopeAttachable() && bone_id != BI_NONE) // a gunsmith receiver may have no addon bones
 	{
 		if (IsScopeAttached())
 		{
@@ -2625,7 +2672,7 @@ void CWeapon::UpdateAddonsVisibility()
 		//		Log("scope", pWeaponVisual->LL_GetBoneVisible		(bone_id));
 	}
 	bone_id = pWeaponVisual->LL_BoneID(wpn_silencer);
-	if (SilencerAttachable())
+	if (SilencerAttachable() && bone_id != BI_NONE)
 	{
 		if (IsSilencerAttached())
 		{
@@ -2646,7 +2693,7 @@ void CWeapon::UpdateAddonsVisibility()
 	}
 
 	bone_id = pWeaponVisual->LL_BoneID(wpn_grenade_launcher);
-	if (GrenadeLauncherAttachable())
+	if (GrenadeLauncherAttachable() && bone_id != BI_NONE)
 	{
 		if (IsGrenadeLauncherAttached())
 		{
@@ -3155,6 +3202,22 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 			}
 		}
 		
+		// Gunsmith: aim through the fitted sight part instead of the receiver's own sights.
+		if (idx == 1 && !m_modular_attachments && m_gs_full_mode)
+		{
+			Fvector gs_delta;
+			if (m_gs_visuals.aim_delta(hi->m_model, gs_delta))
+			{
+				// The offset is applied in the camera frame; the delta is in the model's.
+				Fmatrix inv, rel;
+				inv.invert(trans);
+				rel.mul_43(inv, hi->m_item_transform);
+				rel.transform_dir(gs_delta);
+				curr_offs.x += gs_delta.x;
+				curr_offs.y += gs_delta.y;
+			}
+		}
+
 		float factor;
 		
 		if (idx == 4 || last_idx == 4)

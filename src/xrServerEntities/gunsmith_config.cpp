@@ -48,6 +48,7 @@ namespace gunsmith
 				return false;
 			slot.section = slot_section;
 			read_list(slot_section, "accepts", slot.accepts);
+			slot.mount_bone = READ_IF_EXISTS(pSettings, r_string, slot_section, "mount_bone", "");
 			slot.required = !!READ_IF_EXISTS(pSettings, r_bool, slot_section, "required", FALSE);
 			slot.field_swappable = !!READ_IF_EXISTS(pSettings, r_bool, slot_section, "field_swappable", FALSE);
 			slot.legacy_addon = parse_legacy_addon(READ_IF_EXISTS(pSettings, r_string, slot_section, "legacy_addon", (LPCSTR)nullptr));
