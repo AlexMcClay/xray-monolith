@@ -42,9 +42,10 @@ namespace gunsmith
 		// Whether previews can be drawn (DX10/11 renderer, preview shader present).
 		bool available() const;
 
-		// The icon of a weapon object, or of a section's default build: a rect in the atlas
-		// (pixels) with the section's inventory aspect. A new or changed build is drawn on the
-		// next frame. False when previews aren't available or the gun isn't gs_mode = full.
+		// The icon of a weapon object (gs_mode = full) or of a part item carrying parts, or of a
+		// section's default build: a rect in the atlas (pixels) with the section's inventory
+		// aspect. A new or changed build is drawn on the next frame. False when previews aren't
+		// available or the object has nothing to show.
 		bool icon_rect(u16 id, Frect& rect);
 		bool icon_rect(LPCSTR section, Frect& rect);
 
@@ -88,9 +89,10 @@ namespace gunsmith
 			u32 used = 0; // frame last asked for
 			u32 w = 0, h = 0; // drawn area, from the cell's top left
 			bool dirty = false;
+			bool part = false; // a part item: drawn from its other side, so it faces like a gun
 		};
 
-		bool icon_request(LPCSTR key, u16 id, LPCSTR section, Frect& rect);
+		bool icon_request(LPCSTR key, u16 id, LPCSTR section, bool part, Frect& rect);
 		bool draw_list(u16 id, LPCSTR section, DRAW_LIST& out);
 		SScene* scene(LPCSTR section);
 		void draw_icon(u32 index);

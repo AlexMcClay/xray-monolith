@@ -2950,7 +2950,8 @@ void CLevel::script_register(lua_State* L)
 		def("preview_slots", &gs_preview_slots_script, raw<1>()),
 		def("preview_bounds", &gs_preview_bounds_script, raw<1>()),
 		def("preview_resolution", &gs_preview_resolution),
-		def("is_full_mode", &gs_is_full_mode)
+		def("is_full_mode", &gs_is_full_mode),
+		def("carries_parts", &gs_carries_parts)
 	];
 
 	module(L, "relation_registry")

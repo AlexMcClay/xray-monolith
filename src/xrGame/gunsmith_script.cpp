@@ -6,6 +6,8 @@
 #include "pch_script.h"
 #include "gunsmith_script.h"
 #include "gunsmith_preview.h"
+#include "inventory_item_object.h"
+#include "Level.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "../Include/xrRender/Kinematics.h"
@@ -248,6 +250,12 @@ void gs_preview_resolution(u32 w, u32 h) { gunsmith::CPreview::instance().view_r
 	return t;
 }
 void gs_preview_tick() { gunsmith::CPreview::instance().view_tick(); }
+bool gs_carries_parts(u16 id)
+{
+	CInventoryItemObject* item = g_pGameLevel ? smart_cast<CInventoryItemObject*>(Level().Objects.net_Find(id)) : nullptr;
+	return item && item->gs_carries_parts();
+}
+
 bool gs_is_full_mode(LPCSTR section)
 {
 	return section && pSettings->section_exist(section) && gunsmith::is_full_mode(section);

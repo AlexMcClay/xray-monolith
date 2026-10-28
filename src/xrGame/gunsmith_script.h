@@ -69,3 +69,5 @@ void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pa
 void gs_preview_resolution(u32 w, u32 h);
 void gs_preview_tick();
 bool gs_is_full_mode(LPCSTR section);
+// gunsmith.carries_parts(id): whether a part item carries parts mounted on it.
+bool gs_carries_parts(u16 id);

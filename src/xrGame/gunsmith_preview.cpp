@@ -9,6 +9,7 @@
 #include "gunsmith_visuals.h"
 #include "gunsmith_config.h"
 #include "Weapon.h"
+#include "inventory_item_object.h"
 #include "Level.h"
 #include "../Include/xrRender/Kinematics.h"
 #include "../Include/xrRender/RenderVisual.h"
@@ -39,10 +40,46 @@ namespace gunsmith
 			return crc;
 		}
 
-		// A live gun's cell key: its object and its build.
-		void object_key(const CWeapon* weapon, string128& key)
+		// What an object draws: a full-mode gun with its parts, or a part item with the parts it
+		// carries (`part`: exported parts face -Z where guns face +Z).
+		struct SSource
 		{
-			xr_sprintf(key, "o%u:%08x", u32(weapon->ID()), tree_crc(weapon->gs_tree()));
+			IRenderVisual* root = nullptr;
+			CVisuals* visuals = nullptr;
+			const CTree* tree = nullptr;
+			shared_str owner;
+			bool part = false;
+		};
+
+		bool object_source(u16 id, SSource& src)
+		{
+			CObject* O = Level().Objects.net_Find(id);
+			if (CWeapon* weapon = smart_cast<CWeapon*>(O))
+			{
+				if (!weapon->gs_full_mode() || !weapon->Visual())
+					return false;
+				src.root = weapon->Visual();
+				src.visuals = &weapon->gs_visuals();
+				src.tree = &weapon->gs_tree();
+				src.owner = weapon->cNameSect();
+				src.part = false;
+				return true;
+			}
+			CInventoryItemObject* item = smart_cast<CInventoryItemObject*>(O);
+			if (!item || !item->gs_carries_parts() || !item->Visual())
+				return false;
+			src.root = item->Visual();
+			src.visuals = &item->gs_part_visuals();
+			src.tree = &item->gs_subtree();
+			src.owner = item->cNameSect();
+			src.part = true;
+			return true;
+		}
+
+		// A live object's cell key: the object and its build.
+		void object_key(u16 id, const CTree& tree, string128& key)
+		{
+			xr_sprintf(key, "o%u:%08x", u32(id), tree_crc(tree));
 		}
 
 		// The inventory cell's aspect, fitted into an icon cell.
@@ -123,12 +160,12 @@ namespace gunsmith
 
 	bool CPreview::icon_rect(u16 id, Frect& rect)
 	{
-		CWeapon* weapon = smart_cast<CWeapon*>(Level().Objects.net_Find(id));
-		if (!weapon || !weapon->gs_full_mode())
+		SSource src;
+		if (!object_source(id, src))
 			return false;
 		string128 key;
-		object_key(weapon, key);
-		return icon_request(key, id, weapon->cNameSect().c_str(), rect);
+		object_key(id, *src.tree, key);
+		return icon_request(key, id, src.owner.c_str(), src.part, rect);
 	}
 
 	bool CPreview::icon_rect(LPCSTR section, Frect& rect)
@@ -137,10 +174,10 @@ namespace gunsmith
 			return false;
 		string256 key;
 		xr_sprintf(key, "s%s", section);
-		return icon_request(key, u16(-1), section, rect);
+		return icon_request(key, u16(-1), section, false, rect);
 	}
 
-	bool CPreview::icon_request(LPCSTR key, u16 id, LPCSTR section, Frect& rect)
+	bool CPreview::icon_request(LPCSTR key, u16 id, LPCSTR section, bool part, Frect& rect)
 	{
 		if (!available())
 			return false;
@@ -173,6 +210,7 @@ namespace gunsmith
 			c.key = key;
 			c.id = id;
 			c.section = section;
+			c.part = part;
 			c.dirty = true;
 			icon_size(section, c.w, c.h);
 		}
@@ -284,16 +322,13 @@ namespace gunsmith
 		out.clear();
 		IRenderVisual* root = nullptr;
 		CVisuals* visuals = nullptr;
-		if (id != u16(-1))
+		SSource src;
+		if (id != u16(-1) && object_source(id, src))
 		{
-			CWeapon* weapon = smart_cast<CWeapon*>(Level().Objects.net_Find(id));
-			if (weapon && weapon->gs_full_mode() && weapon->Visual())
-			{
-				root = weapon->Visual();
-				visuals = &weapon->gs_visuals();
-				if (IKinematics* K = root->dcast_PKinematics())
-					visuals->ensure(CVisuals::eWorld, K, weapon->gs_tree(), weapon->cNameSect().c_str(), nullptr, true);
-			}
+			root = src.root;
+			visuals = src.visuals;
+			if (IKinematics* K = root->dcast_PKinematics())
+				visuals->ensure(CVisuals::eWorld, K, *src.tree, src.owner.c_str(), nullptr, true);
 		}
 		if (!root && section && section[0])
 		{
@@ -328,12 +363,13 @@ namespace gunsmith
 		box.getcenter(centre);
 		box.getsize(size);
 
-		// Orthographic, from the gun's right (+X), up +Y: the muzzle (+Z) points right.
+		// Orthographic, from the gun's right (+X), up +Y: the muzzle (+Z) points right. A part
+		// faces -Z, so it is seen from -X to point the same way.
 		const float aspect = float(c.w) / float(c.h);
 		const float width = _max(size.z, size.y * aspect) * 1.04f;
 		const float height = width / aspect;
 		Fvector from, dir, up;
-		dir.set(-1.f, 0.f, 0.f);
+		dir.set(c.part ? 1.f : -1.f, 0.f, 0.f);
 		up.set(0.f, 1.f, 0.f);
 		from.mad(centre, dir, -(size.x * 0.5f + 1.f));
 		Fmatrix view, proj;
@@ -387,11 +423,11 @@ namespace gunsmith
 		// The slots, for markers; view_slots() projects them with the camera of that moment.
 		m_view_points.clear();
 		IKinematics* K = list.front().first->dcast_PKinematics();
+		SSource src;
 		if (m_view_id != u16(-1))
 		{
-			CWeapon* weapon = smart_cast<CWeapon*>(Level().Objects.net_Find(m_view_id));
-			if (weapon)
-				weapon->gs_visuals().slot_points(CVisuals::eWorld, K, weapon->gs_tree(), weapon->cNameSect().c_str(), nullptr, m_view_points);
+			if (object_source(m_view_id, src))
+				src.visuals->slot_points(CVisuals::eWorld, K, *src.tree, src.owner.c_str(), nullptr, m_view_points);
 		}
 		else if (SScene* s = scene(m_view_section.c_str()))
 			s->visuals.slot_points(CVisuals::eWorld, K, s->tree, m_view_section.c_str(), nullptr, m_view_points);
@@ -457,11 +493,11 @@ namespace gunsmith
 		{
 			if (c.id == u16(-1) || c.dirty)
 				continue;
-			CWeapon* weapon = smart_cast<CWeapon*>(Level().Objects.net_Find(c.id));
-			if (!weapon)
+			SSource src;
+			if (!object_source(c.id, src))
 				continue;
 			string128 key;
-			object_key(weapon, key);
+			object_key(c.id, *src.tree, key);
 			if (c.key != key)
 			{
 				c.key = key;
