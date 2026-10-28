@@ -67,7 +67,7 @@ namespace gunsmith
 		return mode && !xr_strcmp(mode, "full");
 	}
 
-	void slots_of(LPCSTR section, bool is_receiver, SLOTS& out)
+	static void slots_of_uncached(LPCSTR section, bool is_receiver, SLOTS& out)
 	{
 		out.clear();
 		if (!section || !pSettings->section_exist(section))
@@ -114,6 +114,27 @@ namespace gunsmith
 			slot.implicit = true;
 			out.push_back(slot);
 		}
+	}
+
+	void slots_of(LPCSTR section, bool is_receiver, SLOTS& out)
+	{
+		// Slot lists only depend on configs, which don't change while the game runs,
+		// and they are read on every shot from phase 2 on.
+		static xr_map<shared_str, SLOTS> cache[2];
+		out.clear();
+		if (!section || !*section)
+			return;
+
+		xr_map<shared_str, SLOTS>& c = cache[is_receiver ? 1 : 0];
+		const shared_str key(section);
+		auto it = c.find(key);
+		if (it != c.end())
+		{
+			out = it->second;
+			return;
+		}
+		slots_of_uncached(section, is_receiver, out);
+		c.insert(mk_pair(key, out));
 	}
 
 	void tags_of(LPCSTR part, xr_vector<shared_str>& out)
@@ -226,5 +247,262 @@ namespace gunsmith
 		case eLegacyLauncher: return "launcher";
 		default: return "none";
 		}
+	}
+
+	//==========================================================================
+	// Phase 2: part stats and durability
+	//==========================================================================
+
+	namespace
+	{
+		const LPCSTR STAT_NAMES[eStatCount] = {
+			"fire_dispersion", "cam_dispersion", "cam_dispersion_inc", "cam_horz",
+			"hit_power", "hit_impulse", "bullet_speed", "rpm",
+			"pdm_base", "pdm_accel", "pdm_vel", "crosshair_inertion",
+			"zoom_rotate_time", "condition_shot_dec", "ergonomics",
+		};
+
+		// Old addon multiplier keys, read from silencer/scope/launcher sections by
+		// CWeaponMagazined::Load*Koeffs. nullptr: no old key for this stat.
+		const LPCSTR LEGACY_K_KEYS[eStatCount] = {
+			"fire_dispersion_base_k", "cam_dispersion_k", "cam_dispersion_inc_k", nullptr,
+			"bullet_hit_power_k", "bullet_hit_impulse_k", "bullet_speed_k", nullptr,
+			"PDM_disp_base_k", "PDM_disp_accel_k", "PDM_disp_vel_k", "crosshair_inertion_k",
+			"zoom_rotate_time_k", "condition_shot_dec_k", nullptr,
+		};
+
+		bool stat_add_in_degrees(u8 stat)
+		{
+			return stat == eStatFireDispersion || stat == eStatCamDispersion || stat == eStatCamDispersionInc;
+		}
+
+		u8 parse_failure(LPCSTR value, u8 fallback)
+		{
+			if (!value) return fallback;
+			if (!xr_strcmp(value, "none")) return eFailNone;
+			if (!xr_strcmp(value, "misfire")) return eFailMisfire;
+			if (!xr_strcmp(value, "extraction")) return eFailExtraction;
+			if (!xr_strcmp(value, "feed")) return eFailFeed;
+			if (!xr_strcmp(value, "barrel")) return eFailBarrel;
+			Msg("! [gunsmith] unknown failure type [%s], using the part kind's default", value);
+			return fallback;
+		}
+
+		struct SKindDefaults
+		{
+			bool wears_on_shot;
+			float wear_per_shot;
+			float condition_dispersion_factor;
+			u8 failure;
+			float jam_start_condition, jam_end_condition, jam_start_prob, jam_end_prob;
+			float barrel_wear_mul;
+			float suppression_min_condition;
+		};
+
+		// Built-in defaults per part kind. Any of them can be changed for a whole kind
+		// in [gs_part_kind_<kind>], and per part in the part's own section.
+		SKindDefaults builtin_kind_defaults(LPCSTR kind)
+		{
+			SKindDefaults d = { false, 0.f, 0.f, eFailNone, 0.5f, 0.1f, 0.f, 0.f, 1.f, 0.f };
+			auto is = [kind](LPCSTR k) { return !xr_strcmp(kind, k); };
+
+			if (is("barrel"))
+			{
+				d.wears_on_shot = true;
+				d.wear_per_shot = 0.0004f;
+				d.condition_dispersion_factor = 1.f;
+				d.failure = eFailBarrel;
+				d.jam_end_prob = 0.05f;
+			}
+			else if (is("bolt") || is("bolt_carrier") || is("trigger") || is("gas_tube"))
+			{
+				d.wears_on_shot = true;
+				d.wear_per_shot = 0.0003f;
+				d.failure = eFailExtraction;
+				d.jam_end_prob = 0.05f;
+			}
+			else if (is("magazine"))
+			{
+				d.wears_on_shot = true;
+				d.wear_per_shot = 0.0005f;
+				d.failure = eFailFeed;
+				d.jam_end_prob = 0.05f;
+			}
+			else if (is("muzzle"))
+			{
+				d.wears_on_shot = true;
+				d.wear_per_shot = 0.0004f;
+				d.suppression_min_condition = 0.3f;
+			}
+			// sight: jam_start_condition (0.5) is the condition below which it adds zoomed sway.
+			// stock, grip, handguard, rail, underbarrel, receiver, generic: no wear, no failure.
+			return d;
+		}
+
+		SKindDefaults kind_defaults(LPCSTR kind)
+		{
+			SKindDefaults d = builtin_kind_defaults(kind);
+			string128 sect;
+			xr_sprintf(sect, "gs_part_kind_%s", kind);
+			if (!pSettings->section_exist(sect))
+				return d;
+
+			d.wears_on_shot = !!READ_IF_EXISTS(pSettings, r_bool, sect, "wears_on_shot", d.wears_on_shot);
+			d.wear_per_shot = READ_IF_EXISTS(pSettings, r_float, sect, "condition_wear_per_shot", d.wear_per_shot);
+			d.condition_dispersion_factor = READ_IF_EXISTS(pSettings, r_float, sect, "condition_dispersion_factor", d.condition_dispersion_factor);
+			d.failure = parse_failure(READ_IF_EXISTS(pSettings, r_string, sect, "failure", (LPCSTR)nullptr), d.failure);
+			d.jam_start_condition = READ_IF_EXISTS(pSettings, r_float, sect, "jam_start_condition", d.jam_start_condition);
+			d.jam_end_condition = READ_IF_EXISTS(pSettings, r_float, sect, "jam_end_condition", d.jam_end_condition);
+			d.jam_start_prob = READ_IF_EXISTS(pSettings, r_float, sect, "jam_start_prob", d.jam_start_prob);
+			d.jam_end_prob = READ_IF_EXISTS(pSettings, r_float, sect, "jam_end_prob", d.jam_end_prob);
+			d.barrel_wear_mul = READ_IF_EXISTS(pSettings, r_float, sect, "barrel_wear_mul", d.barrel_wear_mul);
+			d.suppression_min_condition = READ_IF_EXISTS(pSettings, r_float, sect, "suppression_min_condition", d.suppression_min_condition);
+			return d;
+		}
+
+		void read_part_data(LPCSTR section, SPartData& d)
+		{
+			for (u32 s = 0; s < eStatCount; ++s)
+			{
+				d.add[s] = 0.f;
+				d.mul[s] = 1.f;
+				d.has_mul[s] = false;
+				d.legacy_k[s] = 1.f;
+			}
+			d.weight = d.cost = d.legacy_weight = d.legacy_cost = 0.f;
+
+			const bool exists = section && pSettings->section_exist(section);
+			LPCSTR kind = exists ? READ_IF_EXISTS(pSettings, r_string, section, "part_kind", (LPCSTR)nullptr) : nullptr;
+			d.declared = kind && *kind;
+			if (!d.declared)
+			{
+				// Old-style addons without part_kind still get a kind for display and
+				// sight handling, but no durability: the engine alone changes nothing.
+				LPCSTR cls = exists ? READ_IF_EXISTS(pSettings, r_string, section, "class", (LPCSTR)nullptr) : nullptr;
+				kind = (cls && !xr_strcmp(cls, "WP_SILEN")) ? "muzzle"
+					: (cls && !xr_strcmp(cls, "WP_SCOPE")) ? "sight"
+					: (cls && !xr_strcmp(cls, "WP_GLAUN")) ? "underbarrel"
+					: "generic";
+			}
+			d.kind = kind;
+
+			SKindDefaults k = d.declared ? kind_defaults(kind) : builtin_kind_defaults("generic");
+			if (!d.declared)
+				k.jam_start_condition = 0.f; // no sight sway either
+
+			if (exists)
+			{
+				for (u32 s = 0; s < eStatCount; ++s)
+				{
+					string128 key;
+					xr_sprintf(key, "%s_add", STAT_NAMES[s]);
+					d.add[s] = READ_IF_EXISTS(pSettings, r_float, section, key, 0.f);
+					if (stat_add_in_degrees(u8(s)))
+						d.add[s] = deg2rad(d.add[s]);
+
+					xr_sprintf(key, "%s_mul", STAT_NAMES[s]);
+					d.has_mul[s] = !!pSettings->line_exist(section, key);
+					d.mul[s] = d.has_mul[s] ? pSettings->r_float(section, key) : 1.f;
+
+					if (LEGACY_K_KEYS[s])
+					{
+						d.legacy_k[s] = READ_IF_EXISTS(pSettings, r_float, section, LEGACY_K_KEYS[s], 1.f);
+						clamp(d.legacy_k[s], 0.01f, 2.0f);
+					}
+				}
+
+				d.weight = READ_IF_EXISTS(pSettings, r_float, section, "weight", 0.f);
+				d.cost = READ_IF_EXISTS(pSettings, r_float, section, "part_cost", 0.f);
+				d.legacy_weight = READ_IF_EXISTS(pSettings, r_float, section, "inv_weight", 0.f);
+				d.legacy_cost = READ_IF_EXISTS(pSettings, r_float, section, "cost", 0.f);
+				read_list(section, "blocks_slots", d.blocks_slots);
+			}
+
+			d.wears_on_shot = k.wears_on_shot;
+			d.wear_per_shot = k.wear_per_shot;
+			d.condition_dispersion_factor = k.condition_dispersion_factor;
+			d.failure = k.failure;
+			d.jam_start_condition = k.jam_start_condition;
+			d.jam_end_condition = k.jam_end_condition;
+			d.jam_start_prob = k.jam_start_prob;
+			d.jam_end_prob = k.jam_end_prob;
+			d.barrel_wear_mul = k.barrel_wear_mul;
+			d.suppression_min_condition = k.suppression_min_condition;
+
+			if (exists && d.declared)
+			{
+				d.wears_on_shot = !!READ_IF_EXISTS(pSettings, r_bool, section, "wears_on_shot", d.wears_on_shot);
+				d.wear_per_shot = READ_IF_EXISTS(pSettings, r_float, section, "condition_wear_per_shot", d.wear_per_shot);
+				d.condition_dispersion_factor = READ_IF_EXISTS(pSettings, r_float, section, "condition_dispersion_factor", d.condition_dispersion_factor);
+				d.failure = parse_failure(READ_IF_EXISTS(pSettings, r_string, section, "failure", (LPCSTR)nullptr), d.failure);
+				d.jam_start_condition = READ_IF_EXISTS(pSettings, r_float, section, "jam_start_condition", d.jam_start_condition);
+				d.jam_end_condition = READ_IF_EXISTS(pSettings, r_float, section, "jam_end_condition", d.jam_end_condition);
+				d.jam_start_prob = READ_IF_EXISTS(pSettings, r_float, section, "jam_start_prob", d.jam_start_prob);
+				d.jam_end_prob = READ_IF_EXISTS(pSettings, r_float, section, "jam_end_prob", d.jam_end_prob);
+				d.barrel_wear_mul = READ_IF_EXISTS(pSettings, r_float, section, "barrel_wear_mul", d.barrel_wear_mul);
+				d.suppression_min_condition = READ_IF_EXISTS(pSettings, r_float, section, "suppression_min_condition", d.suppression_min_condition);
+			}
+		}
+	}
+
+	LPCSTR stat_name(u8 stat)
+	{
+		return stat < eStatCount ? STAT_NAMES[stat] : "unknown";
+	}
+
+	LPCSTR failure_name(u8 failure)
+	{
+		switch (failure)
+		{
+		case eFailMisfire: return "misfire";
+		case eFailExtraction: return "extraction";
+		case eFailFeed: return "feed";
+		case eFailBarrel: return "barrel";
+		default: return "none";
+		}
+	}
+
+	const SPartData& part_data(LPCSTR section)
+	{
+		static xr_map<shared_str, SPartData> cache;
+		const shared_str key(section ? section : "");
+		auto it = cache.find(key);
+		if (it != cache.end())
+			return it->second;
+
+		SPartData d;
+		read_part_data(section, d);
+		return cache.insert(mk_pair(key, d)).first->second;
+	}
+
+	float part_jam_probability(const SPartData& part, float condition)
+	{
+		if (part.failure == eFailNone)
+			return 0.f;
+		if (condition > part.jam_start_condition)
+			return 0.f;
+		if (condition < part.jam_end_condition)
+			return part.jam_end_prob;
+		const float span = part.jam_start_condition - part.jam_end_condition;
+		if (span <= EPS)
+			return part.jam_end_prob;
+		const float t = (part.jam_start_condition - condition) / span;
+		return part.jam_start_prob + t * (part.jam_end_prob - part.jam_start_prob);
+	}
+
+	const SSettings& settings()
+	{
+		static SSettings s;
+		static bool loaded = false;
+		if (!loaded)
+		{
+			LPCSTR sect = "gunsmith_settings";
+			s.ergo_base = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_base", 50.f);
+			s.ergo_aim_k = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_aim_k", 0.5f);
+			s.ergo_sway_k = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_sway_k", 0.5f);
+			s.sight_sway_factor = READ_IF_EXISTS(pSettings, r_float, sect, "sight_sway_factor", 1.0f);
+			loaded = true;
+		}
+		return s;
 	}
 }

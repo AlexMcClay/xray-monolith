@@ -92,6 +92,12 @@ namespace gunsmith
 
 		void dump(LPCSTR label) const;
 
+		// True when a part already in the tree lists this slot section in its blocks_slots.
+		bool is_slot_blocked(const shared_str& slot_section) const;
+
+		// Every required slot of every node is filled.
+		bool required_slots_filled() const;
+
 	private:
 		int place_in_free_slot(LPCSTR part, float condition);
 

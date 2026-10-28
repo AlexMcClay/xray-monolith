@@ -146,7 +146,7 @@ namespace gunsmith
 			node_slots(u8(i), slots);
 			for (u32 s = 0; s < slots.size(); ++s)
 			{
-				if (slots[s].implicit || find_in_slot(u8(i), u8(s)) >= 0)
+				if (slots[s].implicit || find_in_slot(u8(i), u8(s)) >= 0 || is_slot_blocked(slots[s].section))
 					continue;
 				if (part_fits_slot(part, slots[s], m_nodes[0].section.c_str(), true))
 					return add_node(part, u8(i), u8(s), condition);
@@ -378,5 +378,27 @@ namespace gunsmith
 				    occ);
 			}
 		}
+	}
+
+	bool CTree::is_slot_blocked(const shared_str& slot_section) const
+	{
+		for (u32 i = 1; i < m_nodes.size(); ++i)
+			for (const shared_str& blocked : part_data(m_nodes[i].section.c_str()).blocks_slots)
+				if (blocked == slot_section)
+					return true;
+		return false;
+	}
+
+	bool CTree::required_slots_filled() const
+	{
+		SLOTS slots;
+		for (u32 i = 0; i < m_nodes.size(); ++i)
+		{
+			node_slots(u8(i), slots);
+			for (u32 s = 0; s < slots.size(); ++s)
+				if (slots[s].required && find_in_slot(u8(i), u8(s)) < 0)
+					return false;
+		}
+		return true;
 	}
 }

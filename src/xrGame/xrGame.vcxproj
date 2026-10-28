@@ -466,6 +466,7 @@
     <ClInclude Include="..\xrServerEntities\xrServer_Objects_ALife_Items.h" />
     <ClInclude Include="..\xrServerEntities\gunsmith_config.h" />
     <ClInclude Include="..\xrServerEntities\gunsmith_tree.h" />
+    <ClInclude Include="..\xrServerEntities\gunsmith_stats.h" />
     <ClInclude Include="..\xrServerEntities\xrServer_Objects_ALife_Monsters.h" />
     <ClInclude Include="..\xrServerEntities\xrServer_Objects_Alife_Smartcovers.h" />
     <ClInclude Include="..\xrServerEntities\xrServer_Object_Base.h" />
@@ -2128,6 +2129,7 @@
     <ClCompile Include="..\xrServerEntities\xrServer_Objects_ALife_Items.cpp" />
     <ClCompile Include="..\xrServerEntities\gunsmith_config.cpp" />
     <ClCompile Include="..\xrServerEntities\gunsmith_tree.cpp" />
+    <ClCompile Include="..\xrServerEntities\gunsmith_stats.cpp" />
     <ClCompile Include="..\xrServerEntities\xrServer_Objects_ALife_Items_script.cpp">
       <PrecompiledHeaderFile>pch_script.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName)_script.pch</PrecompiledHeaderOutputFile>

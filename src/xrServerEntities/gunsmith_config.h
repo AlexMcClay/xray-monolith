@@ -80,4 +80,97 @@ namespace gunsmith
 	shared_str legacy_default_part(LPCSTR receiver, u8 legacy_addon);
 
 	LPCSTR legacy_addon_name(u8 legacy_addon);
+
+	//==========================================================================
+	// Phase 2: part stats and durability
+	//==========================================================================
+
+	// Stats a part can change. Each has `<name>_add` (default 0) and `<name>_mul`
+	// (default 1) keys; the effective value is (base + sum of adds) * product of muls.
+	// Adds for fire_dispersion, cam_dispersion and cam_dispersion_inc are in degrees,
+	// like the weapon keys they modify. rpm adds are in rounds per minute.
+	enum EStat
+	{
+		eStatFireDispersion,
+		eStatCamDispersion,
+		eStatCamDispersionInc,
+		eStatCamHorz, // horizontal recoil (StepAngleHorz, MaxAngleHorz)
+		eStatHitPower,
+		eStatHitImpulse,
+		eStatBulletSpeed,
+		eStatRpm,
+		eStatPdmBase,
+		eStatPdmAccel,
+		eStatPdmVel,
+		eStatCrosshairInertion,
+		eStatZoomRotateTime, // aim-in time
+		eStatConditionShotDec, // receiver wear per shot
+		eStatErgonomics,
+		eStatCount
+	};
+
+	LPCSTR stat_name(u8 stat);
+
+	// How a part fails when worn (`failure` key).
+	enum EFailure
+	{
+		eFailNone = 0,
+		eFailMisfire, // receiver: the weapon's own misfire curve
+		eFailExtraction, // bolt, carrier, trigger, gas tube: cleared by racking the bolt
+		eFailFeed, // magazine: cleared by a full reload
+		eFailBarrel, // barrel: cleared by racking the bolt
+	};
+
+	LPCSTR failure_name(u8 failure);
+
+	// Everything the engine reads from a part section, cached per section.
+	//
+	// Durability keys (`part_kind` must be set for any of them to apply; the
+	// defaults come from the kind, see kind table in gunsmith_config.cpp, and can
+	// be changed per kind in an optional [gs_part_kind_<kind>] section):
+	//   wears_on_shot, condition_wear_per_shot, condition_dispersion_factor,
+	//   failure, jam_start_condition, jam_end_condition, jam_start_prob, jam_end_prob,
+	//   barrel_wear_mul (muzzle), suppression_min_condition (muzzle)
+	// Weight and cost: old-style addons count their item `inv_weight` and `cost`,
+	// as before. Other parts count `weight` and `part_cost` (default 0), so
+	// internal parts that are also items don't add their item price to the gun.
+	struct SPartData
+	{
+		shared_str kind; // part_kind, or inferred from the item class, or "generic"
+		bool declared; // part_kind was set: durability applies
+
+		float add[eStatCount];
+		float mul[eStatCount];
+		bool has_mul[eStatCount];
+		float legacy_k[eStatCount]; // old *_k keys, clamped 0.01..2 as the old code did
+
+		float weight, cost; // gunsmith keys
+		float legacy_weight, legacy_cost; // item inv_weight / cost
+
+		bool wears_on_shot;
+		float wear_per_shot;
+		float condition_dispersion_factor;
+		u8 failure;
+		float jam_start_condition, jam_end_condition, jam_start_prob, jam_end_prob;
+		float barrel_wear_mul;
+		float suppression_min_condition;
+
+		xr_vector<shared_str> blocks_slots;
+	};
+
+	const SPartData& part_data(LPCSTR section);
+
+	// Jam chance of a part at this condition, from its curve.
+	float part_jam_probability(const SPartData& part, float condition);
+
+	// Engine-wide tuning, [gunsmith_settings] in system configs (all optional).
+	struct SSettings
+	{
+		float ergo_base; // receiver ergonomics when the weapon has no `ergonomics` key (50)
+		float ergo_aim_k; // aim time scale per ergonomics point below/above 50 (0.5 per 100 points)
+		float ergo_sway_k; // movement sway scale, same units (0.5)
+		float sight_sway_factor; // extra zoomed sway per point of condition below a sight's threshold (1.0)
+	};
+
+	const SSettings& settings();
 }

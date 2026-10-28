@@ -6606,6 +6606,9 @@
     <ClInclude Include="..\xrServerEntities\gunsmith_tree.h">
       <Filter>Core\Server\ServerEntities\objects_alife_items</Filter>
     </ClInclude>
+    <ClInclude Include="..\xrServerEntities\gunsmith_stats.h">
+      <Filter>Core\Server\ServerEntities\objects_alife_items</Filter>
+    </ClInclude>
     <ClInclude Include="..\xrServerEntities\xrServer_Objects_ALife_Items.h">
       <Filter>Core\Server\ServerEntities\objects_alife_items</Filter>
     </ClInclude>
@@ -10200,6 +10203,9 @@
       <Filter>Core\Server\ServerEntities\objects_alife_items</Filter>
     </ClCompile>
     <ClCompile Include="..\xrServerEntities\gunsmith_tree.cpp">
+      <Filter>Core\Server\ServerEntities\objects_alife_items</Filter>
+    </ClCompile>
+    <ClCompile Include="..\xrServerEntities\gunsmith_stats.cpp">
       <Filter>Core\Server\ServerEntities\objects_alife_items</Filter>
     </ClCompile>
     <ClCompile Include="..\xrServerEntities\xrServer_Objects_ALife_Items.cpp">
