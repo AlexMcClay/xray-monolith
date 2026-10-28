@@ -148,7 +148,7 @@ void CWeaponMagazined::Load(LPCSTR section)
 	if (WeaponSoundExist(section, "snd_holster_actor"))
 		m_sounds.LoadSound(section, "snd_holster_actor", "sndHideActor", true, m_eSoundHide);
 
-	m_sSndShotCurrent = IsSilencerAttached() ? "sndSilencerShot" : "sndShot";
+	m_sSndShotCurrent = IsSuppressed() ? "sndSilencerShot" : "sndShot";
 
 	//звуки и партиклы глушителя, еслит такой есть
 	if (m_eSilencerStatus == ALife::eAddonAttachable || m_eSilencerStatus == ALife::eAddonPermanent)
@@ -229,6 +229,18 @@ void CWeaponMagazined::Load(LPCSTR section)
 
 void CWeaponMagazined::FireStart()
 {
+	// Gunsmith: a required part is missing (e.g. no bolt), the gun can't fire.
+	if (!IsMisfire() && !m_gs_stats.can_fire)
+	{
+		if (!m_gs_cant_fire_logged)
+		{
+			Msg("- [gunsmith] [%s] cannot fire: a required part is missing", cNameSect().c_str());
+			m_gs_cant_fire_logged = true;
+		}
+		OnEmptyClick();
+		return;
+	}
+
 	if (!IsMisfire())
 	{
 		if (IsValid())
@@ -783,10 +795,10 @@ void CWeaponMagazined::state_Fire(float dt)
 			// demonized: Add support for arbitrary shot burst at rpm_mode_2
 			if (GetCurrentFireMode() >= 2 || cycleDownCheck())
 			{
-				fShotTimeCounter = fModeShotTime;
+				fShotTimeCounter = gs_shot_time(fModeShotTime);
 			}
 			else
-				fShotTimeCounter = fOneShotTime;
+				fShotTimeCounter = gs_shot_time(fOneShotTime);
 			//Alundaio: END
 
 			++m_iShotNum;
@@ -1555,7 +1567,19 @@ void CWeaponMagazined::InitAddons()
 		ResetScopeKoeffs();
 	}
 
+	gs_on_suppression_changed();
 	if (IsSilencerAttached())
+		ApplySilencerKoeffs();
+	else
+		ResetSilencerKoeffs();
+
+	inherited::InitAddons();
+}
+
+void CWeaponMagazined::gs_on_suppression_changed()
+{
+	// A silencer worn below its suppression threshold fires like an unsuppressed gun.
+	if (IsSuppressed())
 	{
 		m_sFlameParticlesCurrent = m_sSilencerFlameParticles;
 		m_sSmokeParticlesCurrent = m_sSilencerSmokeParticles;
@@ -1563,7 +1587,6 @@ void CWeaponMagazined::InitAddons()
 
 		//Load silencer values
 		LoadLights(*cNameSect(), "silencer_");
-		ApplySilencerKoeffs();
 	}
 	else
 	{
@@ -1573,10 +1596,7 @@ void CWeaponMagazined::InitAddons()
 
 		//Load normal values
 		LoadLights(*cNameSect(), "");
-		ResetSilencerKoeffs();
 	}
-
-	inherited::InitAddons();
 }
 
 void CWeaponMagazined::LoadSilencerKoeffs()
@@ -1638,14 +1658,17 @@ void CWeaponMagazined::LoadScopeKoeffs()
 	clamp(m_scope_koef.zoom_rotate_time, 0.01f, 2.0f);
 }
 
+// Gunsmith: addon multipliers now come from the part tree (gs_stats(), which reads
+// the same *_k keys), so the cur_* sets stay neutral. Scripts can still set them
+// between InitAddons calls, and they multiply on top, as before.
 void CWeaponMagazined::ApplySilencerKoeffs()
 {
-	cur_silencer_koef = m_silencer_koef;
+	cur_silencer_koef.Reset();
 }
 
 void CWeaponMagazined::ApplyScopeKoeffs()
 {
-	cur_scope_koef = m_scope_koef;
+	cur_scope_koef.Reset();
 }
 
 void CWeaponMagazined::ResetSilencerKoeffs()
@@ -1681,7 +1704,8 @@ void CWeaponMagazined::PlayAnimReload()
 {
 	VERIFY(GetState() == eReload);
 #ifdef NEW_ANIMS //AVO: use new animations
-	if (bMisfire && iAmmoElapsed != 0)
+	// Gunsmith: a feed jam (worn magazine) needs a full reload, not a bolt rack.
+	if (bMisfire && iAmmoElapsed != 0 && m_gs_jam_type != gunsmith::eFailFeed)
 	{
 		//Msg("AVO: ------ MISFIRE");
 		if (HudAnimationExist("anm_reload_misfire"))

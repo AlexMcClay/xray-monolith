@@ -542,11 +542,16 @@ void CShootingObject::FireBullet(const Fvector& pos,
 		l_fHitPower = fvHitPower[egdMaster];
 	}
 
+	float l_fSpeed = m_fStartBulletSpeed * cur_silencer_koef.bullet_speed;
+	l_fHitPower *= cur_silencer_koef.hit_power;
+	float l_fImpulse = fHitImpulse * cur_silencer_koef.hit_impulse;
+	gs_modify_bullet(l_fSpeed, l_fHitPower, l_fImpulse);
+
 	Level().BulletManager().AddBullet(pos,
 	                                  dir,
-	                                  m_fStartBulletSpeed * cur_silencer_koef.bullet_speed,
-	                                  l_fHitPower * cur_silencer_koef.hit_power,
-	                                  fHitImpulse * cur_silencer_koef.hit_impulse,
+	                                  l_fSpeed,
+	                                  l_fHitPower,
+	                                  l_fImpulse,
 	                                  parent_id,
 	                                  weapon_id,
 	                                  ALife::eHitTypeFireWound,

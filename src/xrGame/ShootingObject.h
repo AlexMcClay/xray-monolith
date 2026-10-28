@@ -56,6 +56,8 @@ protected:
 	                        u16 weapon_id,
 	                        bool send_hit,
 	                        int iShotNum = 0);
+	// Lets a weapon change a bullet's speed, hit power and impulse (gunsmith part stats).
+	virtual void gs_modify_bullet(float& speed, float& hit_power, float& impulse) {}
 	void SetBulletSpeed(float new_speed) { m_fStartBulletSpeed = new_speed; }
 	float GetBulletSpeed() { return m_fStartBulletSpeed; }
 

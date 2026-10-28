@@ -1020,6 +1020,7 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 	}
 
 	gs_match_scope_part();
+	gs_rebuild_stats(false); // InitAddons below picks the suppressed or plain effects
 
 	m_ammoType = E->ammo_type;
 	SetState(E->wpn_state);
@@ -1101,9 +1102,12 @@ void CWeapon::net_Import(NET_Packet& P)
 	u8 NewAddonState;
 	P.r_u8(NewAddonState);
 
-	if (NewAddonState != m_flagsAddOnState)
+	const bool addons_changed = NewAddonState != m_flagsAddOnState;
+	if (addons_changed)
 		m_gs_tree.sync_legacy_flags(NewAddonState, GetCondition()); // remote copy only, multiplayer
 	m_flagsAddOnState = NewAddonState;
+	if (addons_changed)
+		gs_rebuild_stats(false);
 	UpdateAddonsVisibility();
 
 	u8 ammoType, wstate;
@@ -1194,6 +1198,187 @@ void CWeapon::gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition)
 	// condition; copying the node's condition onto it comes with the Lua gs_detach.
 	m_gs_tree.set_legacy_addon(legacy_addon, part, condition);
 	gs_sync_to_server();
+	gs_rebuild_stats(false); // callers run InitAddons next
+}
+
+void CWeapon::gs_rebuild_stats(bool notify)
+{
+	if (!m_gs_tree.empty())
+		m_gs_tree.set_condition(0, GetCondition()); // the receiver is the gun
+
+	// Attached old-style addons the tree has no slot for (e.g. made attachable by
+	// an upgrade) still count, as they did before the tree.
+	xr_vector<gunsmith::SExtraPart> extra;
+	const u8 tree_flags = m_gs_tree.legacy_addon_flags();
+	auto add_extra = [&](u8 addon, ALife::EWeaponAddonStatus status, const shared_str& section)
+	{
+		if (status == ALife::eAddonAttachable && (m_flagsAddOnState & addon) && !(tree_flags & addon) && section.size())
+		{
+			gunsmith::SExtraPart e;
+			e.section = section;
+			e.legacy_addon = addon;
+			extra.push_back(e);
+		}
+	};
+	add_extra(gunsmith::eLegacyScope, m_eScopeStatus, m_cur_scope < m_scopes.size() ? GetScopeName() : shared_str());
+	add_extra(gunsmith::eLegacySilencer, m_eSilencerStatus, m_sSilencerName);
+	add_extra(gunsmith::eLegacyLauncher, m_eGrenadeLauncherStatus, m_sGrenadeLauncherName);
+
+	const bool was_suppressed = IsSuppressed();
+	gunsmith::compute(m_gs_tree, extra, m_gs_stats);
+
+	if (m_gs_stats.can_fire)
+		m_gs_cant_fire_logged = false;
+	if (notify && was_suppressed != IsSuppressed())
+		gs_on_suppression_changed();
+}
+
+bool CWeapon::IsSuppressed() const
+{
+	return IsSilencerAttached() && !m_gs_stats.suppressor_worn;
+}
+
+float CWeapon::gs_pdm_base() const
+{
+	float v = m_gs_stats.apply(gunsmith::eStatPdmBase, m_pdm.m_fPDM_disp_base);
+	if (IsZoomed())
+		v *= m_gs_stats.sight_sway;
+	return v;
+}
+
+float CWeapon::gs_pdm_vel() const
+{
+	return m_gs_stats.apply(gunsmith::eStatPdmVel, m_pdm.m_fPDM_disp_vel_factor);
+}
+
+float CWeapon::gs_pdm_accel() const
+{
+	return m_gs_stats.apply(gunsmith::eStatPdmAccel, m_pdm.m_fPDM_disp_accel_factor);
+}
+
+float CWeapon::gs_shot_time(float base_time) const
+{
+	if (base_time <= 0.f)
+		return base_time;
+	const float rpm = m_gs_stats.apply(gunsmith::eStatRpm, 60.f / base_time);
+	return rpm > 1.f ? 60.f / rpm : base_time;
+}
+
+void CWeapon::gs_modify_bullet(float& speed, float& hit_power, float& impulse)
+{
+	speed = m_gs_stats.apply(gunsmith::eStatBulletSpeed, speed);
+	hit_power = m_gs_stats.apply(gunsmith::eStatHitPower, hit_power);
+	impulse = m_gs_stats.apply(gunsmith::eStatHitImpulse, impulse);
+}
+
+void CWeapon::gs_apply_shot_wear(float impair)
+{
+	ChangeCondition(-m_gs_stats.apply(gunsmith::eStatConditionShotDec, GetWeaponDeterioration()) * impair *
+		cur_silencer_koef.condition_shot_dec);
+
+	bool parts_wore = false;
+	for (u32 i = 1; i < m_gs_tree.size(); ++i)
+	{
+		const gunsmith::SNode& n = m_gs_tree.node(u8(i));
+		const gunsmith::SPartData& p = gunsmith::part_data(n.section.c_str());
+		if (!p.wears_on_shot || p.wear_per_shot <= 0.f)
+			continue;
+		float wear = p.wear_per_shot * impair * f_weapon_deterioration;
+		if (!xr_strcmp(p.kind.c_str(), "barrel"))
+			wear *= m_gs_stats.barrel_wear_mul;
+		m_gs_tree.set_condition(u8(i), n.condition - wear);
+		parts_wore = true;
+	}
+
+	gs_rebuild_stats();
+	if (parts_wore)
+		gs_sync_to_server();
+}
+
+bool CWeapon::gs_debug_set_condition(u8 node, float value)
+{
+	if (node >= m_gs_tree.size())
+	{
+		Msg("! gunsmith: node %u does not exist (tree has %u nodes)", u32(node), u32(m_gs_tree.size()));
+		return false;
+	}
+	clamp(value, 0.f, 1.f);
+	if (node == 0)
+		SetCondition(value);
+	else
+		m_gs_tree.set_condition(node, value);
+	gs_rebuild_stats();
+	gs_sync_to_server();
+	return true;
+}
+
+bool CWeapon::gs_debug_set_part(u8 parent, u8 slot, LPCSTR section)
+{
+	if (parent >= m_gs_tree.size())
+	{
+		Msg("! gunsmith: node %u does not exist", u32(parent));
+		return false;
+	}
+	gunsmith::SLOTS slots;
+	m_gs_tree.node_slots(parent, slots);
+	if (slot >= slots.size())
+	{
+		Msg("! gunsmith: node %u has no slot %u (it has %u)", u32(parent), u32(slot), u32(slots.size()));
+		return false;
+	}
+	if (slots[slot].legacy_addon != gunsmith::eLegacyNone)
+	{
+		Msg("! gunsmith: slot %u is an addon slot (%s); attach and detach it in the inventory", u32(slot), gunsmith::legacy_addon_name(slots[slot].legacy_addon));
+		return false;
+	}
+
+	const bool remove = !section || !*section || !xr_strcmp(section, "none");
+	if (!remove)
+	{
+		if (!pSettings->section_exist(section))
+		{
+			Msg("! gunsmith: section [%s] does not exist", section);
+			return false;
+		}
+		if (!gunsmith::part_fits_slot(section, slots[slot], cNameSect().c_str(), true))
+		{
+			Msg("! gunsmith: [%s] does not fit slot [%s] (no matching tag)", section, slots[slot].section.c_str());
+			return false;
+		}
+		if (m_gs_tree.is_slot_blocked(slots[slot].section))
+		{
+			Msg("! gunsmith: slot [%s] is blocked by another part", slots[slot].section.c_str());
+			return false;
+		}
+	}
+
+	const int existing = m_gs_tree.find_in_slot(parent, slot);
+	if (existing >= 0)
+		m_gs_tree.remove_subtree(u8(existing));
+	if (!remove && m_gs_tree.add_node(section, parent, slot, 1.f) < 0)
+	{
+		Msg("! gunsmith: could not add [%s] (tree full?)", section);
+		return false;
+	}
+
+	gs_rebuild_stats();
+	gs_sync_to_server();
+	return true;
+}
+
+void CWeapon::gs_dump_stats() const
+{
+	gunsmith::dump(m_gs_stats);
+	Msg("-   effective: fire_dispersion %.4f deg (base %.4f), bullet_speed %.1f (base %.1f), hit_power[0] %.3f (base %.3f)",
+	    rad2deg(m_gs_stats.apply(gunsmith::eStatFireDispersion, fireDispersionBase)), rad2deg(fireDispersionBase),
+	    m_gs_stats.apply(gunsmith::eStatBulletSpeed, m_fStartBulletSpeed), m_fStartBulletSpeed,
+	    m_gs_stats.apply(gunsmith::eStatHitPower, fvHitPower[0]), fvHitPower[0]);
+	Msg("-   effective: zoom_rotate_time %.3f (base %.3f), cam_dispersion %.4f deg (base %.4f), rpm %.0f (base %.0f)",
+	    m_gs_stats.apply(gunsmith::eStatZoomRotateTime, m_zoom_params.m_fZoomRotateTime), m_zoom_params.m_fZoomRotateTime,
+	    rad2deg(m_gs_stats.apply(gunsmith::eStatCamDispersion, cam_recoil.Dispersion)), rad2deg(cam_recoil.Dispersion),
+	    fOneShotTime > 0.f ? 60.f / gs_shot_time(fOneShotTime) : 0.f, fOneShotTime > 0.f ? 60.f / fOneShotTime : 0.f);
+	Msg("-   suppressed=%s jammed=%s jam=%s node=%u", IsSuppressed() ? "yes" : "no", IsMisfire() ? "yes" : "no",
+	    IsMisfire() ? gunsmith::failure_name(m_gs_jam_type) : "none", u32(m_gs_jam_node));
 }
 
 void CWeapon::gs_match_scope_part()
@@ -1224,6 +1409,7 @@ void CWeapon::OnEvent(NET_Packet& P, u16 type)
 		{
 			P.r_u8(m_flagsAddOnState);
 			m_gs_tree.sync_legacy_flags(m_flagsAddOnState, GetCondition()); // multiplayer buy menu only
+			gs_rebuild_stats(false);
 			InitAddons();
 			UpdateAddonsVisibility();
 		}
@@ -1491,6 +1677,8 @@ void CWeapon::SetDefaults()
 
 	m_flags.set(FUsingCondition, TRUE);
 	bMisfire = false;
+	m_gs_jam_type = gunsmith::eFailNone;
+	m_gs_jam_node = 0;
 	m_flagsAddOnState = 0;
 	m_zoom_params.m_bIsZoomModeNow = false;
 }
@@ -1847,19 +2035,73 @@ BOOL CWeapon::CheckForMisfire()
 {
 	if (OnClient()) return FALSE;
 
-	float rnd = ::Random.randF(0.f, 1.f);
-	float mp = GetConditionMisfireProbability();
-	if (rnd < mp)
+	// The receiver's own misfire curve plus every failure-capable part's curve.
+	// One roll against the sum; the part that caused the jam is picked by its share.
+	struct SCandidate
 	{
-		StopShooting();
-		bMisfire = true;
+		u8 node;
+		u8 type;
+		float probability;
+	};
+	SCandidate candidates[gunsmith::GS_MAX_NODES + 1];
+	u32 count = 0;
+	float total = 0.f;
 
-		return TRUE;
-	}
-	else
+	const float receiver = GetConditionMisfireProbability();
+	if (receiver > 0.f)
 	{
-		return FALSE;
+		candidates[count++] = { 0, gunsmith::eFailMisfire, receiver };
+		total += receiver;
 	}
+
+	if (m_gs_tree.size() > 1)
+	{
+		::luabind::functor<float> part_hook;
+		const bool has_hook = ai().script_engine().functor("xr_weapon_jam.GetPartMisfireProbability", part_hook);
+		CGameObject* owner = smart_cast<CGameObject*>(H_Parent());
+
+		for (u32 i = 1; i < m_gs_tree.size() && count < gunsmith::GS_MAX_NODES + 1; ++i)
+		{
+			const gunsmith::SNode& n = m_gs_tree.node(u8(i));
+			const gunsmith::SPartData& p = gunsmith::part_data(n.section.c_str());
+			if (p.failure == gunsmith::eFailNone)
+				continue;
+			float probability = gunsmith::part_jam_probability(p, n.condition);
+			if (has_hook)
+				probability = part_hook(lua_game_object(), owner ? owner->lua_game_object() : nullptr, int(i), p.kind.c_str(), probability);
+			clamp(probability, 0.f, 1.f);
+			if (probability <= 0.f)
+				continue;
+			candidates[count++] = { u8(i), p.failure, probability };
+			total += probability;
+		}
+	}
+
+	if (total <= 0.f)
+		return FALSE;
+
+	const float chance = _min(total, 1.f);
+	const float rnd = ::Random.randF(0.f, 1.f);
+	if (rnd >= chance)
+		return FALSE;
+
+	float pick = rnd / chance * total;
+	u32 culprit = count - 1;
+	for (u32 i = 0; i < count; ++i)
+	{
+		if (pick < candidates[i].probability)
+		{
+			culprit = i;
+			break;
+		}
+		pick -= candidates[i].probability;
+	}
+
+	m_gs_jam_type = candidates[culprit].type;
+	m_gs_jam_node = candidates[culprit].node;
+	StopShooting();
+	bMisfire = true;
+	return TRUE;
 }
 
 bool CWeapon::IsMisfire() const
@@ -1870,6 +2112,8 @@ bool CWeapon::IsMisfire() const
 void CWeapon::SetMisfireScript(bool b)
 {
 	bMisfire = b;
+	m_gs_jam_type = b ? u8(gunsmith::eFailMisfire) : u8(gunsmith::eFailNone);
+	m_gs_jam_node = 0;
 }
 
 void CWeapon::Reload()
@@ -2572,7 +2816,7 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 			factor = Device.fTimeDelta / m_fSafeModeRotateTime;
 		else
 			factor = Device.fTimeDelta /
-			(m_zoom_params.m_fZoomRotateTime * cur_silencer_koef.zoom_rotate_time * cur_scope_koef.zoom_rotate_time
+			(m_gs_stats.apply(gunsmith::eStatZoomRotateTime, m_zoom_params.m_fZoomRotateTime) * cur_silencer_koef.zoom_rotate_time * cur_scope_koef.zoom_rotate_time
 					* cur_launcher_koef.zoom_rotate_time);
 
 		InterpolateOffset(m_hud_offset[0], curr_offs, factor);
@@ -3158,18 +3402,8 @@ float CWeapon::Weight() const
 {
 	float res = CInventoryItemObject::Weight();
 
-	if (IsGrenadeLauncherAttached() && GetGrenadeLauncherName().size())
-	{
-		res += pSettings->r_float(GetGrenadeLauncherName(), "inv_weight");
-	}
-	if (IsScopeAttached() && m_scopes.size())
-	{
-		res += pSettings->r_float(GetScopeName(), "inv_weight");
-	}
-	if (IsSilencerAttached() && GetSilencerName().size())
-	{
-		res += pSettings->r_float(GetSilencerName(), "inv_weight");
-	}
+	// Attached parts, including old-style addons (their item inv_weight, as before).
+	res += m_gs_stats.weight_add;
 
 	res += GetMagazineWeight(m_magazine);
 	return res;
@@ -3375,18 +3609,10 @@ void CWeapon::ZoomDec()
 u32 CWeapon::Cost() const
 {
 	u32 res = CInventoryItem::Cost();
-	if (IsGrenadeLauncherAttached() && GetGrenadeLauncherName().size())
-	{
-		res += pSettings->r_u32(GetGrenadeLauncherName(), "cost");
-	}
-	if (IsScopeAttached() && m_scopes.size())
-	{
-		res += pSettings->r_u32(GetScopeName(), "cost");
-	}
-	if (IsSilencerAttached() && GetSilencerName().size())
-	{
-		res += pSettings->r_u32(GetSilencerName(), "cost");
-	}
+
+	// Attached parts, including old-style addons (their item cost, as before).
+	if (m_gs_stats.cost_add > 0.f)
+		res += u32(m_gs_stats.cost_add + 0.5f);
 
 	if (iAmmoElapsed)
 	{

@@ -52,7 +52,7 @@ float CActor::GetWeaponAccuracy() const
 	else
 		disp_aim = 1.0;
 
-	float dispersion = m_fDispBase * GetWeaponParam(W, Get_PDM_Base(), 1.0f) *
+	float dispersion = m_fDispBase * GetWeaponParam(W, gs_pdm_base(), 1.0f) *
 		GetWeaponParam(W, Get_Silencer_PDM_Base(), 1.0f) * GetWeaponParam(W, Get_Scope_PDM_Base(), 1.0f) *
 		GetWeaponParam(W, Get_Launcher_PDM_Base(), 1.0f);
 
@@ -65,12 +65,12 @@ float CActor::GetWeaponAccuracy() const
 
 		//fAVelocity = angle velocity
 		dispersion *= (1.0f + (AVelocity / VEL_A_MAX) * m_fDispVelFactor * GetWeaponParam(
-				W, Get_PDM_Vel_F(), 1.0f) *
+				W, gs_pdm_vel(), 1.0f) *
 			GetWeaponParam(W, Get_Silencer_PDM_Vel(), 1.0f) * GetWeaponParam(W, Get_Scope_PDM_Vel(), 1.0f) *
 			GetWeaponParam(W, Get_Launcher_PDM_Vel(), 1.0f));
 
 		//fVelocity = linear velocity
-		dispersion *= (1.0f + (state.fVelocity / VEL_MAX) * m_fDispVelFactor * GetWeaponParam(W, Get_PDM_Vel_F(), 1.0f)
+		dispersion *= (1.0f + (state.fVelocity / VEL_MAX) * m_fDispVelFactor * GetWeaponParam(W, gs_pdm_vel(), 1.0f)
 			*
 			GetWeaponParam(W, Get_Silencer_PDM_Vel(), 1.0f) * GetWeaponParam(W, Get_Scope_PDM_Vel(), 1.0f) *
 			GetWeaponParam(W, Get_Launcher_PDM_Vel(), 1.0f));
@@ -79,7 +79,7 @@ float CActor::GetWeaponAccuracy() const
 		bool bAccelerated = isActorAccelerated(mstate_real, IsZoomAimingMode());
 		if (bAccelerated || !state.bCrouch)
 		{
-			dispersion *= (1.0f + m_fDispAccelFactor * GetWeaponParam(W, Get_PDM_Accel_F(), 1.0f) *
+			dispersion *= (1.0f + m_fDispAccelFactor * GetWeaponParam(W, gs_pdm_accel(), 1.0f) *
 				GetWeaponParam(W, Get_Silencer_PDM_Accel(), 1.0f) * GetWeaponParam(W, Get_Scope_PDM_Accel(), 1.0f) *
 				GetWeaponParam(W, Get_Launcher_PDM_Accel(), 1.0f));
 		}
@@ -265,7 +265,12 @@ void CActor::HitSector(CObject* who, CObject* weapon)
 void CActor::on_weapon_shot_start(CWeapon* weapon)
 {
 	//CWeaponMagazined* pWM = smart_cast<CWeaponMagazined*> (weapon);
-	CameraRecoil const& camera_recoil = (IsZoomAimingMode()) ? weapon->zoom_cam_recoil : weapon->cam_recoil;
+	CameraRecoil const& base_recoil = (IsZoomAimingMode()) ? weapon->zoom_cam_recoil : weapon->cam_recoil;
+	// Horizontal recoil from the weapon's parts (gunsmith cam_horz_mul).
+	CameraRecoil camera_recoil;
+	camera_recoil.Clone(base_recoil);
+	camera_recoil.StepAngleHorz *= weapon->gs_stats().mul[gunsmith::eStatCamHorz];
+	camera_recoil.MaxAngleHorz *= weapon->gs_stats().mul[gunsmith::eStatCamHorz];
 
 	CCameraShotEffector* effector = smart_cast<CCameraShotEffector*>(Cameras().GetCamEffector(eCEShot));
 	if (!effector)

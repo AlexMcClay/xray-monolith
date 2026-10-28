@@ -109,7 +109,7 @@ void SBullet::Init(const Fvector& position,
 		if (g_obj) 
 		{
 			CWeapon* weapon = smart_cast<CWeapon*>(g_obj);
-			if (weapon && weapon->IsSilencerAttached())
+			if (weapon && weapon->IsSuppressed())
 				flags.allow_tracer = (weapon->GetSilencedTracers());	// momopate: customize per weapon
 		}
 	}

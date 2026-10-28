@@ -118,6 +118,7 @@ public:
 	virtual bool CanDetach(const char* item_section_name);
 
 	virtual void InitAddons();
+	virtual void gs_on_suppression_changed();
 
 	virtual bool Action(u16 cmd, u32 flags);
 	bool IsAmmoAvailable();

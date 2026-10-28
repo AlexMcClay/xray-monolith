@@ -16,7 +16,7 @@
 
 #include "NewZoomFlag.h"
 
-#include "gunsmith_tree.h"
+#include "gunsmith_stats.h"
 
 class CEntity;
 class ENGINE_API CMotionDef;
@@ -356,8 +356,42 @@ public:
 	CSE_ALifeItemWeapon* gs_server_entity() const;
 	void gs_sync_to_server();
 
+	// Stat modifiers from the parts. Read sites use gs_stats().apply(stat, base).
+	const gunsmith::SWeaponStats& gs_stats() const { return m_gs_stats; }
+	// Recomputes gs_stats() from the tree; `notify` re-applies suppressed sound and
+	// particles when a worn suppressor crosses its threshold.
+	void gs_rebuild_stats(bool notify = true);
+
+	// A silencer is attached and not worn below its suppression threshold.
+	bool IsSuppressed() const;
+
+	float gs_pdm_base() const;
+	float gs_pdm_vel() const;
+	float gs_pdm_accel() const;
+	// Seconds per shot after rpm modifiers.
+	float gs_shot_time(float base_time) const;
+
+	// Which part caused the current jam (gunsmith::EFailure and node index).
+	u8 gs_jam_type() const { return m_gs_jam_type; }
+	u8 gs_jam_node() const { return m_gs_jam_node; }
+
+	// Debug and test helpers for the gs_* console commands.
+	bool gs_debug_set_condition(u8 node, float value);
+	bool gs_debug_set_part(u8 parent, u8 slot, LPCSTR section);
+	void gs_dump_stats() const;
+
 protected:
 	gunsmith::CTree m_gs_tree;
+	gunsmith::SWeaponStats m_gs_stats;
+	u8 m_gs_jam_type = 0;
+	u8 m_gs_jam_node = 0;
+	bool m_gs_cant_fire_logged = false;
+
+	// Per-shot wear of the receiver and every part in the firing path.
+	void gs_apply_shot_wear(float impair);
+	virtual void gs_modify_bullet(float& speed, float& hit_power, float& impulse);
+	// Switches shot sound, particles and lights between suppressed and not.
+	virtual void gs_on_suppression_changed() {}
 
 	// Mirrors an attach (part != null) or detach of an old-style addon into the tree.
 	void gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition);

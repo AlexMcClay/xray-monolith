@@ -73,7 +73,7 @@ void CWeapon::FireTrace(const Fvector& P, const Fvector& D)
 	//-------------------------------------------------------------	
 	bool is_tracer = m_bHasTracers && !!l_cartridge.m_flags.test(CCartridge::cfTracer);
 	if (is_tracer && !IsGameTypeSingle())
-		is_tracer = is_tracer /*&& (m_magazine.size() % 3 == 0)*/ && !IsSilencerAttached();
+		is_tracer = is_tracer /*&& (m_magazine.size() % 3 == 0)*/ && !IsSuppressed();
 
 	l_cartridge.m_flags.set(CCartridge::cfTracer, is_tracer);
 	if (m_u8TracerColorID != u8(-1))
@@ -82,7 +82,8 @@ void CWeapon::FireTrace(const Fvector& P, const Fvector& D)
 	//повысить изношенность оружия с учетом влияния конкретного патрона
 	//	float Deterioration = GetWeaponDeterioration();
 	//	Msg("Deterioration = %f", Deterioration);
-	ChangeCondition(-GetWeaponDeterioration() * l_cartridge.param_s.impair * cur_silencer_koef.condition_shot_dec);
+	// Receiver wear (as before) plus every part in the firing path (gunsmith).
+	gs_apply_shot_wear(l_cartridge.param_s.impair);
 
 
 	float fire_disp = 0.f;

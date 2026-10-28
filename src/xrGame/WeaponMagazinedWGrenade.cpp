@@ -707,9 +707,10 @@ void CWeaponMagazinedWGrenade::LoadLauncherKoeffs()
 	clamp(m_launcher_koef.zoom_rotate_time, 0.01f, 2.0f);
 }
 
+// Gunsmith: launcher multipliers now come from the part tree (see ApplySilencerKoeffs).
 void CWeaponMagazinedWGrenade::ApplyLauncherKoeffs()
 {
-	cur_launcher_koef = m_launcher_koef;
+	cur_launcher_koef.Reset();
 }
 
 void CWeaponMagazinedWGrenade::ResetLauncherKoeffs()
@@ -777,7 +778,8 @@ void CWeaponMagazinedWGrenade::PlayAnimReload()
 #ifdef NEW_ANIMS //AVO: use new animations
 	if (IsGrenadeLauncherAttached())
 	{
-		if (bMisfire)
+		// Gunsmith: a feed jam (worn magazine) needs a full reload, not a bolt rack.
+		if (bMisfire && m_gs_jam_type != gunsmith::eFailFeed)
 		{
 			if (HudAnimationExist("anm_reload_misfire_w_gl"))
 			{

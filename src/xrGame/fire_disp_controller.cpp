@@ -40,7 +40,7 @@ void CFireDispertionController::Update()
 		CWeapon* tmp_weapon = smart_cast<CWeapon*>(tmp_actor->inventory().ActiveItem());
 		if (tmp_weapon)
 		{
-			tmp_inertion = tmp_weapon->GetCrosshairInertion();
+			tmp_inertion = tmp_weapon->gs_stats().apply(gunsmith::eStatCrosshairInertion, tmp_weapon->GetCrosshairInertion());
 		}
 	}
 	float diff_time = tmp_inertion * _abs(end_disp - start_disp);

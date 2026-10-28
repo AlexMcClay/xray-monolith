@@ -62,12 +62,12 @@ void CWeaponShotEffector::Shot(CWeapon* weapon)
 
 	CCartridge* ammo = !weapon->m_magazine.empty() ? &weapon->m_magazine.back() : (0);
 	float k_cam_disp = ammo ? ammo->param_s.k_cam_dispersion : 1.0f;
-	float angle = m_cam_recoil.Dispersion
+	float angle = weapon->gs_stats().apply(gunsmith::eStatCamDispersion, m_cam_recoil.Dispersion)
 		* weapon->cur_silencer_koef.cam_dispersion
 		* weapon->cur_scope_koef.cam_dispersion
 		* weapon->cur_launcher_koef.cam_dispersion
 		* k_cam_disp;
-	angle += m_cam_recoil.DispersionInc
+	angle += weapon->gs_stats().apply(gunsmith::eStatCamDispersionInc, m_cam_recoil.DispersionInc)
 		* weapon->cur_silencer_koef.cam_disper_inc
 		* weapon->cur_scope_koef.cam_disper_inc
 		* weapon->cur_launcher_koef.cam_disper_inc
