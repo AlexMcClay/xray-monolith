@@ -3216,19 +3216,46 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 			}
 		}
 		
-		// Gunsmith: aim through the fitted sight part instead of the receiver's own sights.
+		// Gunsmith: aim through the fitted sight part. Its aim point is kept on the camera's axis
+		// (where the screen centre and a collimator's dot are): a correction to the aim offset,
+		// seeded from the HUD section's gs_aim_point and refined while aiming steadily, so the
+		// sight lines up whatever the aim offset, model scale or mount chain.
 		if (idx == 1 && !m_modular_attachments && m_gs_full_mode)
 		{
-			Fvector gs_delta;
-			if (m_gs_visuals.aim_delta(hi->m_model, gs_delta))
+			Fvector sight;
+			shared_str key;
+			if (m_gs_visuals.sight_point(hi->m_model, sight, key))
 			{
-				// The offset is applied in the camera frame; the delta is in the model's.
-				Fmatrix inv, rel;
-				inv.invert(trans);
-				rel.mul_43(inv, hi->m_item_transform);
-				rel.transform_dir(gs_delta);
-				curr_offs.x += gs_delta.x;
-				curr_offs.y += gs_delta.y;
+				Fmatrix cam_inv;
+				cam_inv.invert(trans);
+				if (key != m_gs_aim_sight)
+				{
+					m_gs_aim_sight = key;
+					m_gs_aim_corr.set(0.f, 0.f, 0.f);
+					Fvector d;
+					if (m_gs_visuals.aim_delta(hi->m_model, d))
+					{
+						// the delta is in the model's frame; the offset is applied in the camera's
+						Fmatrix rel;
+						rel.mul_43(cam_inv, hi->m_item_transform);
+						rel.transform_dir(d);
+						m_gs_aim_corr.set(d.x, d.y, 0.f);
+					}
+				}
+				curr_offs.x += m_gs_aim_corr.x;
+				curr_offs.y += m_gs_aim_corr.y;
+
+				// Refine once the HUD has settled at the aim position, not while firing.
+				if (m_zoom_params.m_fZoomRotationFactor >= 1.f && GetState() == eIdle &&
+					m_hud_offset[0].similar(curr_offs, 0.003f))
+				{
+					Fvector s;
+					hi->m_item_transform.transform_tiny(s, sight);
+					cam_inv.transform_tiny(s); // camera space: x right, y up, z forward
+					const float k = _min(1.f, Device.fTimeDelta * 4.f);
+					m_gs_aim_corr.x -= s.x * k;
+					m_gs_aim_corr.y -= s.y * k;
+				}
 			}
 		}
 

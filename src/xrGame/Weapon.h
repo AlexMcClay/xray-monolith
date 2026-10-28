@@ -419,6 +419,10 @@ public:
 protected:
 	gunsmith::CVisuals m_gs_visuals;
 	bool m_gs_full_mode = false;
+	// Aim correction (camera space) that keeps the fitted sight on the camera axis, and the sight
+	// it was made for. Seeded from gs_aim_point, refined while aiming steadily.
+	Fvector m_gs_aim_corr = { 0.f, 0.f, 0.f };
+	shared_str m_gs_aim_sight;
 
 	// Magazine parts (`ammo_mag_size`) set the magazine size; the weapon's own comes back when
 	// none is fitted. `live`: a change in play, so rounds that no longer fit are returned.

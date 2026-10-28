@@ -325,15 +325,38 @@ namespace gunsmith
 		return true;
 	}
 
+	const CVisuals::SChild* CVisuals::pick_sight(const SContext& c) const
+	{
+		const SChild* sight = nullptr;
+		for (const SChild& ch : c.children)
+			if (ch.pv->has_aim && (!sight || ch.pv->aim_priority >= sight->pv->aim_priority))
+				sight = &ch; // highest aim_priority; among equals the last in the tree
+		return sight;
+	}
+
+	bool CVisuals::sight_point(IKinematics* root, Fvector& point, shared_str& key)
+	{
+		SContext& c = m_ctx[eHud];
+		if (c.children.empty() || c.root != root)
+			return false;
+		const SChild* sight = pick_sight(c);
+		if (!sight)
+			return false;
+		update_local(c, root);
+		sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(point, sight->pv->aim_point);
+		sight->local.transform_tiny(point);
+		string256 k;
+		xr_sprintf(k, "%u:%s", u32(sight->node), c.sig[sight->node].section.c_str());
+		key = k;
+		return true;
+	}
+
 	bool CVisuals::aim_delta(IKinematics* root, Fvector& delta)
 	{
 		SContext& c = m_ctx[eHud];
 		if (!c.has_root_aim || c.children.empty() || c.root != root)
 			return false;
-		const SChild* sight = nullptr;
-		for (const SChild& ch : c.children)
-			if (ch.pv->has_aim && (!sight || ch.pv->aim_priority >= sight->pv->aim_priority))
-				sight = &ch; // highest aim_priority; among equals the last in the tree
+		const SChild* sight = pick_sight(c);
 		if (!sight)
 			return false;
 		update_local(c, root);

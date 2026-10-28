@@ -85,6 +85,10 @@ namespace gunsmith
 		// model's space. False without a receiver aim point or a sight part.
 		bool aim_delta(IKinematics* root, Fvector& delta);
 
+		// HUD: the fitted sight's aim point in the receiver model's space, and a key that changes
+		// when a different sight (or the same sight elsewhere) is fitted.
+		bool sight_point(IKinematics* root, Fvector& point, shared_str& key);
+
 		bool has_children(int ctx) const { return !m_ctx[ctx].children.empty(); }
 
 	private:
@@ -124,5 +128,6 @@ namespace gunsmith
 		SContext m_ctx[2];
 
 		void update_local(SContext& c, IKinematics* root);
+		const SChild* pick_sight(const SContext& c) const;
 	};
 }
