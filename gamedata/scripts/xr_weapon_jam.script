@@ -28,6 +28,24 @@ function GetConditionMisfireProbability(weapon, npc, base_value)
 	return t.ret_value or 0
 end
 
+-- Gunsmith: per-part jam chance, called by the engine for every failure-capable
+-- part (barrel, bolt, magazine...) on every shot, for the player and NPCs alike.
+--   weapon     game_object of the weapon
+--   owner      game_object of who holds it, or nil
+--   node       part node index in the weapon's part tree
+--   part_kind  part_kind of that part ("barrel", "magazine", ...)
+--   base_value chance from the part's condition curve, 0..1
+-- Callbacks set t.ret_value to change the chance. The NPC callback above is separate
+-- and still only covers the receiver's own misfire curve.
+AddScriptCallback("weapon_get_part_misfire_probability")
+function GetPartMisfireProbability(weapon, owner, node, part_kind, base_value)
+	local t = {
+		ret_value = base_value
+	}
+	SendScriptCallback("weapon_get_part_misfire_probability", weapon, owner, node, part_kind, base_value, t)
+	return t.ret_value or base_value
+end
+
 -- Vanilla misfire code
 function npc_misfire(weapon, npc, base_value, t)
 	local itm = weapon	

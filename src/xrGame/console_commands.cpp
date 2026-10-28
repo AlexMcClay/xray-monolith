@@ -432,11 +432,64 @@ public:
 		}
 		Msg("- gs_dump_tree: [%s] id=%u addon flags=0x%02x condition=%.4f", wpn->cNameSect().c_str(), u32(wpn->ID()), u32(wpn->GetAddonsState()), wpn->GetCondition());
 		wpn->gs_tree().dump("client");
+		wpn->gs_dump_stats();
 		if (CSE_ALifeItemWeapon* se = wpn->gs_server_entity())
 		{
 			Msg("- gs_dump_tree: server addon flags=0x%02x", u32(se->m_addon_flags.get()));
 			se->m_gs_tree.dump("server");
 		}
+	}
+};
+
+static CWeapon* gs_active_weapon(LPCSTR command)
+{
+	CActor* actor = Actor();
+	CWeapon* wpn = actor ? smart_cast<CWeapon*>(actor->inventory().ActiveItem()) : nullptr;
+	if (!wpn)
+		Msg("! %s: hold a weapon first", command);
+	return wpn;
+}
+
+// Gunsmith test helper: gs_set_condition <node> <0..1>
+class CCC_GsSetCondition : public IConsole_Command
+{
+public:
+	CCC_GsSetCondition(LPCSTR N) : IConsole_Command(N) {}
+
+	virtual void Execute(LPCSTR args)
+	{
+		u32 node = 0;
+		float value = 0.f;
+		if (sscanf_s(args, "%u %f", &node, &value) != 2 || node > 255)
+		{
+			Msg("! usage: gs_set_condition <node> <0..1>   (node numbers from gs_dump_tree; 0 is the gun)");
+			return;
+		}
+		if (CWeapon* wpn = gs_active_weapon("gs_set_condition"))
+			if (wpn->gs_debug_set_condition(u8(node), value))
+				Msg("- gs_set_condition: node %u = %.3f", node, value);
+	}
+};
+
+// Gunsmith test helper: gs_set_part <parent node> <slot> <part section | none>
+class CCC_GsSetPart : public IConsole_Command
+{
+public:
+	CCC_GsSetPart(LPCSTR N) : IConsole_Command(N) {}
+
+	virtual void Execute(LPCSTR args)
+	{
+		u32 parent = 0, slot = 0;
+		string256 section;
+		section[0] = 0;
+		if (sscanf_s(args, "%u %u %255s", &parent, &slot, section, (unsigned)sizeof(section)) != 3 || parent > 255 || slot > 255)
+		{
+			Msg("! usage: gs_set_part <parent node> <slot> <part section | none>");
+			return;
+		}
+		if (CWeapon* wpn = gs_active_weapon("gs_set_part"))
+			if (wpn->gs_debug_set_part(u8(parent), u8(slot), section))
+				Msg("- gs_set_part: node %u slot %u = %s", parent, slot, section);
 	}
 };
 
@@ -2547,6 +2600,8 @@ void CCC_RegisterCommands()
 
 	CMD1(CCC_MemStats, "stat_memory");
 	CMD1(CCC_GsDumpTree, "gs_dump_tree");
+	CMD1(CCC_GsSetCondition, "gs_set_condition");
+	CMD1(CCC_GsSetPart, "gs_set_part");
 #ifdef DEBUG
 	CMD1(CCC_MemCheckpoint, "stat_memory_checkpoint");
 #endif //#ifdef DEBUG
