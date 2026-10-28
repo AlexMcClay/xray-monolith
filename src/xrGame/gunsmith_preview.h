@@ -28,8 +28,9 @@ namespace gunsmith
 			ICON_H = 200,
 			ATLAS_W = 2048,
 			ATLAS_H = 2048,
-			VIEW_W = 1024,
+			VIEW_W = 1024, // default view texture size; view_resolution() changes it
 			VIEW_H = 512,
+			VIEW_MAX = 2048,
 		};
 
 		CPreview(); // use instance()
@@ -54,6 +55,13 @@ namespace gunsmith
 		// `aspect` is the shown view's width / height on screen; the texture is stretched to it.
 		void view_camera(float yaw_deg, float pitch_deg, float zoom, float pan_x, float pan_y, float aspect);
 		void view_tick();
+		void view_resolution(u32 w, u32 h);
+		u32 view_width() const { return m_view_w; }
+		u32 view_height() const { return m_view_h; }
+
+		// The build's box on screen with the current camera, in u, v across the view (0..1 from
+		// the top left; can lie outside). False before the first view is drawn.
+		bool view_bounds(Frect& uv) const;
 
 		// The slots' mount points (from the last view drawn) through the current camera, so they
 		// match the image drawn this frame: u, v across the view (0..1, from the top left), and
@@ -98,6 +106,7 @@ namespace gunsmith
 		u32 m_view_tick = 0;
 		float m_yaw = 0.f, m_pitch = 10.f, m_zoom = 1.f, m_pan_x = 0.f, m_pan_y = 0.f, m_aspect = 2.f;
 		Fbox m_view_box; // of the last view drawn
+		u32 m_view_w = VIEW_W, m_view_h = VIEW_H;
 		xr_vector<CVisuals::SSlotPoint> m_view_points; // its slots, in the receiver model's space
 	};
 }

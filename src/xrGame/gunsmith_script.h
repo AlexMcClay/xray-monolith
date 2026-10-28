@@ -49,7 +49,9 @@ class CScriptGameObject;
 //   gunsmith.icon_rect(id) / icon_rect_section(section)  {x1, y1, x2, y2} in icon_texture(), or nil
 //   gunsmith.preview_object(id) / preview_section(section) / preview_clear()
 //   gunsmith.preview_camera(yaw, pitch, zoom, pan_x, pan_y, aspect), preview_tick() every frame shown
-//   gunsmith.preview_slots()  { {node, slot, u, v, visible}, ... } for the last view drawn
+//   gunsmith.preview_slots()  { {node, slot, u, v, visible}, ... } with the current camera
+//   gunsmith.preview_bounds() {x1, y1, x2, y2} of the build on screen (0..1), or nil
+//   gunsmith.preview_resolution(w, h) the view texture's size (default 1024 x 512)
 //   gunsmith.preview_texture(), preview_size() -> {w, h}, preview_available()
 ::luabind::object gs_icon_rect_script(lua_State* L, u16 id);
 ::luabind::object gs_icon_rect_section_script(lua_State* L, LPCSTR section);
@@ -62,5 +64,7 @@ void gs_preview_section(LPCSTR section);
 void gs_preview_clear();
 void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pan_y, float aspect);
 ::luabind::object gs_preview_slots_script(lua_State* L);
+::luabind::object gs_preview_bounds_script(lua_State* L);
+void gs_preview_resolution(u32 w, u32 h);
 void gs_preview_tick();
 bool gs_is_full_mode(LPCSTR section);

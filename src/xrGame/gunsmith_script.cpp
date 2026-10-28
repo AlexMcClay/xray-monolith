@@ -204,8 +204,8 @@ namespace
 ::luabind::object gs_preview_size_script(lua_State* L)
 {
 	::luabind::object t = ::luabind::newtable(L);
-	t["w"] = int(gunsmith::CPreview::VIEW_W);
-	t["h"] = int(gunsmith::CPreview::VIEW_H);
+	t["w"] = int(gunsmith::CPreview::instance().view_width());
+	t["h"] = int(gunsmith::CPreview::instance().view_height());
 	return t;
 }
 
@@ -219,6 +219,15 @@ void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pa
 {
 	gunsmith::CPreview::instance().view_camera(yaw, pitch, zoom, pan_x, pan_y, aspect);
 }
+
+::luabind::object gs_preview_bounds_script(lua_State* L)
+{
+	Frect r;
+	const bool ok = gunsmith::CPreview::instance().view_bounds(r);
+	return rect_to_lua(L, ok, r);
+}
+
+void gs_preview_resolution(u32 w, u32 h) { gunsmith::CPreview::instance().view_resolution(w, h); }
 
 ::luabind::object gs_preview_slots_script(lua_State* L)
 {

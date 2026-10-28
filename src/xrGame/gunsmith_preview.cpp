@@ -220,6 +220,37 @@ namespace gunsmith
 		m_view_tick = Device.dwFrame;
 	}
 
+	void CPreview::view_resolution(u32 w, u32 h)
+	{
+		m_view_w = clampr(w, u32(64), u32(VIEW_MAX));
+		m_view_h = clampr(h, u32(64), u32(VIEW_MAX));
+	}
+
+	bool CPreview::view_bounds(Frect& uv) const
+	{
+		if (m_view_points.empty())
+			return false;
+		Fmatrix view, proj, vp;
+		view_matrices(m_view_box, view, proj);
+		vp.mul(proj, view);
+		uv.set(flt_max, flt_max, -flt_max, -flt_max);
+		for (u32 i = 0; i < 8; ++i)
+		{
+			Fvector p;
+			m_view_box.getpoint(i, p);
+			Fvector4 h;
+			vp.transform(h, p);
+			if (h.w <= EPS_L)
+				continue;
+			const float u = (h.x / h.w + 1.f) * 0.5f, v = (1.f - h.y / h.w) * 0.5f;
+			uv.x1 = _min(uv.x1, u);
+			uv.y1 = _min(uv.y1, v);
+			uv.x2 = _max(uv.x2, u);
+			uv.y2 = _max(uv.y2, v);
+		}
+		return uv.x1 <= uv.x2;
+	}
+
 	CPreview::SScene* CPreview::scene(LPCSTR section)
 	{
 		auto it = m_scenes.find(section);
@@ -346,7 +377,7 @@ namespace gunsmith
 			visuals.push_back(item.first);
 			xforms.push_back(item.second);
 		}
-		if (!::Render->PreviewRender(VIEW_TEXTURE, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H, view, proj, visuals.data(),
+		if (!::Render->PreviewRender(VIEW_TEXTURE, m_view_w, m_view_h, 0, 0, m_view_w, m_view_h, view, proj, visuals.data(),
 									 xforms.data(), u32(visuals.size())))
 		{
 			m_failed = true;
