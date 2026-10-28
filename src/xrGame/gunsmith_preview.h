@@ -7,6 +7,7 @@
 #pragma once
 
 #include "../xrEngine/pure.h"
+#include "gunsmith_visuals.h"
 
 class CWeapon;
 class IRenderVisual;
@@ -54,15 +55,16 @@ namespace gunsmith
 		void view_camera(float yaw_deg, float pitch_deg, float zoom, float pan_x, float pan_y, float aspect);
 		void view_tick();
 
-		// The slots' mount points in the last view drawn: u, v across the view (0..1, from the
-		// top left), and whether the point is in front of the camera and inside the view.
+		// The slots' mount points (from the last view drawn) through the current camera, so they
+		// match the image drawn this frame: u, v across the view (0..1, from the top left), and
+		// whether the point is in front of the camera and inside the view.
 		struct SViewSlot
 		{
 			u8 node, slot;
 			float u, v;
 			bool visible;
 		};
-		const xr_vector<SViewSlot>& view_slots() const { return m_view_slots; }
+		void view_slots(xr_vector<SViewSlot>& out) const;
 
 		virtual void OnRender();
 
@@ -85,6 +87,7 @@ namespace gunsmith
 		SScene* scene(LPCSTR section);
 		void draw_icon(u32 index);
 		void draw_view();
+		void view_matrices(const Fbox& box, Fmatrix& view, Fmatrix& proj) const;
 
 		xr_vector<SCell> m_cells;
 		xr_map<shared_str, SScene*> m_scenes;
@@ -94,7 +97,7 @@ namespace gunsmith
 		shared_str m_view_section;
 		u32 m_view_tick = 0;
 		float m_yaw = 0.f, m_pitch = 10.f, m_zoom = 1.f, m_pan_x = 0.f, m_pan_y = 0.f, m_aspect = 2.f;
-		xr_vector<SViewSlot> m_view_slots;
-		Fmatrix m_view_view, m_view_proj; // of the last view drawn, for projecting slot points
+		Fbox m_view_box; // of the last view drawn
+		xr_vector<CVisuals::SSlotPoint> m_view_points; // its slots, in the receiver model's space
 	};
 }

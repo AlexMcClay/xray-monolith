@@ -105,8 +105,7 @@ namespace gunsmith
 	CPreview::CPreview()
 	{
 		m_cells.resize((ATLAS_W / ICON_W) * (ATLAS_H / ICON_H));
-		m_view_view.identity();
-		m_view_proj.identity();
+		m_view_box.invalidate();
 		Device.seqRender.Add(this, REG_PRIORITY_HIGH);
 	}
 
@@ -203,7 +202,7 @@ namespace gunsmith
 	{
 		m_view_id = u16(-1);
 		m_view_section = nullptr;
-		m_view_slots.clear();
+		m_view_points.clear();
 	}
 
 	void CPreview::view_camera(float yaw_deg, float pitch_deg, float zoom, float pan_x, float pan_y, float aspect)
@@ -336,13 +335,44 @@ namespace gunsmith
 		if (!draw_list(m_view_id, m_view_section.c_str(), list))
 			return;
 
-		Fbox box;
-		bounds(list, box);
+		bounds(list, m_view_box);
+		Fmatrix view, proj;
+		view_matrices(m_view_box, view, proj);
+
+		xr_vector<IRenderVisual*> visuals;
+		xr_vector<Fmatrix> xforms;
+		for (const auto& item : list)
+		{
+			visuals.push_back(item.first);
+			xforms.push_back(item.second);
+		}
+		if (!::Render->PreviewRender(VIEW_TEXTURE, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H, view, proj, visuals.data(),
+									 xforms.data(), u32(visuals.size())))
+		{
+			m_failed = true;
+			return;
+		}
+
+		// The slots, for markers; view_slots() projects them with the camera of that moment.
+		m_view_points.clear();
+		IKinematics* K = list.front().first->dcast_PKinematics();
+		if (m_view_id != u16(-1))
+		{
+			CWeapon* weapon = smart_cast<CWeapon*>(Level().Objects.net_Find(m_view_id));
+			if (weapon)
+				weapon->gs_visuals().slot_points(CVisuals::eWorld, K, weapon->gs_tree(), weapon->cNameSect().c_str(), nullptr, m_view_points);
+		}
+		else if (SScene* s = scene(m_view_section.c_str()))
+			s->visuals.slot_points(CVisuals::eWorld, K, s->tree, m_view_section.c_str(), nullptr, m_view_points);
+	}
+
+	// Orbits the build's centre; yaw 0 / pitch 0 looks at its right side like the icons.
+	void CPreview::view_matrices(const Fbox& box, Fmatrix& view, Fmatrix& proj) const
+	{
 		Fvector centre;
 		box.getcenter(centre);
 		const float radius = _max(box.getradius(), 0.05f);
 
-		// Orbit the build's centre; yaw 0 / pitch 0 looks at its right side like the icons.
 		const float yaw = deg2rad(m_yaw), pitch = deg2rad(m_pitch);
 		Fvector back, dir, up, right, cam_up;
 		back.set(_cos(pitch) * _cos(yaw), _sin(pitch), _cos(pitch) * _sin(yaw));
@@ -354,43 +384,23 @@ namespace gunsmith
 		centre.mad(cam_up, -m_pan_y * radius);
 
 		const float aspect = 1.f / m_aspect; // X-Ray: height / width, of the view as shown
-		const float half_h = tanf(VIEW_FOV * 0.5f) / aspect; // tangent of half the horizontal FOV
-		const float dist = radius / half_h / m_zoom * 1.05f;
+		const float half_w = tanf(VIEW_FOV * 0.5f) / aspect; // tangent of half the horizontal FOV
+		const float dist = radius / half_w / m_zoom * 1.05f;
 		Fvector from;
 		from.mad(centre, back, dist);
-		m_view_view.build_camera_dir(from, dir, up);
-		m_view_proj.build_projection(VIEW_FOV, aspect, 0.02f, dist + radius * 2.f + 1.f);
+		view.build_camera_dir(from, dir, up);
+		proj.build_projection(VIEW_FOV, aspect, 0.02f, dist + radius * 2.f + 1.f);
+	}
 
-		xr_vector<IRenderVisual*> visuals;
-		xr_vector<Fmatrix> xforms;
-		for (const auto& item : list)
-		{
-			visuals.push_back(item.first);
-			xforms.push_back(item.second);
-		}
-		if (!::Render->PreviewRender(VIEW_TEXTURE, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H, m_view_view, m_view_proj,
-		                             visuals.data(), xforms.data(), u32(visuals.size())))
-		{
-			m_failed = true;
+	void CPreview::view_slots(xr_vector<SViewSlot>& out) const
+	{
+		out.clear();
+		if (m_view_points.empty())
 			return;
-		}
-
-		// Slot markers: the mount points through the same camera.
-		m_view_slots.clear();
-		IKinematics* K = list.front().first->dcast_PKinematics();
-		xr_vector<CVisuals::SSlotPoint> points;
-		if (m_view_id != u16(-1))
-		{
-			CWeapon* weapon = smart_cast<CWeapon*>(Level().Objects.net_Find(m_view_id));
-			if (weapon)
-				weapon->gs_visuals().slot_points(CVisuals::eWorld, K, weapon->gs_tree(), weapon->cNameSect().c_str(), nullptr, points);
-		}
-		else if (SScene* s = scene(m_view_section.c_str()))
-			s->visuals.slot_points(CVisuals::eWorld, K, s->tree, m_view_section.c_str(), nullptr, points);
-
-		Fmatrix vp;
-		vp.mul(m_view_proj, m_view_view);
-		for (const CVisuals::SSlotPoint& p : points)
+		Fmatrix view, proj, vp;
+		view_matrices(m_view_box, view, proj);
+		vp.mul(proj, view);
+		for (const CVisuals::SSlotPoint& p : m_view_points)
 		{
 			Fvector4 h;
 			vp.transform(h, p.pos);
@@ -402,7 +412,7 @@ namespace gunsmith
 			s.u = (h.x * iw + 1.f) * 0.5f;
 			s.v = (1.f - h.y * iw) * 0.5f;
 			s.visible = s.visible && s.u >= 0.f && s.u <= 1.f && s.v >= 0.f && s.v <= 1.f;
-			m_view_slots.push_back(s);
+			out.push_back(s);
 		}
 	}
 

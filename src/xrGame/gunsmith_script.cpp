@@ -224,7 +224,9 @@ void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pa
 {
 	::luabind::object t = ::luabind::newtable(L);
 	int count = 0;
-	for (const auto& s : gunsmith::CPreview::instance().view_slots())
+	xr_vector<gunsmith::CPreview::SViewSlot> slots;
+	gunsmith::CPreview::instance().view_slots(slots);
+	for (const auto& s : slots)
 	{
 		::luabind::object row = ::luabind::newtable(L);
 		row["node"] = int(s.node);
