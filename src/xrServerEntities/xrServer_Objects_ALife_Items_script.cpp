@@ -43,13 +43,14 @@ void set_condition_script(CSE_ALifeInventoryItem* item, float value)
 #ifdef XRGAME_EXPORTS
 // Gunsmith: part tree access on a weapon's server object, for guns that are
 // offline (NPC loadouts, traders, stashes). Same table format as game_object:gs_get_tree.
-::luabind::object gs_get_tree_script(CSE_ALifeItemWeapon* weapon)
+// Takes the calling lua_State (raw<1>): see gunsmith_script.h.
+::luabind::object cse_gs_get_tree_script(lua_State* L, CSE_ALifeItemWeapon* weapon)
 {
 	weapon->gs_ensure_tree();
-	return gunsmith::tree_to_lua(weapon->m_gs_tree);
+	return gunsmith::tree_to_lua(L, weapon->m_gs_tree);
 }
 
-bool gs_set_tree_script(CSE_ALifeItemWeapon* weapon, ::luabind::object nodes)
+bool cse_gs_set_tree_script(CSE_ALifeItemWeapon* weapon, ::luabind::object nodes)
 {
 	gunsmith::CTree tree;
 	xr_string error;
@@ -126,8 +127,8 @@ void CSE_ALifeItemWeapon::script_register(lua_State* L)
 		.def("get_ammo_elapsed", &CSE_ALifeItemWeapon::get_ammo_elapsed)
 		.def("get_ammo_magsize", &CSE_ALifeItemWeapon::get_ammo_magsize)
 #ifdef XRGAME_EXPORTS
-		.def("gs_get_tree", &gs_get_tree_script)
-		.def("gs_set_tree", &gs_set_tree_script)
+		.def("gs_get_tree", &cse_gs_get_tree_script, raw<1>())
+		.def("gs_set_tree", &cse_gs_set_tree_script)
 #endif
 	];
 }

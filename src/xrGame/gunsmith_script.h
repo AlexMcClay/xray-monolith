@@ -16,7 +16,10 @@ namespace gunsmith
 	//       { index, section, accepts = {tag, ...}, required, field_swappable, implicit,
 	//         legacy_addon, occupant, blocked }, ... } }
 	// parent and slot are absent on the receiver; legacy_addon and occupant are absent when unset.
-	::luabind::object tree_to_lua(const CTree& tree);
+	// Build tables on the calling script's lua_State (luabind raw<1> policy): luabind
+	// pushes a returned object onto the state it was created in, so a table made on
+	// the main state comes back as nil to scripts running in their own thread.
+	::luabind::object tree_to_lua(lua_State* L, const CTree& tree);
 
 	// Builds a tree from an array of { section, parent, slot, condition }.
 	// Element 1 is the receiver: its section, if given, must be `receiver`, and its
@@ -26,3 +29,12 @@ namespace gunsmith
 	bool tree_from_lua(const ::luabind::object& nodes, LPCSTR receiver, float receiver_condition, CTree& out,
 	                   xr_string& error);
 }
+
+// game_object methods that return Lua values (script_game_object_gunsmith.cpp),
+// registered with raw<1>() so they receive the calling lua_State.
+class CScriptGameObject;
+::luabind::object gs_get_tree_script(lua_State* L, CScriptGameObject* self);
+::luabind::object gs_get_stats_script(lua_State* L, CScriptGameObject* self);
+::luabind::object gs_preview_stats_script(lua_State* L, CScriptGameObject* self, ::luabind::object changes);
+::luabind::object gs_detach_script(lua_State* L, CScriptGameObject* self, u8 node);
+::luabind::object gs_detach_spawn_script(lua_State* L, CScriptGameObject* self, u8 node, bool spawn);

@@ -10,9 +10,8 @@
 
 namespace gunsmith
 {
-	::luabind::object tree_to_lua(const CTree& tree)
+	::luabind::object tree_to_lua(lua_State* L, const CTree& tree)
 	{
-		lua_State* L = ai().script_engine().lua();
 		::luabind::object result = ::luabind::newtable(L);
 
 		SLOTS slots;

@@ -14,21 +14,26 @@
 
 #ifdef GAME_OBJECT_EXTENDED_EXPORTS
 
+// Functions that return Lua values take the calling lua_State (luabind raw<1>
+// policy): luabind pushes a returned object onto the state it was created in, so a
+// table built on the main state comes back as nil to scripts running in their own
+// thread, such as run_string.
+
 namespace
 {
 	CWeapon* gs_weapon(CScriptGameObject* self, LPCSTR method)
 	{
-		CWeapon* weapon = smart_cast<CWeapon*>(&self->object());
+		CWeapon* weapon = self ? smart_cast<CWeapon*>(&self->object()) : nullptr;
 		if (!weapon)
 			ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError,
-			                                "game_object:%s: [%s] is not a weapon", method, self->object().cNameSect().c_str());
+			                                "game_object:%s: [%s] is not a weapon", method,
+			                                self ? self->object().cNameSect().c_str() : "nil");
 		return weapon;
 	}
 
-	::luabind::object stats_to_lua(const CWeapon* weapon, const gunsmith::SWeaponStats& stats, bool has_silencer,
-	                               u8 jam_type, u8 jam_node, bool jammed)
+	::luabind::object stats_to_lua(lua_State* L, const CWeapon* weapon, const gunsmith::SWeaponStats& stats,
+	                               bool has_silencer, u8 jam_type, u8 jam_node, bool jammed)
 	{
-		lua_State* L = ai().script_engine().lua();
 		::luabind::object t = ::luabind::newtable(L);
 
 		t["ergonomics"] = stats.ergonomics;
@@ -65,12 +70,12 @@ namespace
 	}
 }
 
-::luabind::object CScriptGameObject::gs_get_tree()
+::luabind::object gs_get_tree_script(lua_State* L, CScriptGameObject* self)
 {
-	CWeapon* weapon = gs_weapon(this, "gs_get_tree");
+	CWeapon* weapon = gs_weapon(self, "gs_get_tree");
 	if (!weapon)
-		return ::luabind::newtable(ai().script_engine().lua());
-	return gunsmith::tree_to_lua(weapon->gs_tree());
+		return ::luabind::newtable(L);
+	return gunsmith::tree_to_lua(L, weapon->gs_tree());
 }
 
 LPCSTR CScriptGameObject::gs_can_attach_reason(LPCSTR section, u8 parent, u8 slot)
@@ -130,20 +135,18 @@ bool CScriptGameObject::gs_attach_section(LPCSTR section, u8 parent, u8 slot, fl
 	return weapon && weapon->gs_attach_part(section, parent, slot, condition);
 }
 
-::luabind::object CScriptGameObject::gs_detach_spawn(u8 node, bool spawn)
+::luabind::object gs_detach_spawn_script(lua_State* L, CScriptGameObject* self, u8 node, bool spawn)
 {
-	CWeapon* weapon = gs_weapon(this, "gs_detach");
-	if (!weapon)
-		return ::luabind::object(ai().script_engine().lua()); // nil
+	CWeapon* weapon = gs_weapon(self, "gs_detach");
 	u16 item_id = u16(-1);
-	if (!weapon->gs_detach_part(node, spawn, item_id))
-		return ::luabind::object(ai().script_engine().lua()); // nil
-	return ::luabind::object(ai().script_engine().lua(), item_id == u16(-1) ? -1 : int(item_id));
+	if (!weapon || !weapon->gs_detach_part(node, spawn, item_id))
+		return ::luabind::object(); // nil
+	return ::luabind::object(L, item_id == u16(-1) ? -1 : int(item_id));
 }
 
-::luabind::object CScriptGameObject::gs_detach(u8 node)
+::luabind::object gs_detach_script(lua_State* L, CScriptGameObject* self, u8 node)
 {
-	return gs_detach_spawn(node, true);
+	return gs_detach_spawn_script(L, self, node, true);
 }
 
 bool CScriptGameObject::gs_set_condition(u8 node, float value)
@@ -152,19 +155,18 @@ bool CScriptGameObject::gs_set_condition(u8 node, float value)
 	return weapon && weapon->gs_debug_set_condition(node, value);
 }
 
-::luabind::object CScriptGameObject::gs_get_stats()
+::luabind::object gs_get_stats_script(lua_State* L, CScriptGameObject* self)
 {
-	CWeapon* weapon = gs_weapon(this, "gs_get_stats");
+	CWeapon* weapon = gs_weapon(self, "gs_get_stats");
 	if (!weapon)
-		return ::luabind::newtable(ai().script_engine().lua());
-	return stats_to_lua(weapon, weapon->gs_stats(), weapon->IsSilencerAttached(), weapon->gs_jam_type(),
+		return ::luabind::newtable(L);
+	return stats_to_lua(L, weapon, weapon->gs_stats(), weapon->IsSilencerAttached(), weapon->gs_jam_type(),
 	                    weapon->gs_jam_node(), weapon->IsMisfire());
 }
 
-::luabind::object CScriptGameObject::gs_preview_stats(::luabind::object changes)
+::luabind::object gs_preview_stats_script(lua_State* L, CScriptGameObject* self, ::luabind::object changes)
 {
-	lua_State* L = ai().script_engine().lua();
-	CWeapon* weapon = gs_weapon(this, "gs_preview_stats");
+	CWeapon* weapon = gs_weapon(self, "gs_preview_stats");
 	if (!weapon)
 		return ::luabind::newtable(L);
 
@@ -231,7 +233,7 @@ bool CScriptGameObject::gs_set_condition(u8 node, float value)
 	weapon->gs_compute_stats(tree, stats);
 	const bool has_silencer = (tree.legacy_addon_flags() & gunsmith::eLegacySilencer) ||
 		(weapon->IsSilencerAttached() && !(tree.legacy_mask() & gunsmith::eLegacySilencer));
-	::luabind::object result = stats_to_lua(weapon, stats, has_silencer, 0, 0, false);
+	::luabind::object result = stats_to_lua(L, weapon, stats, has_silencer, 0, 0, false);
 	result["errors"] = errors;
 	return result;
 }
