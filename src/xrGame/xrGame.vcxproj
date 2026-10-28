@@ -464,6 +464,8 @@
     <ClInclude Include="..\xrServerEntities\xrServer_Objects_ALife.h" />
     <ClInclude Include="..\xrServerEntities\xrServer_Objects_ALife_All.h" />
     <ClInclude Include="..\xrServerEntities\xrServer_Objects_ALife_Items.h" />
+    <ClInclude Include="..\xrServerEntities\gunsmith_config.h" />
+    <ClInclude Include="..\xrServerEntities\gunsmith_tree.h" />
     <ClInclude Include="..\xrServerEntities\xrServer_Objects_ALife_Monsters.h" />
     <ClInclude Include="..\xrServerEntities\xrServer_Objects_Alife_Smartcovers.h" />
     <ClInclude Include="..\xrServerEntities\xrServer_Object_Base.h" />
@@ -2124,6 +2126,8 @@
     <ClCompile Include="..\xrServerEntities\xrServer_Objects_Abstract.cpp" />
     <ClCompile Include="..\xrServerEntities\xrServer_Objects_ALife.cpp" />
     <ClCompile Include="..\xrServerEntities\xrServer_Objects_ALife_Items.cpp" />
+    <ClCompile Include="..\xrServerEntities\gunsmith_config.cpp" />
+    <ClCompile Include="..\xrServerEntities\gunsmith_tree.cpp" />
     <ClCompile Include="..\xrServerEntities\xrServer_Objects_ALife_Items_script.cpp">
       <PrecompiledHeaderFile>pch_script.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName)_script.pch</PrecompiledHeaderOutputFile>
