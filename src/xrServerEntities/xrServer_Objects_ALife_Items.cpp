@@ -579,10 +579,12 @@ void CSE_ALifeItemWeapon::clone_addons(CSE_ALifeItemWeapon* parent)
 
 void CSE_ALifeItemWeapon::gs_ensure_tree()
 {
+	// A new gun's parts, and addons it gains from its flags, start at full condition;
+	// only the gun itself (node 0) takes the weapon's condition.
 	if (m_gs_tree.empty())
-		m_gs_tree.build_default(*s_name, m_addon_flags.get(), m_fCondition);
+		m_gs_tree.build_default(*s_name, m_addon_flags.get(), 1.f);
 	else
-		m_gs_tree.sync_legacy_flags(m_addon_flags.get(), m_fCondition);
+		m_gs_tree.sync_legacy_flags(m_addon_flags.get(), 1.f);
 
 	// The receiver is the gun: its condition is the weapon's condition.
 	m_gs_tree.set_condition(0, m_fCondition);
