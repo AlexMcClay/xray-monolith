@@ -80,7 +80,7 @@ namespace gunsmith
 	{
 		out.clear();
 		if (index < m_nodes.size())
-			slots_of(m_nodes[index].section.c_str(), index == 0, out);
+			slots_of(m_nodes[index].section.c_str(), index == 0 && !m_part_root, out);
 	}
 
 	void CTree::write(NET_Packet& packet) const
@@ -400,5 +400,55 @@ namespace gunsmith
 					return false;
 		}
 		return true;
+	}
+
+	void CTree::extract_subtree(u8 node, CTree& out) const
+	{
+		out.clear();
+		out.m_part_root = true;
+		if (node == 0 || node >= m_nodes.size())
+			return;
+
+		xr_vector<u8> remap;
+		remap.resize(m_nodes.size(), GS_NO_PARENT);
+		for (u32 i = node; i < m_nodes.size(); ++i)
+		{
+			const SNode& n = m_nodes[i];
+			SNode c = n;
+			if (i == node)
+			{
+				c.parent = GS_NO_PARENT;
+				c.slot = 0;
+			}
+			else if (remap[n.parent] != GS_NO_PARENT) // parents come first, so this is known
+				c.parent = remap[n.parent];
+			else
+				continue; // not mounted on `node`
+			remap[i] = u8(out.m_nodes.size());
+			out.m_nodes.push_back(c);
+		}
+	}
+
+	int CTree::graft(const CTree& sub, u8 parent, u8 slot, float root_condition)
+	{
+		if (sub.empty() || parent >= m_nodes.size() || find_in_slot(parent, slot) >= 0 ||
+			m_nodes.size() + sub.size() > GS_MAX_NODES)
+			return -1;
+
+		const u32 base = m_nodes.size();
+		for (u32 i = 0; i < sub.size(); ++i)
+		{
+			SNode c = sub.node(u8(i));
+			if (i == 0)
+			{
+				c.parent = parent;
+				c.slot = slot;
+				c.condition = clampr(root_condition, 0.f, 1.f);
+			}
+			else
+				c.parent = u8(base + c.parent);
+			m_nodes.push_back(c);
+		}
+		return int(base);
 	}
 }

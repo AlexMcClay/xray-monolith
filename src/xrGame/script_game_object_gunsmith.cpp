@@ -11,6 +11,10 @@
 #include "ai_space.h"
 #include "script_engine.h"
 #include "gunsmith_script.h"
+#include "Level.h"
+#include "xrServer.h"
+#include "game_sv_base.h"
+#include "clsid_game.h"
 
 #ifdef GAME_OBJECT_EXTENDED_EXPORTS
 
@@ -72,6 +76,14 @@ namespace
 
 ::luabind::object gs_get_tree_script(lua_State* L, CScriptGameObject* self)
 {
+	// A part item: the parts it carries (empty when none or not online on the server).
+	if (self && !smart_cast<CWeapon*>(&self->object()))
+	{
+		if (OnServer() && Level().Server && Level().Server->game)
+			if (CSE_ALifeItem* se = smart_cast<CSE_ALifeItem*>(Level().Server->game->get_entity_from_eid(self->object().ID())))
+				if (se->m_tClassID == CLSID_IITEM_ATTACH)
+					return gunsmith::tree_to_lua(L, se->m_gs_subtree);
+	}
 	CWeapon* weapon = gs_weapon(self, "gs_get_tree");
 	if (!weapon)
 		return ::luabind::newtable(L);
@@ -122,7 +134,7 @@ bool CScriptGameObject::gs_attach(CScriptGameObject* part, u8 parent, u8 slot)
 		return weapon->Attach(item, true);
 	}
 
-	if (!weapon->gs_attach_part(section, parent, slot, item->GetCondition()))
+	if (!weapon->gs_attach_item(item, parent, slot))
 		return false;
 	if (OnServer())
 		item->object().DestroyObject();

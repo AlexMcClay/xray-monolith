@@ -9,6 +9,7 @@
 #include "pch_script.h"
 #include "xrServer_Objects_ALife_Items.h"
 #include "xrServer_script_macroses.h"
+#include "clsid_game.h"
 #ifdef XRGAME_EXPORTS
 #	include "gunsmith_script.h"
 #endif
@@ -50,6 +51,32 @@ void set_condition_script(CSE_ALifeInventoryItem* item, float value)
 	return gunsmith::tree_to_lua(L, weapon->m_gs_tree);
 }
 
+// Gunsmith: the parts a detached part item carries (node 0 is the item itself).
+::luabind::object cse_item_gs_get_tree_script(lua_State* L, CSE_ALifeItem* item)
+{
+	return gunsmith::tree_to_lua(L, item->m_gs_subtree);
+}
+
+bool cse_item_gs_set_tree_script(CSE_ALifeItem* item, ::luabind::object nodes)
+{
+	if (item->m_tClassID != CLSID_IITEM_ATTACH)
+	{
+		Msg("! cse_alife_item:gs_set_tree [%s]: only plain part items (II_ATTCH) carry parts", item->s_name.c_str());
+		return false;
+	}
+	gunsmith::CTree tree;
+	xr_string error;
+	if (!gunsmith::tree_from_lua(nodes, item->s_name.c_str(), item->m_fCondition, tree, error))
+	{
+		Msg("! cse_alife_item:gs_set_tree [%s]: %s", item->s_name.c_str(), error.c_str());
+		return false;
+	}
+	tree.set_part_root(true);
+	tree.validate(item->s_name.c_str());
+	item->m_gs_subtree = tree;
+	return true;
+}
+
 bool cse_gs_set_tree_script(CSE_ALifeItemWeapon* weapon, ::luabind::object nodes)
 {
 	gunsmith::CTree tree;
@@ -89,6 +116,10 @@ void CSE_ALifeItem::script_register(lua_State* L)
 			CSE_ALifeDynamicObjectVisual,
 			CSE_ALifeInventoryItem
 		)
+#ifdef XRGAME_EXPORTS
+		.def("gs_get_tree", &cse_item_gs_get_tree_script, raw<1>())
+		.def("gs_set_tree", &cse_item_gs_set_tree_script)
+#endif
 	];
 }
 

@@ -163,8 +163,9 @@
 // 127	 CSE_ALifeObjectClimable		added material;
 // 128	 CSE_ALifeObjectClimable		added can_fire in smart covers;
 // 129	 CSE_ALifeItemWeapon			appended with the gunsmith part tree (gunsmith::CTree, own u16 version)
+// 130	 CSE_ALifeItem (II_ATTCH only)	appended with the gunsmith sub-tree of a detached part
 //------------------------------------------------------------------------------
-#define SPAWN_VERSION	u16(129)
+#define SPAWN_VERSION	u16(130)
 
 SERVER_ENTITY_DECLARE_BEGIN2(CSE_Shape, ISE_Shape, CShapeData)
 public:

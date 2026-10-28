@@ -20,9 +20,9 @@ namespace
 
 	const LPCSTR PACK_MASK = "*.spawn";
 	// Packet version whose layout peek_graph_vertex reads.
-	// 129 only appended weapon state after m_tGraphID, so the header layout read here is unchanged from 128.
-	const u16 PEEKED_SPAWN_VERSION = 129;
-	static_assert(SPAWN_VERSION == PEEKED_SPAWN_VERSION, "peek_graph_vertex mirrors Spawn_Read for version 129; update both");
+	// 129 and 130 only appended item state after m_tGraphID, so the header layout read here is unchanged from 128.
+	const u16 PEEKED_SPAWN_VERSION = 130;
+	static_assert(SPAWN_VERSION == PEEKED_SPAWN_VERSION, "peek_graph_vertex mirrors Spawn_Read for version 130; update both");
 	static_assert(XRAI_CURRENT_VERSION == 10, "CGameGraphBuilder::readable_version lists the all.spawn layouts the pack readers walk; update it");
 
 	// The level.ai versions the CLevelGraph constructor accepts; keep in sync with it.

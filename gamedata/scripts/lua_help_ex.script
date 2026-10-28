@@ -245,6 +245,11 @@
         function clone_upgrades(cse_alife_item_weapon*)
     }
 
+    class cse_alife_item {
+        table gs_get_tree() -- gunsmith: for a part item (II_ATTCH), the parts it carries, node 0 being the item itself; same format as game_object:gs_get_tree()
+        bool gs_set_tree(table build) -- gunsmith: sets the parts a part item carries; element 1 is the item itself
+    }
+
     class cse_visual {
         string visual_name() // current visual path, empty string when the entity has none
         void set_visual_name(string name) // sets the visual path, ignores an empty name and logs it
@@ -1171,6 +1176,7 @@
 		does nothing when the legs are not shown
 
         // Gunsmith part tree (weapons). Node and slot numbers are 0-based; node 0 is the gun itself.
+        // gs_get_tree() on a part item (not a weapon) returns the parts it carries.
         // Tree table: array, element n + 1 is node n:
         //   { index, section, parent, slot, condition, kind, legacy_addon, slots = { { index, section, accepts = {tags},
         //     required, field_swappable, implicit, legacy_addon, occupant, blocked }, ... } }
@@ -1184,7 +1190,7 @@
         string gs_can_attach_reason(string section, number parent, number slot) -- "" when it fits, else no_weapon, no_tree, no_such_node, no_such_slot, no_such_section, slot_taken, slot_blocked, does_not_fit, tree_full
         bool gs_attach(game_object item, number parent, number slot) -- moves an inventory item into the tree with its condition; addon slots go through the weapon's own attach
         bool gs_attach_section(string section, number parent, number slot, number condition) -- fits a part without an item (non-addon slots only)
-        number gs_detach(number node, bool spawn = true) -- removes the part and its children; with spawn each becomes an inventory item with its condition. Returns the first item's id, -1 when no item was spawned, nil on failure. Fails with spawn when a part has no class key (not an item)
+        number gs_detach(number node, bool spawn = true) -- removes the part and its children; with spawn each becomes an inventory item with its condition. Returns the first item's id, -1 when no item was spawned, nil on failure. Fails with spawn when a part has no class key (not an item). A plain part item (II_ATTCH) with parts mounted on it comes off as one item carrying them; gs_attach of such an item puts them all back
         bool gs_set_condition(number node, number condition) -- node 0 sets the weapon's condition
         table gs_get_stats()
         table gs_preview_stats(table changes) -- changes: array of { parent, slot, section ("none" empties the slot), condition = 1 }, applied in order to a copy, each replacing what's in the slot. Returns a stats table plus errors = { "<index>: <reason>" }

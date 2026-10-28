@@ -327,6 +327,7 @@ CSE_ALifeItem::CSE_ALifeItem(LPCSTR caSection) : CSE_ALifeDynamicObjectVisual(ca
                                                  CSE_ALifeInventoryItem(caSection)
 {
 	m_physics_disabled = false;
+	m_gs_subtree.set_part_root(true);
 }
 
 CSE_ALifeItem::~CSE_ALifeItem()
@@ -354,6 +355,11 @@ void CSE_ALifeItem::STATE_Write(NET_Packet& tNetPacket)
 {
 	inherited1::STATE_Write(tNetPacket);
 	inherited2::STATE_Write(tNetPacket);
+
+	// Gunsmith: a part item carries the parts mounted on it. Only plain part items:
+	// derived item classes append their own state after this.
+	if (m_tClassID == CLSID_IITEM_ATTACH)
+		m_gs_subtree.write(tNetPacket);
 }
 
 void CSE_ALifeItem::STATE_Read(NET_Packet& tNetPacket, u16 size)
@@ -366,6 +372,24 @@ void CSE_ALifeItem::STATE_Read(NET_Packet& tNetPacket, u16 size)
 		tNetPacket.r_u8();
 	}
 	inherited2::STATE_Read(tNetPacket, size);
+
+	// Gunsmith sub-tree. Older packets, and script-built packets that stop after the
+	// upgrades, have none; the item then keeps what it had.
+	if (m_tClassID == CLSID_IITEM_ATTACH && m_wVersion > 129 && !tNetPacket.r_eof())
+	{
+		gunsmith::CTree tree;
+		tree.set_part_root(true);
+		if (tree.read(tNetPacket))
+		{
+			tree.validate(*s_name);
+			m_gs_subtree = tree;
+		}
+		else
+		{
+			m_gs_subtree.clear();
+			m_gs_subtree.set_part_root(true);
+		}
+	}
 }
 
 void CSE_ALifeItem::UPDATE_Write(NET_Packet& tNetPacket)

@@ -1497,7 +1497,7 @@ bool CWeapon::gs_attach_part(LPCSTR section, u8 parent, u8 slot, float condition
 	return true;
 }
 
-u16 CWeapon::gs_spawn_part_item(LPCSTR section, float condition)
+u16 CWeapon::gs_spawn_part_item(LPCSTR section, float condition, const gunsmith::CTree* subtree)
 {
 	if (!OnServer() || !ai().get_alife())
 		return u16(-1);
@@ -1514,6 +1514,12 @@ u16 CWeapon::gs_spawn_part_item(LPCSTR section, float condition)
 		return u16(-1);
 	if (CSE_ALifeInventoryItem* inv = smart_cast<CSE_ALifeInventoryItem*>(item))
 		inv->m_fCondition = clampr(condition, 0.f, 1.f);
+	if (subtree && subtree->size() > 1)
+		if (CSE_ALifeItem* part = smart_cast<CSE_ALifeItem*>(item))
+		{
+			part->m_gs_subtree = *subtree;
+			part->m_gs_subtree.set_part_root(true);
+		}
 
 	NET_Packet packet;
 	packet.w_begin(M_SPAWN);
@@ -1556,15 +1562,28 @@ bool CWeapon::gs_detach_part(u8 node, bool spawn, u16& item_id)
 			removed.push_back({ n.section, n.condition });
 	}
 
+	const u8 legacy = m_gs_tree.node_legacy_addon(node);
+
+	// A plain part item (II_ATTCH) with parts mounted on it comes off as one item that
+	// carries them; anything else comes off as one item per part.
+	gunsmith::CTree subtree;
+	m_gs_tree.extract_subtree(node, subtree);
+	const bool bundle = spawn && legacy == gunsmith::eLegacyNone && removed.size() > 1 &&
+		pSettings->line_exist(removed[0].section, "class") &&
+		pSettings->r_clsid(removed[0].section, "class") == CLSID_IITEM_ATTACH;
+
 	if (spawn)
 		for (const SRemoved& r : removed)
+		{
 			if (!pSettings->line_exist(r.section, "class"))
 			{
 				Msg("! [gunsmith] [%s] gs_detach: [%s] is not an inventory item; detach with spawn = false to discard it", cNameSect().c_str(), r.section.c_str());
 				return false;
 			}
+			if (bundle)
+				break; // only the carrying part has to be an item
+		}
 
-	const u8 legacy = m_gs_tree.node_legacy_addon(node);
 	if (legacy != gunsmith::eLegacyNone)
 	{
 		// Old-style addon: the weapon's own detach code clears the flag, visuals and
@@ -1585,6 +1604,13 @@ bool CWeapon::gs_detach_part(u8 node, bool spawn, u16& item_id)
 		gs_sync_to_server();
 	}
 
+	if (bundle)
+	{
+		item_id = gs_spawn_part_item(removed[0].section.c_str(), removed[0].condition, &subtree);
+		gs_callback_detached(removed[0].section.c_str(), item_id == u16(-1) ? -1 : int(item_id));
+		return true;
+	}
+
 	for (const SRemoved& r : removed)
 	{
 		const u16 id = spawn ? gs_spawn_part_item(r.section.c_str(), r.condition) : u16(-1);
@@ -1592,6 +1618,45 @@ bool CWeapon::gs_detach_part(u8 node, bool spawn, u16& item_id)
 			item_id = id;
 		gs_callback_detached(r.section.c_str(), id == u16(-1) ? -1 : int(id));
 	}
+	return true;
+}
+
+bool CWeapon::gs_attach_item(CInventoryItem* item, u8 parent, u8 slot)
+{
+	LPCSTR section = item->object().cNameSect().c_str();
+
+	// Parts carried by the item, from its server object.
+	const gunsmith::CTree* subtree = nullptr;
+	if (OnServer() && Level().Server && Level().Server->game)
+		if (CSE_ALifeItem* se = smart_cast<CSE_ALifeItem*>(Level().Server->game->get_entity_from_eid(item->object().ID())))
+			if (se->m_tClassID == CLSID_IITEM_ATTACH && se->m_gs_subtree.size() > 1)
+				subtree = &se->m_gs_subtree;
+
+	if (!subtree)
+		return gs_attach_part(section, parent, slot, item->GetCondition());
+
+	LPCSTR reason = gs_check_place(m_gs_tree, section, parent, slot, false);
+	if (*reason)
+	{
+		Msg("! [gunsmith] [%s] cannot attach [%s] to node %u slot %u: %s", cNameSect().c_str(), section, u32(parent), u32(slot), reason);
+		return false;
+	}
+	gunsmith::SLOTS slots;
+	m_gs_tree.node_slots(parent, slots);
+	if (slots[slot].legacy_addon != gunsmith::eLegacyNone)
+		return false;
+
+	const int root = m_gs_tree.graft(*subtree, parent, slot, item->GetCondition());
+	if (root < 0)
+	{
+		Msg("! [gunsmith] [%s] cannot attach [%s] with its %u part(s): the tree is full", cNameSect().c_str(), section, u32(subtree->size() - 1));
+		return false;
+	}
+	// Carried parts that no longer fit their slots are dropped and logged, as on load.
+	m_gs_tree.validate(cNameSect().c_str());
+	gs_rebuild_stats();
+	gs_sync_to_server();
+	gs_callback_attached(u8(root), section);
 	return true;
 }
 

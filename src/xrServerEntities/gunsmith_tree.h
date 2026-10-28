@@ -98,9 +98,26 @@ namespace gunsmith
 		// Every required slot of every node is filled.
 		bool required_slots_filled() const;
 
+		// A tree whose node 0 is a part rather than a weapon: a detached part carrying
+		// the parts mounted on it. Node 0's slots then come from its `slots` key, and
+		// it gets no implicit addon slots. Not saved: owners set it after reading.
+		void set_part_root(bool part_root) { m_part_root = part_root; }
+		bool is_part_root() const { return m_part_root; }
+
+		// Copies node `node` and everything mounted on it into `out`, re-rooted so
+		// that part is node 0 (a part-root tree).
+		void extract_subtree(u8 node, CTree& out) const;
+
+		// Adds a part-root tree under `parent`'s `slot`: its node 0 becomes the part
+		// in that slot (with `root_condition`), its other nodes keep their conditions.
+		// Returns the new index of that part, or -1 if the slot is taken, the parent
+		// doesn't exist or the tree would get too big.
+		int graft(const CTree& sub, u8 parent, u8 slot, float root_condition);
+
 	private:
 		int place_in_free_slot(LPCSTR part, float condition);
 
 		NODES m_nodes;
+		bool m_part_root = false;
 	};
 }

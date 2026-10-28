@@ -391,8 +391,12 @@ public:
 	// item with its condition; `item_id` is the first one, or 0xffff.
 	bool gs_detach_part(u8 node, bool spawn, u16& item_id);
 	// Spawns a part section as an item next to (or in the inventory of) the weapon's
-	// owner, with the given condition. Returns its id, or 0xffff.
-	u16 gs_spawn_part_item(LPCSTR section, float condition);
+	// owner, with the given condition and, for part items, the parts mounted on it.
+	// Returns its id, or 0xffff.
+	u16 gs_spawn_part_item(LPCSTR section, float condition, const gunsmith::CTree* subtree = nullptr);
+	// Puts an inventory item into a free non-addon slot, with any parts it carries.
+	// Fires on_gs_part_attached. The caller destroys the item.
+	bool gs_attach_item(CInventoryItem* item, u8 parent, u8 slot);
 	// Stats a tree would give this weapon (the live tree, or a preview copy).
 	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out) const;
 	// One stat in display units (degrees for angles, rounds per minute for rpm):

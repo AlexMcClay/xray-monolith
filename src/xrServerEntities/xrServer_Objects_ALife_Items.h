@@ -94,6 +94,11 @@ SERVER_ENTITY_DECLARE_END
 SERVER_ENTITY_DECLARE_BEGIN2(CSE_ALifeItem, CSE_ALifeDynamicObjectVisual, CSE_ALifeInventoryItem)
 	bool m_physics_disabled;
 
+	// Gunsmith: the parts mounted on this part, when it was detached from a weapon
+	// with them (node 0 is this item). Only plain part items (II_ATTCH) save it
+	// (SPAWN_VERSION > 129).
+	gunsmith::CTree m_gs_subtree;
+
 	CSE_ALifeItem(LPCSTR caSection);
 	virtual ~CSE_ALifeItem();
 	virtual CSE_Abstract* base();
