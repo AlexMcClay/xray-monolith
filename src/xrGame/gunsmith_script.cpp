@@ -215,9 +215,26 @@ bool gs_preview_available() { return gunsmith::CPreview::instance().available();
 void gs_preview_object(u16 id) { gunsmith::CPreview::instance().view_object(id); }
 void gs_preview_section(LPCSTR section) { gunsmith::CPreview::instance().view_section(section); }
 void gs_preview_clear() { gunsmith::CPreview::instance().view_clear(); }
-void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pan_y)
+void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pan_y, float aspect)
 {
-	gunsmith::CPreview::instance().view_camera(yaw, pitch, zoom, pan_x, pan_y);
+	gunsmith::CPreview::instance().view_camera(yaw, pitch, zoom, pan_x, pan_y, aspect);
+}
+
+::luabind::object gs_preview_slots_script(lua_State* L)
+{
+	::luabind::object t = ::luabind::newtable(L);
+	int count = 0;
+	for (const auto& s : gunsmith::CPreview::instance().view_slots())
+	{
+		::luabind::object row = ::luabind::newtable(L);
+		row["node"] = int(s.node);
+		row["slot"] = int(s.slot);
+		row["u"] = s.u;
+		row["v"] = s.v;
+		row["visible"] = s.visible;
+		t[++count] = row;
+	}
+	return t;
 }
 void gs_preview_tick() { gunsmith::CPreview::instance().view_tick(); }
 bool gs_is_full_mode(LPCSTR section)

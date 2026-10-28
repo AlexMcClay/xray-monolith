@@ -110,6 +110,31 @@ namespace gunsmith
 		return true;
 	}
 
+	namespace
+	{
+		// The mount `name` on a node's model: a bone of that name, else a virtual mount on the
+		// owner's section (for the receiver on the HUD, its hud section first). `mount` is
+		// relative to `bone`. `warn` logs a missing mount once.
+		void resolve_mount(IKinematics* K, const shared_str& name, int ctx, bool on_receiver, LPCSTR owner,
+						   LPCSTR hud_sect, bool warn, Fmatrix& mount, u16& bone)
+		{
+			mount.identity();
+			bone = K->LL_BoneID(name);
+			if (bone != BI_NONE)
+				return;
+			shared_str follow;
+			const bool found = (on_receiver && ctx == CVisuals::eHud && read_virtual_mount(hud_sect, name.c_str(), mount, &follow)) ||
+				read_virtual_mount(owner, name.c_str(), mount, &follow);
+			if (!found && warn)
+				warn_once(owner, "has no mount bone or gs_mount_<name>_pos for", name.c_str());
+			bone = follow.size() ? K->LL_BoneID(follow) : BI_NONE;
+			if (follow.size() && bone == BI_NONE && warn)
+				warn_once(owner, "has no bone for gs_mount_<name>_bone", follow.c_str());
+			if (bone == BI_NONE)
+				bone = K->LL_GetBoneRoot();
+		}
+	}
+
 	bool mount_resolves(IKinematics* model, LPCSTR name, LPCSTR section, LPCSTR section2)
 	{
 		Fmatrix m;
@@ -209,23 +234,10 @@ namespace gunsmith
 
 			// The mount: a bone of that name, else a virtual mount on the owner's section.
 			Fmatrix mount;
-			mount.identity();
-			u16 bone = parentK->LL_BoneID(slot.mount_bone);
-			if (bone == BI_NONE)
-			{
-				const bool on_receiver = n.parent == 0;
-				LPCSTR owner = on_receiver ? receiver : tree.node(n.parent).section.c_str();
-				shared_str follow;
-				const bool found = (on_receiver && ctx == eHud && read_virtual_mount(hud_sect, slot.mount_bone.c_str(), mount, &follow)) ||
-					read_virtual_mount(owner, slot.mount_bone.c_str(), mount, &follow);
-				if (!found)
-					warn_once(owner, "has no mount bone or gs_mount_<name>_pos for", slot.mount_bone.c_str());
-				bone = follow.size() ? parentK->LL_BoneID(follow) : BI_NONE;
-				if (follow.size() && bone == BI_NONE)
-					warn_once(owner, "has no bone for gs_mount_<name>_bone", follow.c_str());
-				if (bone == BI_NONE)
-					bone = parentK->LL_GetBoneRoot();
-			}
+			u16 bone;
+			const bool on_receiver = n.parent == 0;
+			resolve_mount(parentK, slot.mount_bone, ctx, on_receiver, on_receiver ? receiver : tree.node(n.parent).section.c_str(),
+						  hud_sect, true, mount, bone);
 
 			const bool was_hud = ::Render->hud_loading;
 			::Render->hud_loading = ctx == eHud;
@@ -335,6 +347,58 @@ namespace gunsmith
 			ch.K->CalculateBones_Invalidate();
 			ch.K->CalculateBones(TRUE);
 			out.push_back(std::make_pair(ch.visual, ch.local));
+		}
+	}
+
+	void CVisuals::slot_points(int ctx, IKinematics* root, const CTree& tree, LPCSTR receiver, LPCSTR hud_sect,
+							   xr_vector<SSlotPoint>& out)
+	{
+		out.clear();
+		SContext& c = m_ctx[ctx];
+		if (!root || c.root != root)
+			return;
+		update_local(c, root);
+		SLOTS slots;
+		for (u32 i = 0; i < tree.size() && i < GS_MAX_NODES; ++i)
+		{
+			// The node's model and its transform in the root's space.
+			IKinematics* K = nullptr;
+			Fmatrix local;
+			if (i == 0)
+			{
+				K = root;
+				local.identity();
+			}
+			else
+			{
+				for (const SChild& ch : c.children)
+					if (ch.node == i)
+					{
+						K = ch.K;
+						local = ch.local;
+						break;
+					}
+			}
+			if (!K)
+				continue; // a part without a model: its slots have nowhere to show
+
+			tree.node_slots(u8(i), slots);
+			LPCSTR owner = i == 0 ? receiver : tree.node(u8(i)).section.c_str();
+			for (u32 s = 0; s < slots.size(); ++s)
+			{
+				if (!slots[s].mount_bone.size())
+					continue;
+				Fmatrix mount, m;
+				u16 bone;
+				resolve_mount(K, slots[s].mount_bone, ctx, i == 0, owner, hud_sect, false, mount, bone);
+				m.mul_43(local, K->LL_GetTransform_R(bone));
+				m.mulB_43(mount);
+				SSlotPoint p;
+				p.node = u8(i);
+				p.slot = u8(s);
+				p.pos = m.c;
+				out.push_back(p);
+			}
 		}
 	}
 

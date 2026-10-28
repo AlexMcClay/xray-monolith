@@ -203,10 +203,12 @@ namespace gunsmith
 	{
 		m_view_id = u16(-1);
 		m_view_section = nullptr;
+		m_view_slots.clear();
 	}
 
-	void CPreview::view_camera(float yaw_deg, float pitch_deg, float zoom, float pan_x, float pan_y)
+	void CPreview::view_camera(float yaw_deg, float pitch_deg, float zoom, float pan_x, float pan_y, float aspect)
 	{
+		m_aspect = clampr(aspect, 0.25f, 8.f);
 		m_yaw = yaw_deg;
 		m_pitch = clampr(pitch_deg, -80.f, 80.f);
 		m_zoom = clampr(zoom, 0.2f, 10.f);
@@ -351,7 +353,7 @@ namespace gunsmith
 		centre.mad(right, -m_pan_x * radius);
 		centre.mad(cam_up, -m_pan_y * radius);
 
-		const float aspect = float(VIEW_H) / float(VIEW_W); // X-Ray: height / width
+		const float aspect = 1.f / m_aspect; // X-Ray: height / width, of the view as shown
 		const float half_h = tanf(VIEW_FOV * 0.5f) / aspect; // tangent of half the horizontal FOV
 		const float dist = radius / half_h / m_zoom * 1.05f;
 		Fvector from;
@@ -368,7 +370,40 @@ namespace gunsmith
 		}
 		if (!::Render->PreviewRender(VIEW_TEXTURE, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H, m_view_view, m_view_proj,
 		                             visuals.data(), xforms.data(), u32(visuals.size())))
+		{
 			m_failed = true;
+			return;
+		}
+
+		// Slot markers: the mount points through the same camera.
+		m_view_slots.clear();
+		IKinematics* K = list.front().first->dcast_PKinematics();
+		xr_vector<CVisuals::SSlotPoint> points;
+		if (m_view_id != u16(-1))
+		{
+			CWeapon* weapon = smart_cast<CWeapon*>(Level().Objects.net_Find(m_view_id));
+			if (weapon)
+				weapon->gs_visuals().slot_points(CVisuals::eWorld, K, weapon->gs_tree(), weapon->cNameSect().c_str(), nullptr, points);
+		}
+		else if (SScene* s = scene(m_view_section.c_str()))
+			s->visuals.slot_points(CVisuals::eWorld, K, s->tree, m_view_section.c_str(), nullptr, points);
+
+		Fmatrix vp;
+		vp.mul(m_view_proj, m_view_view);
+		for (const CVisuals::SSlotPoint& p : points)
+		{
+			Fvector4 h;
+			vp.transform(h, p.pos);
+			SViewSlot s;
+			s.node = p.node;
+			s.slot = p.slot;
+			s.visible = h.w > EPS_L;
+			const float iw = s.visible ? 1.f / h.w : 0.f;
+			s.u = (h.x * iw + 1.f) * 0.5f;
+			s.v = (1.f - h.y * iw) * 0.5f;
+			s.visible = s.visible && s.u >= 0.f && s.u <= 1.f && s.v >= 0.f && s.v <= 1.f;
+			m_view_slots.push_back(s);
+		}
 	}
 
 	void CPreview::OnRender()

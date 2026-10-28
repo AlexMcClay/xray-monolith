@@ -50,8 +50,19 @@ namespace gunsmith
 		void view_object(u16 id);
 		void view_section(LPCSTR section);
 		void view_clear();
-		void view_camera(float yaw_deg, float pitch_deg, float zoom, float pan_x, float pan_y);
+		// `aspect` is the shown view's width / height on screen; the texture is stretched to it.
+		void view_camera(float yaw_deg, float pitch_deg, float zoom, float pan_x, float pan_y, float aspect);
 		void view_tick();
+
+		// The slots' mount points in the last view drawn: u, v across the view (0..1, from the
+		// top left), and whether the point is in front of the camera and inside the view.
+		struct SViewSlot
+		{
+			u8 node, slot;
+			float u, v;
+			bool visible;
+		};
+		const xr_vector<SViewSlot>& view_slots() const { return m_view_slots; }
 
 		virtual void OnRender();
 
@@ -82,7 +93,8 @@ namespace gunsmith
 		u16 m_view_id = u16(-1);
 		shared_str m_view_section;
 		u32 m_view_tick = 0;
-		float m_yaw = 0.f, m_pitch = 10.f, m_zoom = 1.f, m_pan_x = 0.f, m_pan_y = 0.f;
+		float m_yaw = 0.f, m_pitch = 10.f, m_zoom = 1.f, m_pan_x = 0.f, m_pan_y = 0.f, m_aspect = 2.f;
+		xr_vector<SViewSlot> m_view_slots;
 		Fmatrix m_view_view, m_view_proj; // of the last view drawn, for projecting slot points
 	};
 }

@@ -2947,6 +2947,7 @@ void CLevel::script_register(lua_State* L)
 		def("preview_clear", &gs_preview_clear),
 		def("preview_camera", &gs_preview_camera),
 		def("preview_tick", &gs_preview_tick),
+		def("preview_slots", &gs_preview_slots_script, raw<1>()),
 		def("is_full_mode", &gs_is_full_mode)
 	];
 

@@ -98,6 +98,16 @@ namespace gunsmith
 		// the root's bones.
 		void draw_list(int ctx, IKinematics* root, xr_vector<std::pair<IRenderVisual*, Fmatrix>>& out);
 
+		// Every slot that has a mount_bone, on the root and on each drawn part: where a part in
+		// it mounts, in the root model's space (workbench markers). Arguments as for ensure().
+		struct SSlotPoint
+		{
+			u8 node, slot;
+			Fvector pos;
+		};
+		void slot_points(int ctx, IKinematics* root, const CTree& tree, LPCSTR receiver, LPCSTR hud_sect,
+						 xr_vector<SSlotPoint>& out);
+
 		bool has_children(int ctx) const { return !m_ctx[ctx].children.empty(); }
 
 	private:

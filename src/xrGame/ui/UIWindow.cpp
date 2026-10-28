@@ -7,6 +7,7 @@
 #include "../Include/xrRender/UIRender.h"
 #include "../UIGameCustom.h"
 #include "../ui/UIDialogWnd.h"
+#include "UIScriptWnd.h"
 //#include "UIHelper.h"
 //#include "UIHint.h"
 //#include "../ScriptXMLInit.h"
@@ -467,6 +468,10 @@ void CUIWindow::OnMouseMove()
 
 void CUIWindow::OnMouseScroll(float iDirection)
 {
+	// Lets script windows react to the wheel (ui_events.WINDOW_MOUSE_WHEEL_UP / _DOWN callbacks).
+	// Only a script dialog's own callbacks run; nothing is broadcast to other windows.
+	if (CUIDialogWndEx* script_wnd = smart_cast<CUIDialogWndEx*>(GetMessageTarget()))
+		script_wnd->RunCallback(this, iDirection == WINDOW_MOUSE_WHEEL_UP ? WINDOW_MOUSE_WHEEL_UP : WINDOW_MOUSE_WHEEL_DOWN);
 }
 
 bool CUIWindow::OnDbClick()

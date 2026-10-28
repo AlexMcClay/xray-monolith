@@ -38,6 +38,16 @@ void CUIDialogWndEx::SendMessage(CUIWindow* pWnd, s16 msg, void* pData)
 	//		(*it)->m_cpp_callback(pData);
 }
 
+bool CUIDialogWndEx::RunCallback(CUIWindow* pWnd, s16 msg)
+{
+	event_comparer ec(pWnd, msg);
+	CALLBACK_IT it = std::find_if(m_callbacks.begin(), m_callbacks.end(), ec);
+	if (it == m_callbacks.end())
+		return false;
+	((*it)->m_callback)();
+	return true;
+}
+
 bool CUIDialogWndEx::Load(LPCSTR xml_name)
 {
 	return true;
