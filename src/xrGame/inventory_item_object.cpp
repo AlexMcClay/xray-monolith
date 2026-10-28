@@ -9,6 +9,10 @@
 //#include "stdafx.h"
 #include "pch_script.h"
 #include "inventory_item_object.h"
+#include "gunsmith_visuals.h"
+#include "clsid_game.h"
+#include "xrServer_Objects_ALife_Items.h"
+#include "../Include/xrRender/Kinematics.h"
 
 
 CInventoryItemObject::CInventoryItemObject()
@@ -17,6 +21,25 @@ CInventoryItemObject::CInventoryItemObject()
 
 CInventoryItemObject::~CInventoryItemObject()
 {
+	xr_delete(m_gs_visuals);
+}
+
+gunsmith::CVisuals& CInventoryItemObject::gs_part_visuals()
+{
+	if (!m_gs_visuals)
+		m_gs_visuals = xr_new<gunsmith::CVisuals>();
+	return *m_gs_visuals;
+}
+
+void CInventoryItemObject::RenderAttachments()
+{
+	CPhysicItem::RenderAttachments();
+	IKinematics* K = gs_carries_parts() && Visual() ? Visual()->dcast_PKinematics() : nullptr;
+	if (!K)
+		return;
+	gunsmith::CVisuals& v = gs_part_visuals();
+	v.ensure(gunsmith::CVisuals::eWorld, K, m_gs_subtree, cNameSect().c_str(), nullptr, true);
+	v.render(gunsmith::CVisuals::eWorld, K, XFORM());
 }
 
 DLL_Pure* CInventoryItemObject::_construct()
@@ -97,11 +120,22 @@ BOOL CInventoryItemObject::net_Spawn(CSE_Abstract* DC)
 {
 	BOOL res = CPhysicItem::net_Spawn(DC);
 	CInventoryItem::net_Spawn(DC);
+
+	// Gunsmith: the parts a part item carries come with its spawn data.
+	m_gs_subtree.clear();
+	m_gs_subtree.set_part_root(true);
+	CSE_ALifeItem* se = smart_cast<CSE_ALifeItem*>(DC);
+	if (se && se->m_tClassID == CLSID_IITEM_ATTACH && se->m_gs_subtree.size() > 1)
+	{
+		m_gs_subtree = se->m_gs_subtree;
+		m_gs_subtree.set_part_root(true);
+	}
 	return (res);
 }
 
 void CInventoryItemObject::net_Destroy()
 {
+	xr_delete(m_gs_visuals);
 	CInventoryItem::net_Destroy();
 	CPhysicItem::net_Destroy();
 }

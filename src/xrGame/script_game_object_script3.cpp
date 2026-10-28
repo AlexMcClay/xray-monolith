@@ -563,6 +563,7 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		.def("gs_set_condition", SAFE_WRAP(&CScriptGameObject::gs_set_condition))
 		.def("gs_get_stats", &gs_get_stats_script, raw<1>())
 		.def("gs_preview_stats", &gs_preview_stats_script, raw<1>())
+		.def("gs_preview_attach", &gs_preview_attach_script, raw<1>())
 		.def("gs_part_layout", &gs_part_layout_script, raw<1>())
 		//For Weapon & Outfit
 		.def("install_upgrade", SAFE_WRAP(&CScriptGameObject::InstallUpgrade))

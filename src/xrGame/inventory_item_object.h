@@ -10,6 +10,12 @@
 
 #include "physic_item.h"
 #include "inventory_item.h"
+#include "gunsmith_tree.h"
+
+namespace gunsmith
+{
+	class CVisuals;
+}
 
 class CInventoryItemObject :
 	public CInventoryItem,
@@ -75,6 +81,18 @@ protected:
 
 public:
 	virtual bool Useful() const;
+
+	// Gunsmith: a part item (class II_ATTCH) carrying the parts mounted on it, copied from
+	// its server object at spawn. Those parts are drawn on its world model, and its icon
+	// shows them (gunsmith_preview).
+	bool gs_carries_parts() const { return m_gs_subtree.size() > 1; }
+	const gunsmith::CTree& gs_subtree() const { return m_gs_subtree; }
+	gunsmith::CVisuals& gs_part_visuals();
+	virtual void RenderAttachments();
+
+private:
+	gunsmith::CTree m_gs_subtree;
+	gunsmith::CVisuals* m_gs_visuals = nullptr; // only for items that carry parts
 
 public:
 	virtual u32 ef_weapon_type() const;

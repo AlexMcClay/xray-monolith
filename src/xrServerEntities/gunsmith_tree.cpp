@@ -201,14 +201,16 @@ namespace gunsmith
 		sync_legacy_flags(addon_flags, condition);
 	}
 
-	void CTree::validate(LPCSTR receiver)
+	void CTree::validate(LPCSTR receiver, xr_vector<shared_str>* dropped)
 	{
 		if (m_nodes.empty())
 			return;
+		const bool quiet = dropped != nullptr;
 
 		if (m_nodes[0].section != receiver)
 		{
-			Msg("~ [gunsmith] part tree receiver [%s] renamed to [%s]", m_nodes[0].section.c_str(), receiver);
+			if (!quiet)
+				Msg("~ [gunsmith] part tree receiver [%s] renamed to [%s]", m_nodes[0].section.c_str(), receiver);
 			m_nodes[0].section = receiver;
 		}
 
@@ -233,7 +235,8 @@ namespace gunsmith
 					{
 						if (find_in_slot(n.parent, u8(s)) < 0 && part_fits_slot(n.section.c_str(), slots[s], receiver, false))
 						{
-							Msg("~ [gunsmith] [%s] part [%s] moved from slot %u to slot %u", receiver, n.section.c_str(), u32(n.slot), s);
+							if (!quiet)
+								Msg("~ [gunsmith] [%s] part [%s] moved from slot %u to slot %u", receiver, n.section.c_str(), u32(n.slot), s);
 							n.slot = u8(s);
 							reason = nullptr;
 							break;
@@ -246,7 +249,20 @@ namespace gunsmith
 
 			if (reason)
 			{
-				Msg("! [gunsmith] [%s] dropped part [%s] and its children: %s", receiver, n.section.c_str(), reason);
+				if (quiet)
+				{
+					// The node and everything under it (parents come before their children).
+					for (u32 j = i; j < m_nodes.size(); ++j)
+					{
+						u32 k = j;
+						while (k > i)
+							k = m_nodes[k].parent;
+						if (k == i)
+							dropped->push_back(m_nodes[j].section);
+					}
+				}
+				else
+					Msg("! [gunsmith] [%s] dropped part [%s] and its children: %s", receiver, n.section.c_str(), reason);
 				remove_subtree(u8(i));
 				continue;
 			}

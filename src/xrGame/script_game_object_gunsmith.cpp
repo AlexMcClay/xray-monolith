@@ -15,6 +15,7 @@
 #include "xrServer.h"
 #include "game_sv_base.h"
 #include "clsid_game.h"
+#include "inventory_item_object.h"
 
 #ifdef GAME_OBJECT_EXTENDED_EXPORTS
 
@@ -201,6 +202,81 @@ bool CScriptGameObject::gs_set_condition(u8 node, float value)
 		t[++count] = row;
 	}
 	return t;
+}
+
+// Stats with the part item `item` in the slot, together with every part it carries, done
+// the way gs_attach does it (graft, then drop carried parts that don't fit) on a copy.
+// Adds `errors` ("1: <reason>" when the item itself doesn't fit), `carried` (the sections it
+// brings, itself first) and `dropped` (carried sections that wouldn't stay on).
+::luabind::object gs_preview_attach_script(lua_State* L, CScriptGameObject* self, CScriptGameObject* item, u8 parent, u8 slot)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_preview_attach");
+	if (!weapon || !item)
+		return ::luabind::newtable(L);
+	CInventoryItem* ii = smart_cast<CInventoryItem*>(&item->object());
+	LPCSTR section = item->object().cNameSect().c_str();
+	const float condition = ii ? ii->GetCondition() : 1.f;
+
+	// What it carries: from its server object, as an attach reads it; else the client's copy.
+	const gunsmith::CTree* subtree = nullptr;
+	if (OnServer() && Level().Server && Level().Server->game)
+		if (CSE_ALifeItem* se = smart_cast<CSE_ALifeItem*>(Level().Server->game->get_entity_from_eid(item->object().ID())))
+			if (se->m_tClassID == CLSID_IITEM_ATTACH && se->m_gs_subtree.size() > 1)
+				subtree = &se->m_gs_subtree;
+	if (!subtree)
+		if (CInventoryItemObject* io = smart_cast<CInventoryItemObject*>(&item->object()))
+			if (io->gs_carries_parts())
+				subtree = &io->gs_subtree();
+
+	gunsmith::CTree tree = weapon->gs_tree();
+	::luabind::object errors = ::luabind::newtable(L);
+	::luabind::object carried = ::luabind::newtable(L);
+	::luabind::object dropped = ::luabind::newtable(L);
+	carried[1] = section;
+	if (subtree)
+		for (u32 i = 1; i < subtree->size(); ++i)
+			carried[i + 1] = subtree->node(u8(i)).section.c_str();
+
+	if (parent >= tree.size())
+		errors[1] = "1: no_such_node";
+	else
+	{
+		const int existing = tree.find_in_slot(parent, slot);
+		if (existing >= 0)
+			tree.remove_subtree(u8(existing));
+		LPCSTR reason = weapon->gs_check_place(tree, section, parent, slot, true);
+		if (*reason)
+		{
+			string256 msg;
+			xr_sprintf(msg, "1: %s", reason);
+			errors[1] = (LPCSTR)msg;
+			tree = weapon->gs_tree();
+		}
+		else if (!subtree)
+			tree.add_node(section, parent, slot, condition);
+		else if (tree.graft(*subtree, parent, slot, condition) < 0)
+		{
+			errors[1] = "1: tree_full";
+			tree = weapon->gs_tree();
+		}
+		else
+		{
+			xr_vector<shared_str> lost;
+			tree.validate(weapon->cNameSect().c_str(), &lost);
+			for (u32 i = 0; i < lost.size(); ++i)
+				dropped[i + 1] = lost[i].c_str();
+		}
+	}
+
+	gunsmith::SWeaponStats stats;
+	weapon->gs_compute_stats(tree, stats);
+	const bool has_silencer = (tree.legacy_addon_flags() & gunsmith::eLegacySilencer) ||
+		(weapon->IsSilencerAttached() && !(tree.legacy_mask() & gunsmith::eLegacySilencer)) || stats.suppressor_part;
+	::luabind::object result = stats_to_lua(L, weapon, stats, has_silencer, 0, 0, false);
+	result["errors"] = errors;
+	result["carried"] = carried;
+	result["dropped"] = dropped;
+	return result;
 }
 
 ::luabind::object gs_preview_stats_script(lua_State* L, CScriptGameObject* self, ::luabind::object changes)

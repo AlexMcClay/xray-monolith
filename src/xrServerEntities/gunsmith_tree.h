@@ -67,8 +67,9 @@ namespace gunsmith
 
 		// Drops nodes whose section no longer exists or which no longer fit their
 		// slot (moving them to another free fitting slot on the same parent first).
-		// Each drop is logged with the section name.
-		void validate(LPCSTR receiver);
+		// Each drop is logged with the section name; with `dropped` nothing is logged and
+		// the sections of every dropped node (children included) are added to it instead.
+		void validate(LPCSTR receiver, xr_vector<shared_str>* dropped = nullptr);
 
 		// Legacy addon flag a node stands for, from its slot's legacy_addon.
 		u8 node_legacy_addon(u8 index) const;
