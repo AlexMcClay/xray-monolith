@@ -48,6 +48,9 @@
 #include "cameralook.h"
 #include "character_hit_animations_params.h"
 #include "inventory_upgrade_manager.h"
+#include "Weapon.h"
+#include "inventory.h"
+#include "xrServer_Objects_ALife_Items.h"
 
 #include "ai_debug_variables.h"
 #include "../xrphysics/console_vars.h"
@@ -406,6 +409,36 @@ static void full_memory_stats()
 	dump_file_mappings();
 #endif // DEBUG
 }
+
+// Gunsmith: prints the active weapon's part tree, client mirror and server copy.
+class CCC_GsDumpTree : public IConsole_Command
+{
+public:
+	CCC_GsDumpTree(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
+
+	virtual void Execute(LPCSTR args)
+	{
+		CActor* actor = Actor();
+		if (!actor)
+		{
+			Msg("! gs_dump_tree: no actor");
+			return;
+		}
+		CWeapon* wpn = smart_cast<CWeapon*>(actor->inventory().ActiveItem());
+		if (!wpn)
+		{
+			Msg("! gs_dump_tree: the active item is not a weapon");
+			return;
+		}
+		Msg("- gs_dump_tree: [%s] id=%u addon flags=0x%02x condition=%.4f", wpn->cNameSect().c_str(), u32(wpn->ID()), u32(wpn->GetAddonsState()), wpn->GetCondition());
+		wpn->gs_tree().dump("client");
+		if (CSE_ALifeItemWeapon* se = wpn->gs_server_entity())
+		{
+			Msg("- gs_dump_tree: server addon flags=0x%02x", u32(se->m_addon_flags.get()));
+			se->m_gs_tree.dump("server");
+		}
+	}
+};
 
 class CCC_MemStats : public IConsole_Command
 {
@@ -2513,6 +2546,7 @@ void CCC_RegisterCommands()
 	//g_OptConCom.Init();
 
 	CMD1(CCC_MemStats, "stat_memory");
+	CMD1(CCC_GsDumpTree, "gs_dump_tree");
 #ifdef DEBUG
 	CMD1(CCC_MemCheckpoint, "stat_memory_checkpoint");
 #endif //#ifdef DEBUG
