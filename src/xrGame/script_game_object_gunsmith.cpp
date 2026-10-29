@@ -168,6 +168,15 @@ bool CScriptGameObject::gs_set_condition(u8 node, float value)
 	return weapon && weapon->gs_debug_set_condition(node, value);
 }
 
+bool CScriptGameObject::gs_set_parts_condition(float value)
+{
+	CWeapon* weapon = gs_weapon(this, "gs_set_parts_condition");
+	if (!weapon)
+		return false;
+	weapon->gs_set_parts_condition(value);
+	return true;
+}
+
 ::luabind::object gs_get_stats_script(lua_State* L, CScriptGameObject* self)
 {
 	CWeapon* weapon = gs_weapon(self, "gs_get_stats");

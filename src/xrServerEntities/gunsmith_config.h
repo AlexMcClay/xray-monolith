@@ -47,17 +47,20 @@ namespace gunsmith
 	typedef xr_vector<SSlotInfo> SLOTS;
 
 	// Receiver keys on the weapon section:
-	//   gs_mode          = legacy | full  (default legacy)
+	//   gs_mode          = legacy | full  (default legacy; full-mode guns take no old-style addons)
 	//   gs_slots         = slot, slot, ... root slots
 	//   gs_default_build = entry, ...     entry is a part section (placed in the first free
-	//                                     slot it fits) or parent:slot:part_section
+	//                                     slot it fits) or parent:slot:part_section, where slot is
+	//                                     an index or a slot's mount_bone (e.g. mod_scope); a leading
+	//                                     '?' makes an entry optional (skipped quietly if missing)
 	// Part keys (on any item section):
 	//   part_kind, tags, slots, blocks_slots (plus visual and stat keys used by later phases)
 
 	bool is_full_mode(LPCSTR receiver);
 
 	// Slots a node exposes, in index order. A receiver gets its `gs_slots`, then
-	// implicit slots for any attachable legacy addon not already covered. A part gets
+	// implicit slots for any attachable legacy addon not already covered (not on full-mode
+	// receivers: they take no old-style addons). A part gets
 	// its `slots`.
 	void slots_of(LPCSTR section, bool is_receiver, SLOTS& out);
 

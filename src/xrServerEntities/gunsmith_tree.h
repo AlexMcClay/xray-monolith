@@ -52,6 +52,8 @@ namespace gunsmith
 		int find_in_slot(u8 parent, u8 slot) const;
 
 		void set_condition(u8 index, float condition);
+		// Every node, the receiver included (a found gun's parts match the gun).
+		void set_all_conditions(float condition);
 		void set_mode(u8 index, u8 mode);
 
 		// Slots that node `index` exposes.

@@ -800,6 +800,12 @@ void CWeapon::Load(LPCSTR section)
 	m_eScopeStatus = (ALife::EWeaponAddonStatus)pSettings->r_s32(section, "scope_status");
 	m_eSilencerStatus = (ALife::EWeaponAddonStatus)pSettings->r_s32(section, "silencer_status");
 	m_eGrenadeLauncherStatus = (ALife::EWeaponAddonStatus)pSettings->r_s32(section, "grenade_launcher_status");
+	if (gunsmith::is_full_mode(section))
+	{
+		// Full-mode guns take no old-style addons, whatever the section says: scopes, suppressors and
+		// launchers are parts there. Vanilla attach code then refuses them and hides their bones.
+		m_eScopeStatus = m_eSilencerStatus = m_eGrenadeLauncherStatus = ALife::eAddonDisabled;
+	}
 
 	m_altAimPos = READ_IF_EXISTS(pSettings, r_bool, section, "use_alt_aim_hud", false);
 
@@ -1050,6 +1056,8 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 	m_gs_tree = E->m_gs_tree;
 	m_gs_full_mode = gunsmith::is_full_mode(cNameSect().c_str());
 	m_flagsAddOnState = E->m_addon_flags.get();
+	if (m_gs_full_mode)
+		m_flagsAddOnState = 0; // no old-style addons on full-mode guns (Load disabled them); loadout scripts may still set the flags
 
 	if (m_modular_attachments && m_cur_scope == 0 && (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) != 0 && m_scopes.size() > 1)
 	{
@@ -1433,6 +1441,15 @@ void CWeapon::gs_apply_shot_wear(float impair)
 	gs_rebuild_stats();
 	if (parts_wore)
 		gs_sync_to_server();
+}
+
+void CWeapon::gs_set_parts_condition(float value)
+{
+	clamp(value, 0.f, 1.f);
+	SetCondition(value);
+	m_gs_tree.set_all_conditions(value);
+	gs_rebuild_stats();
+	gs_sync_to_server();
 }
 
 bool CWeapon::gs_debug_set_condition(u8 node, float value)

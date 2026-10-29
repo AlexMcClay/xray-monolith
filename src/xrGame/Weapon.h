@@ -381,6 +381,8 @@ public:
 	u8 gs_jam_type() const { return m_gs_jam_type; }
 	u8 gs_jam_node() const { return m_gs_jam_node; }
 
+	// The gun and every part at one condition (Lua gs_set_parts_condition: found and spawned guns).
+	void gs_set_parts_condition(float value);
 	// Debug and test helpers for the gs_* console commands.
 	bool gs_debug_set_condition(u8 node, float value);
 	bool gs_debug_set_part(u8 parent, u8 slot, LPCSTR section);

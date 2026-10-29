@@ -76,6 +76,12 @@ namespace gunsmith
 			m_nodes[index].condition = clampr(condition, 0.f, 1.f);
 	}
 
+	void CTree::set_all_conditions(float condition)
+	{
+		for (SNode& n : m_nodes)
+			n.condition = clampr(condition, 0.f, 1.f);
+	}
+
 	void CTree::set_mode(u8 index, u8 mode)
 	{
 		if (index < m_nodes.size())
@@ -183,22 +189,39 @@ namespace gunsmith
 				if (!xr_strlen(entry))
 					continue;
 
+				// "?entry": optional, skipped silently when its part section doesn't exist (a part from a pack
+				// that isn't installed, such as a variant's sight from an optics pack).
+				LPCSTR body = entry;
+				const bool optional = entry[0] == '?';
+				if (optional)
+					++body;
+
 				int added = -1;
-				LPCSTR part = entry;
+				bool parent_missing = false; // an optional entry on an optional part that was skipped
+				LPCSTR part = body;
 				string256 part_str;
-				if (_GetItemCount(entry, ':') == 3)
+				if (_GetItemCount(body, ':') == 3)
 				{
-					// parent:slot:part_section
+					// parent:slot:part_section; slot is an index into the parent's slots, or a slot's
+					// mount_bone (Tarkov's slot name, e.g. mod_scope), so a part can go on another pack's part
 					string256 parent_str, slot_str;
-					_GetItem(entry, 0, parent_str, ':');
-					_GetItem(entry, 1, slot_str, ':');
-					_GetItem(entry, 2, part_str, ':');
+					_GetItem(body, 0, parent_str, ':');
+					_GetItem(body, 1, slot_str, ':');
+					_GetItem(body, 2, part_str, ':');
 					part = part_str;
 					const int parent = atoi(parent_str);
-					const int slot = atoi(slot_str);
 					SLOTS slots;
 					if (parent >= 0 && parent < int(m_nodes.size()))
 						node_slots(u8(parent), slots);
+					else
+						parent_missing = true;
+					int slot = -1;
+					if (slot_str[0] >= '0' && slot_str[0] <= '9')
+						slot = atoi(slot_str);
+					else
+						for (u32 s = 0; s < slots.size() && slot < 0; ++s)
+							if (!xr_strcmp(slots[s].mount_bone.c_str(), slot_str))
+								slot = int(s);
 					if (pSettings->section_exist(part) && slot >= 0 && slot < int(slots.size()) &&
 						find_in_slot(u8(parent), u8(slot)) < 0 && part_fits_slot(part, slots[slot], receiver, false))
 						added = add_node(part, u8(parent), u8(slot), condition);
@@ -206,7 +229,7 @@ namespace gunsmith
 				else if (pSettings->section_exist(part))
 					added = place_in_free_slot(part, condition);
 
-				if (added < 0)
+				if (added < 0 && !(optional && (parent_missing || !pSettings->section_exist(part))))
 					Msg("! [gunsmith] [%s] gs_default_build entry [%s] could not be placed", receiver, entry);
 			}
 		}

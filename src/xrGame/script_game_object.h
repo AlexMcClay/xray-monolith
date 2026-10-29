@@ -1292,6 +1292,7 @@ public:
 	bool gs_attach(CScriptGameObject* part, u8 parent, u8 slot);
 	bool gs_attach_section(LPCSTR section, u8 parent, u8 slot, float condition);
 	bool gs_set_condition(u8 node, float value);
+	bool gs_set_parts_condition(float value);
 #endif
 	//-Alundaio
 

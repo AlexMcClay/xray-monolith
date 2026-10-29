@@ -85,7 +85,8 @@ namespace gunsmith
 				Msg("! [gunsmith] slot section [%s] listed by [%s] does not exist", name.c_str(), section);
 		}
 
-		if (!is_receiver)
+		// Full-mode guns take no old-style addons: scopes, suppressors and launchers are parts there.
+		if (!is_receiver || is_full_mode(section))
 			return;
 
 		struct SLegacy

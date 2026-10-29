@@ -561,6 +561,7 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		.def("gs_detach", &gs_detach_script, raw<1>())
 		.def("gs_detach", &gs_detach_spawn_script, raw<1>())
 		.def("gs_set_condition", SAFE_WRAP(&CScriptGameObject::gs_set_condition))
+		.def("gs_set_parts_condition", SAFE_WRAP(&CScriptGameObject::gs_set_parts_condition))
 		.def("gs_get_stats", &gs_get_stats_script, raw<1>())
 		.def("gs_preview_stats", &gs_preview_stats_script, raw<1>())
 		.def("gs_preview_attach", &gs_preview_attach_script, raw<1>())
