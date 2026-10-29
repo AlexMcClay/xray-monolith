@@ -50,14 +50,16 @@ namespace
 		return sh;
 	}
 
-	void draw_visual(SPreview& P, dxRender_Visual* V)
+	// `world` is set again for every mesh: a rigid skinned mesh (RM_SINGLE) multiplies its bone into
+	// the world matrix and leaves it there, which would move the model's later meshes.
+	void draw_visual(SPreview& P, dxRender_Visual* V, const Fmatrix& world)
 	{
 		if (!V)
 			return;
 		if (FHierrarhyVisual* H = dynamic_cast<FHierrarhyVisual*>(V))
 		{
 			for (IRenderVisual* child : H->children)
-				draw_visual(P, static_cast<dxRender_Visual*>(child));
+				draw_visual(P, static_cast<dxRender_Visual*>(child), world);
 			return;
 		}
 		LPCSTR shader = V->dbg_shader.size() ? V->dbg_shader.c_str() : V->dbg_shader_def.c_str();
@@ -69,6 +71,7 @@ namespace
 			return;
 		RCache.set_Shader(mesh_shader(P, texture, V->skinning));
 		RCache.set_CullMode(CULL_CCW);
+		RCache.set_xform_world(world);
 		V->Render(1.f);
 	}
 
@@ -131,10 +134,7 @@ bool CRender::PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, 
 	RCache.set_xform_view(view);
 	RCache.set_xform_project(proj);
 	for (u32 i = 0; i < count; ++i)
-	{
-		RCache.set_xform_world(xforms[i]);
-		draw_visual(P, static_cast<dxRender_Visual*>(visuals[i]));
-	}
+		draw_visual(P, static_cast<dxRender_Visual*>(visuals[i]), xforms[i]);
 
 #ifdef USE_DX11
 	D3D11_BOX box;

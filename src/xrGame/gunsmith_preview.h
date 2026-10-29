@@ -60,13 +60,13 @@ namespace gunsmith
 		u32 view_width() const { return m_view_w; }
 		u32 view_height() const { return m_view_h; }
 
-		// The build's box on screen with the current camera, in u, v across the view (0..1 from
-		// the top left; can lie outside). False before the first view is drawn.
+		// The build's box on screen as last drawn, in u, v across the view (0..1 from the top
+		// left; can lie outside). False before the first view is drawn.
 		bool view_bounds(Frect& uv) const;
 
-		// The slots' mount points (from the last view drawn) through the current camera, so they
-		// match the image drawn this frame: u, v across the view (0..1, from the top left), and
-		// whether the point is in front of the camera and inside the view.
+		// The slots' points (CVisuals::slot_points) projected with the very matrices the last view
+		// was drawn with, so they always match the image: u, v across the view (0..1, from the top
+		// left), and whether the point is in front of the camera and inside the view.
 		struct SViewSlot
 		{
 			u8 node, slot;
@@ -110,5 +110,7 @@ namespace gunsmith
 		Fbox m_view_box; // of the last view drawn
 		u32 m_view_w = VIEW_W, m_view_h = VIEW_H;
 		xr_vector<CVisuals::SSlotPoint> m_view_points; // its slots, in the receiver model's space
+		Fmatrix m_view_vp; // projection * view the last view was drawn with
+		float m_view_zoom = 1.f, m_view_pan_x = 0.f, m_view_pan_y = 0.f; // its camera (debug log)
 	};
 }

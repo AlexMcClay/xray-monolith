@@ -268,9 +268,7 @@ namespace gunsmith
 	{
 		if (m_view_points.empty())
 			return false;
-		Fmatrix view, proj, vp;
-		view_matrices(m_view_box, view, proj);
-		vp.mul(proj, view);
+		const Fmatrix& vp = m_view_vp;
 		uv.set(flt_max, flt_max, -flt_max, -flt_max);
 		for (u32 i = 0; i < 8; ++i)
 		{
@@ -419,8 +417,12 @@ namespace gunsmith
 			m_failed = true;
 			return;
 		}
+		m_view_vp.mul(proj, view); // the markers and bounds project with exactly these
+		m_view_zoom = m_zoom;
+		m_view_pan_x = m_pan_x;
+		m_view_pan_y = m_pan_y;
 
-		// The slots, for markers; view_slots() projects them with the camera of that moment.
+		// The slots, for markers; view_slots() projects them with the matrices of this draw.
 		m_view_points.clear();
 		IKinematics* K = list.front().first->dcast_PKinematics();
 		SSource src;
@@ -464,9 +466,7 @@ namespace gunsmith
 		out.clear();
 		if (m_view_points.empty())
 			return;
-		Fmatrix view, proj, vp;
-		view_matrices(m_view_box, view, proj);
-		vp.mul(proj, view);
+		const Fmatrix& vp = m_view_vp;
 		for (const CVisuals::SSlotPoint& p : m_view_points)
 		{
 			Fvector4 h;
@@ -480,6 +480,17 @@ namespace gunsmith
 			s.v = (1.f - h.y * iw) * 0.5f;
 			s.visible = s.visible && s.u >= 0.f && s.u <= 1.f && s.v >= 0.f && s.v <= 1.f;
 			out.push_back(s);
+		}
+		if (g_gs_preview_debug && !out.empty() && Device.dwFrame % 60 == 0)
+		{
+			Fvector c;
+			m_view_box.getcenter(c);
+			Msg("- [gunsmith] view: camera now yaw %.1f pitch %.1f zoom %.3f pan %.3f,%.3f aspect %.3f; drawn with zoom %.3f pan %.3f,%.3f; "
+				"box centre %.3f,%.3f,%.3f radius %.3f; view %ux%u; slot %u:%u at %.3f,%.3f,%.3f -> u %.3f v %.3f",
+				m_yaw, m_pitch, m_zoom, m_pan_x, m_pan_y, m_aspect, m_view_zoom, m_view_pan_x, m_view_pan_y,
+				c.x, c.y, c.z, m_view_box.getradius(), m_view_w, m_view_h, u32(m_view_points[0].node),
+				u32(m_view_points[0].slot), m_view_points[0].pos.x, m_view_points[0].pos.y, m_view_points[0].pos.z,
+				out[0].u, out[0].v);
 		}
 	}
 
