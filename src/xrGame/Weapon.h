@@ -18,6 +18,7 @@
 
 #include "gunsmith_stats.h"
 #include "gunsmith_visuals.h"
+#include "gunsmith_tactical.h"
 
 class CEntity;
 extern int g_gs_aim_debug;
@@ -425,7 +426,23 @@ public:
 	const gunsmith::SPartVisual* gs_sight_part(shared_str* section = nullptr) const;
 	const gunsmith::SPartVisual* gs_optic() const;
 
+	// Tactical devices (gunsmith_tactical.h): flashlights and lasers fitted as parts, any number,
+	// switched together. The state lives in the tree (saved with it): node 0's mode is the on flag,
+	// each device node's mode its selected mode.
+	bool gs_devices_on() const { return !m_gs_tree.empty() && m_gs_tree.node(0).mode != 0; }
+	bool gs_has_devices() const;
+	// Toggles every device; returns the new state.
+	bool gs_devices_toggle();
+	// Every device to its next mode (each within its own modes).
+	void gs_devices_next_mode();
+	bool gs_set_device_mode(u8 node, u8 mode);
+	// A device light (not just a laser) is shining in first person or on the world model.
+	bool gs_devices_lit() const { return m_gs_devices.lit(); }
+
 protected:
+	gunsmith::CTacticalDevices m_gs_devices;
+	void gs_update_devices();
+
 	gunsmith::CVisuals m_gs_visuals;
 	bool m_gs_full_mode = false;
 	// Aim correction (camera space) that keeps the fitted sight on the camera axis, and the sight

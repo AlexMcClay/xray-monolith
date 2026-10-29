@@ -5112,6 +5112,9 @@
     <ClInclude Include="gunsmith_visuals.h">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClInclude>
+    <ClInclude Include="gunsmith_tactical.h">
+      <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
+    </ClInclude>
     <ClInclude Include="gunsmith_preview.h">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClInclude>
@@ -8742,6 +8745,9 @@
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClCompile>
     <ClCompile Include="gunsmith_visuals.cpp">
+      <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
+    </ClCompile>
+    <ClCompile Include="gunsmith_tactical.cpp">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClCompile>
     <ClCompile Include="gunsmith_preview.cpp">

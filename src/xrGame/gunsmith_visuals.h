@@ -30,6 +30,11 @@ namespace gunsmith
 	//   scope_texture                      a 2D scope overlay (ui\scopes.xml); default none
 	//   aim_eye_point, aim_eye_offset      where the eye sits behind the scope (model space), and how far
 	//                                      in front of the camera that point is placed (metres, default 0)
+	// A tactical device (flashlight, laser; see gunsmith_tactical.h):
+	//   tactical_modes                     its modes, e.g. "light | light, laser | laser"
+	//   light_point, light_section         where the light comes out (model space; it shines along -Z)
+	//                                      and its light definition section
+	//   laser_point, laser_section         the same for the laser
 	// All positions are in the model's own space (as exported) and follow the named bone's
 	// motion; how a bone is oriented at rest doesn't matter.
 	struct SPartVisual
@@ -50,6 +55,14 @@ namespace gunsmith
 		Fvector eye_point;
 		float eye_offset;
 		bool is_optic() const { return has_aim && (magnification > 1.f || zoom_factor > 0.f); }
+
+		enum { eTacLight = 1, eTacLaser = 2 };
+		xr_vector<u8> tac_modes; // per mode: eTacLight | eTacLaser
+		Fvector light_point, laser_point;
+		shared_str light_section, laser_section;
+		bool is_tactical() const { return !tac_modes.empty(); }
+		// The flags of mode `mode` (clamped to the last mode).
+		u8 tac_flags(u8 mode) const { return tac_modes.empty() ? 0 : tac_modes[_min(u32(mode), u32(tac_modes.size() - 1))]; }
 	};
 
 	const SPartVisual& part_visual(LPCSTR section);
@@ -103,6 +116,10 @@ namespace gunsmith
 		// HUD: the fitted sight's aim point in the receiver model's space, and a key that changes
 		// when a different sight (or the same sight elsewhere) is fitted.
 		bool sight_point(IKinematics* root, Fvector& point, shared_str& key);
+
+		// A drawn part's frame in the root model's space, its bone's current pose included: points
+		// on the part (light_point, ...) map through it. False when that node isn't drawn.
+		bool part_frame(int ctx, IKinematics* root, u8 node, Fmatrix& out);
 
 		// HUD: the fitted sight's part data and, when it has aim_eye_point, that point in the
 		// receiver model's space. Null without a sight.

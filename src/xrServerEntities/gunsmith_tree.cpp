@@ -76,6 +76,12 @@ namespace gunsmith
 			m_nodes[index].condition = clampr(condition, 0.f, 1.f);
 	}
 
+	void CTree::set_mode(u8 index, u8 mode)
+	{
+		if (index < m_nodes.size())
+			m_nodes[index].mode = mode;
+	}
+
 	void CTree::node_slots(u8 index, SLOTS& out) const
 	{
 		out.clear();
@@ -93,6 +99,7 @@ namespace gunsmith
 			packet.w_u8(n.parent);
 			packet.w_u8(n.slot);
 			packet.w_float_q16(clampr(n.condition, 0.f, 1.f), 0.f, 1.f);
+			packet.w_u8(n.mode);
 		}
 	}
 
@@ -125,6 +132,12 @@ namespace gunsmith
 			packet.r_u8(n.parent);
 			packet.r_u8(n.slot);
 			packet.r_float_q16(n.condition, 0.f, 1.f);
+			if (version >= 2)
+			{
+				if (packet.r_elapsed() < sizeof(u8))
+					goto corrupt;
+				packet.r_u8(n.mode);
+			}
 
 			if (n.section.size() == 0 || (i == 0 ? n.parent != GS_NO_PARENT : n.parent >= i))
 				goto corrupt;

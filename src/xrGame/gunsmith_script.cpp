@@ -32,6 +32,7 @@ namespace gunsmith
 				t["slot"] = int(n.slot);
 			}
 			t["condition"] = n.condition;
+			t["mode"] = int(n.mode);
 			t["kind"] = i == 0 ? "receiver" : part_data(n.section.c_str()).kind.c_str();
 			const u8 legacy = tree.node_legacy_addon(u8(i));
 			if (legacy != eLegacyNone)
@@ -163,7 +164,12 @@ namespace gunsmith
 				error = msg;
 				return false;
 			}
-			if (out.add_node(section, u8(parent), u8(slot), float(condition)) < 0)
+			double mode = 0.0;
+			read_number(row, "mode", mode);
+			const int added = out.add_node(section, u8(parent), u8(slot), float(condition));
+			if (added >= 0)
+				out.set_mode(u8(added), u8(clampr(mode, 0.0, 255.0)));
+			if (added < 0)
 			{
 				xr_sprintf(msg, "node %u [%s]: the tree is full (%u nodes)", node, section, u32(GS_MAX_NODES));
 				error = msg;

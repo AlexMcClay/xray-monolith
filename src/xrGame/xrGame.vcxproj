@@ -1561,6 +1561,7 @@
     <ClInclude Include="script_game_object.h" />
     <ClInclude Include="gunsmith_script.h" />
     <ClInclude Include="gunsmith_visuals.h" />
+    <ClInclude Include="gunsmith_tactical.h" />
     <ClInclude Include="gunsmith_preview.h" />
     <ClInclude Include="script_game_object_impl.h" />
     <ClInclude Include="script_hit.h" />
@@ -3485,6 +3486,7 @@
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName)_script.pch</PrecompiledHeaderOutputFile>
     </ClCompile>
     <ClCompile Include="gunsmith_visuals.cpp" />
+    <ClCompile Include="gunsmith_tactical.cpp" />
     <ClCompile Include="gunsmith_preview.cpp" />
     <ClCompile Include="gunsmith_script.cpp">
       <PrecompiledHeaderFile>pch_script.h</PrecompiledHeaderFile>

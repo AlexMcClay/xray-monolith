@@ -10,8 +10,8 @@
 namespace gunsmith
 {
 	// Save layout version written after the weapon's legacy fields. Increment it
-	// only with a migration path in CTree::read.
-	const u16 GS_SAVE_VERSION = 1;
+	// only with a migration path in CTree::read. 2: each node also saves its mode.
+	const u16 GS_SAVE_VERSION = 2;
 	const u8 GS_NO_PARENT = 0xFF;
 	const u8 GS_MAX_NODES = 64;
 
@@ -21,8 +21,11 @@ namespace gunsmith
 		u8 parent; // index of the parent node, GS_NO_PARENT for the receiver
 		u8 slot; // index into the parent's slot list
 		float condition; // 0..1
+		// A tactical device's selected mode (index into its tactical_modes). On node 0, the
+		// receiver, it is the weapon's devices-on flag (0 off, 1 on). See gunsmith_tactical.h.
+		u8 mode;
 
-		SNode() : parent(GS_NO_PARENT), slot(0), condition(1.f) {}
+		SNode() : parent(GS_NO_PARENT), slot(0), condition(1.f), mode(0) {}
 	};
 
 	// Node 0 is the receiver (the weapon section itself). Every other node's parent
@@ -49,12 +52,13 @@ namespace gunsmith
 		int find_in_slot(u8 parent, u8 slot) const;
 
 		void set_condition(u8 index, float condition);
+		void set_mode(u8 index, u8 mode);
 
 		// Slots that node `index` exposes.
 		void node_slots(u8 index, SLOTS& out) const;
 
 		// Save layout: gs_version u16, node_count u8, then per node
-		// section stringZ, parent u8, slot u8, condition u16 (0..65535 = 0..1).
+		// section stringZ, parent u8, slot u8, condition u16 (0..65535 = 0..1), mode u8 (version 2+).
 		void write(NET_Packet& packet) const;
 
 		// Reads a tree written by write(). Never reads past the end of the packet.

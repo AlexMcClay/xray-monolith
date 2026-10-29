@@ -2036,6 +2036,8 @@ void CWeapon::UpdateCL()
 	UpdateFlameParticles();
 	UpdateFlameParticles2();
 
+	gs_update_devices();
+
 	if (!IsGameTypeSingle())
 		make_Interpolation();
 
@@ -2128,6 +2130,7 @@ void CWeapon::RenderAttachments()
 		return;
 	m_gs_visuals.ensure(gunsmith::CVisuals::eWorld, K, m_gs_tree, cNameSect().c_str(), nullptr, true);
 	m_gs_visuals.render(gunsmith::CVisuals::eWorld, K, XFORM());
+	m_gs_devices.render_beams(gunsmith::CVisuals::eWorld);
 }
 
 void CWeapon::gs_world_layout(xr_vector<std::pair<u8, Fmatrix>>& out)
@@ -2146,6 +2149,88 @@ void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
 		return;
 	m_gs_visuals.ensure(gunsmith::CVisuals::eHud, model, m_gs_tree, cNameSect().c_str(), HudSection().c_str(), true);
 	m_gs_visuals.render(gunsmith::CVisuals::eHud, model, xform);
+	m_gs_devices.render_beams(gunsmith::CVisuals::eHud);
+}
+
+bool CWeapon::gs_has_devices() const
+{
+	for (u8 i = 1; i < m_gs_tree.size(); ++i)
+		if (gunsmith::part_visual(m_gs_tree.node(i).section.c_str()).is_tactical())
+			return true;
+	return false;
+}
+
+bool CWeapon::gs_devices_toggle()
+{
+	if (m_gs_tree.empty() || !gs_has_devices())
+		return false;
+	m_gs_tree.set_mode(0, gs_devices_on() ? 0 : 1);
+	gs_sync_to_server();
+	return gs_devices_on();
+}
+
+void CWeapon::gs_devices_next_mode()
+{
+	bool changed = false;
+	for (u8 i = 1; i < m_gs_tree.size(); ++i)
+	{
+		const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(i).section.c_str());
+		if (pv.tac_modes.size() < 2)
+			continue;
+		m_gs_tree.set_mode(i, u8((m_gs_tree.node(i).mode + 1) % pv.tac_modes.size()));
+		changed = true;
+	}
+	if (changed)
+		gs_sync_to_server();
+}
+
+bool CWeapon::gs_set_device_mode(u8 node, u8 mode)
+{
+	if (node == 0 || node >= m_gs_tree.size())
+		return false;
+	const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(node).section.c_str());
+	if (!pv.is_tactical() || mode >= pv.tac_modes.size())
+		return false;
+	m_gs_tree.set_mode(node, mode);
+	gs_sync_to_server();
+	return true;
+}
+
+// Devices light only on the actor's active weapon (NPCs' stay off for now), drawn on the HUD model in
+// first person and on the world model otherwise.
+void CWeapon::gs_update_devices()
+{
+	if (!m_gs_full_mode)
+		return;
+	m_gs_devices.sync(m_gs_tree);
+	if (m_gs_devices.empty())
+		return;
+	CActor* actor = smart_cast<CActor*>(H_Parent());
+	if (!actor || actor->inventory().ActiveItem() != this || !gs_devices_on())
+	{
+		m_gs_devices.off();
+		return;
+	}
+	attachable_hud_item* hi = GetHUDmode() ? HudItemData() : nullptr;
+	if (hi && hi->m_model)
+	{
+		m_gs_visuals.ensure(gunsmith::CVisuals::eHud, hi->m_model, m_gs_tree, cNameSect().c_str(), HudSection().c_str(), true);
+		// the HUD projection the barrel ray uses (CHudItem::Ray), to cast the laser in the world
+		Fmatrix proj;
+		proj.build_projection(deg2rad(GetBaseHudFov() * 83.f), Device.fASPECT, R_VIEWPORT_NEAR,
+							  g_pGamePersistent->Environment().CurrentEnv->far_plane);
+		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eHud, hi->m_model, hi->m_item_transform, &proj, actor);
+	}
+	else
+	{
+		IKinematics* K = Visual() ? Visual()->dcast_PKinematics() : nullptr;
+		if (!K)
+		{
+			m_gs_devices.off();
+			return;
+		}
+		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eWorld, K, XFORM(), nullptr, actor);
+	}
 }
 
 bool CWeapon::hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos)

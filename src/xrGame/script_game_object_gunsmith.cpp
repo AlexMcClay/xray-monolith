@@ -228,6 +228,64 @@ bool CScriptGameObject::gs_set_condition(u8 node, float value)
 	return t;
 }
 
+// Tactical devices: { on = bool, devices = { { node, section, mode, modes = { "light", "light, laser", ... } }, ... } }
+::luabind::object gs_tactical_state_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_tactical_state");
+	if (!weapon)
+		return ::luabind::object();
+	::luabind::object t = ::luabind::newtable(L);
+	t["on"] = weapon->gs_devices_on();
+	::luabind::object list = ::luabind::newtable(L);
+	const gunsmith::CTree& tree = weapon->gs_tree();
+	int count = 0;
+	for (u8 i = 1; i < tree.size(); ++i)
+	{
+		const gunsmith::SNode& n = tree.node(i);
+		const gunsmith::SPartVisual& pv = gunsmith::part_visual(n.section.c_str());
+		if (!pv.is_tactical())
+			continue;
+		::luabind::object d = ::luabind::newtable(L);
+		d["node"] = int(i);
+		d["section"] = n.section.c_str();
+		d["mode"] = int(_min(u32(n.mode), u32(pv.tac_modes.size() - 1)));
+		::luabind::object modes = ::luabind::newtable(L);
+		for (u32 m = 0; m < pv.tac_modes.size(); ++m)
+		{
+			const u8 f = pv.tac_modes[m];
+			modes[m + 1] = (f & gunsmith::SPartVisual::eTacLight) && (f & gunsmith::SPartVisual::eTacLaser) ? "light, laser"
+				: (f & gunsmith::SPartVisual::eTacLight) ? "light" : "laser";
+		}
+		d["modes"] = modes;
+		list[++count] = d;
+	}
+	t["devices"] = list;
+	return t;
+}
+
+// Toggles every tactical device; returns the new state (false without devices).
+::luabind::object gs_tactical_toggle_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_tactical_toggle");
+	return ::luabind::object(L, weapon ? weapon->gs_devices_toggle() : false);
+}
+
+// Every tactical device to its next mode.
+::luabind::object gs_tactical_next_mode_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_tactical_next_mode");
+	if (weapon)
+		weapon->gs_devices_next_mode();
+	return ::luabind::object(L, weapon != nullptr);
+}
+
+// One device's mode (0-based index into its modes); false if node isn't a device or mode is out of range.
+::luabind::object gs_tactical_set_mode_script(lua_State* L, CScriptGameObject* self, u8 node, u8 mode)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_tactical_set_mode");
+	return ::luabind::object(L, weapon ? weapon->gs_set_device_mode(node, mode) : false);
+}
+
 // Stats with the part item `item` in the slot, together with every part it carries, done
 // the way gs_attach does it (graft, then drop carried parts that don't fit) on a copy.
 // Adds `errors` ("1: <reason>" when the item itself doesn't fit), `carried` (the sections it

@@ -91,6 +91,32 @@ namespace gunsmith
 		v.has_eye = section && pSettings->line_exist(section, "aim_eye_point");
 		v.eye_point = read_vec(section, "aim_eye_point");
 		v.eye_offset = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_eye_offset", 0.f) : 0.f;
+		// "light | light, laser | laser": one entry per mode, each a comma list of what is on
+		if (section && pSettings->line_exist(section, "tactical_modes"))
+		{
+			LPCSTR modes = pSettings->r_string(section, "tactical_modes");
+			const int count = _GetItemCount(modes, '|');
+			string256 mode, what;
+			for (int m = 0; m < count; ++m)
+			{
+				_GetItem(modes, m, mode, '|');
+				u8 flags = 0;
+				for (int w = 0, wc = _GetItemCount(mode, ','); w < wc; ++w)
+				{
+					_Trim(_GetItem(mode, w, what, ','));
+					if (!xr_strcmp(what, "light"))
+						flags |= SPartVisual::eTacLight;
+					else if (!xr_strcmp(what, "laser"))
+						flags |= SPartVisual::eTacLaser;
+				}
+				if (flags)
+					v.tac_modes.push_back(flags);
+			}
+		}
+		v.light_point = read_vec(section, "light_point");
+		v.laser_point = read_vec(section, "laser_point");
+		v.light_section = read_str(section, "light_section");
+		v.laser_section = read_str(section, "laser_section");
 		return cache.insert(mk_pair(key, v)).first->second;
 	}
 
@@ -453,6 +479,22 @@ namespace gunsmith
 		xr_sprintf(k, "%u:%s", u32(sight->node), c.sig[sight->node].section.c_str());
 		key = k;
 		return true;
+	}
+
+	bool CVisuals::part_frame(int ctx, IKinematics* root, u8 node, Fmatrix& out)
+	{
+		SContext& c = m_ctx[ctx];
+		if (c.children.empty() || c.root != root)
+			return false;
+		for (const SChild& ch : c.children)
+		{
+			if (ch.node != node)
+				continue;
+			update_local(c, root);
+			out.mul_43(ch.local, ch.K->LL_GetTransform_R(ch.K->LL_GetBoneRoot()));
+			return true;
+		}
+		return false;
 	}
 
 	const SPartVisual* CVisuals::sight_eye(IKinematics* root, Fvector& eye, bool& has_eye)
