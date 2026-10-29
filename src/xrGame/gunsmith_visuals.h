@@ -67,6 +67,15 @@ namespace gunsmith
 
 	const SPartVisual& part_visual(LPCSTR section);
 
+	// Sight switching (Gunsmith Docs 13). A gun cycles through its fitted cyclable sights (an aim point and
+	// aim_priority >= 1: optics and red dots, not iron sights) with vanilla's wpn_func key. The chosen
+	// sight's node is saved in node 0's mode, bits 1-7 (bit 0 is the tactical devices' on/off; 0 = automatic).
+	inline bool is_cyclable_sight(const SPartVisual& pv) { return pv.has_aim && pv.aim_priority >= 1; }
+	inline u8 selected_sight(const CTree& tree) { return tree.empty() ? 0 : u8(tree.node(0).mode >> 1); }
+	// The node a gun aims through: `selected` when it is a fitted cyclable sight, else the highest
+	// aim_priority (ties: the last in the tree). 0 without a sight.
+	u8 sight_node(const CTree& tree, u8 selected);
+
 	// A virtual mount on a model that has no bone of that name, from keys on `section`:
 	//   gs_mount_<name>_pos, gs_mount_<name>_rot   in the model's space (metres; degrees H,P,B)
 	//   gs_mount_<name>_bone                        bone whose motion it follows (default the root
@@ -181,6 +190,7 @@ namespace gunsmith
 		};
 
 		SContext m_ctx[2];
+		u8 m_sight_node = 0; // the node the gun aims through (sight_node), set by ensure()
 
 		void update_local(SContext& c, IKinematics* root);
 		const SChild* pick_sight(const SContext& c) const;

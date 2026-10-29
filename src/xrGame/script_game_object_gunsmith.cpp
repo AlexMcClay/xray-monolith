@@ -237,6 +237,48 @@ bool CScriptGameObject::gs_set_parts_condition(float value)
 	return t;
 }
 
+// Sight switching (Gunsmith Docs 13): the cyclable sights fitted, { { node, section }, ... } in tree order.
+::luabind::object gs_sights_script(lua_State* L, CScriptGameObject* self)
+{
+	::luabind::object t = ::luabind::newtable(L);
+	CWeapon* weapon = gs_weapon(self, "gs_sights");
+	if (!weapon)
+		return t;
+	xr_vector<u8> sights;
+	weapon->gs_sight_list(sights);
+	int i = 1;
+	for (u8 node : sights)
+	{
+		::luabind::object s = ::luabind::newtable(L);
+		s["node"] = int(node);
+		s["section"] = weapon->gs_tree().node(node).section.c_str();
+		t[i++] = s;
+	}
+	return t;
+}
+
+// The node of the sight the weapon aims through, or nil.
+::luabind::object gs_sight_node_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_sight_node");
+	const u8 node = weapon ? weapon->gs_sight_node() : 0;
+	return node ? ::luabind::object(L, int(node)) : ::luabind::object();
+}
+
+// To the next fitted sight; false with fewer than two.
+::luabind::object gs_sight_next_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_sight_next");
+	return ::luabind::object(L, weapon ? weapon->gs_sight_next() : false);
+}
+
+// Aim through a given fitted sight (a node from gs_sights); false if it isn't one.
+::luabind::object gs_sight_select_script(lua_State* L, CScriptGameObject* self, u8 node)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_sight_select");
+	return ::luabind::object(L, weapon ? weapon->gs_sight_select(node) : false);
+}
+
 // Tactical devices: { on = bool, devices = { { node, section, mode, modes = { "light", "light, laser", ... } }, ... } }
 ::luabind::object gs_tactical_state_script(lua_State* L, CScriptGameObject* self)
 {

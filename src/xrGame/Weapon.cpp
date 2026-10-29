@@ -476,6 +476,11 @@ void CWeapon::SetUIScope(LPCSTR scope_texture)
 BOOL useSeparateUBGLKeybind = TRUE;
 void CWeapon::SwitchZoomType()
 {
+	// Gunsmith guns with two or more optics or red dots: the key moves to the next fitted sight
+	// (Gunsmith Docs 13). Vanilla's alternative aim (zoom type 1) is for vanilla guns.
+	if (m_gs_full_mode && gs_sight_next())
+		return;
+
 	if (!useSeparateUBGLKeybind)
     {
 		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))
@@ -1328,21 +1333,53 @@ void CWeapon::gs_rebuild_stats(bool notify)
 
 const gunsmith::SPartVisual* CWeapon::gs_sight_part(shared_str* section) const
 {
-	const gunsmith::SPartVisual* best = nullptr;
 	if (!m_gs_full_mode)
-		return best;
+		return nullptr;
+	const u8 node = gs_sight_node(); // the same choice CVisuals makes (gunsmith::sight_node)
+	if (!node)
+		return nullptr;
+	const gunsmith::SNode& n = m_gs_tree.node(node);
+	if (section)
+		*section = n.section;
+	return &gunsmith::part_visual(n.section.c_str());
+}
+
+u8 CWeapon::gs_sight_node() const
+{
+	return m_gs_full_mode ? gunsmith::sight_node(m_gs_tree, gunsmith::selected_sight(m_gs_tree)) : 0;
+}
+
+void CWeapon::gs_sight_list(xr_vector<u8>& out) const
+{
+	out.clear();
+	if (!m_gs_full_mode)
+		return;
 	for (u8 i = 1; i < m_gs_tree.size(); ++i)
-	{
-		const gunsmith::SNode& n = m_gs_tree.node(i);
-		const gunsmith::SPartVisual& pv = gunsmith::part_visual(n.section.c_str());
-		if (pv.has_aim && (!best || pv.aim_priority >= best->aim_priority))
-		{
-			best = &pv; // highest aim_priority; among equals the last in the tree (as CVisuals)
-			if (section)
-				*section = n.section;
-		}
-	}
-	return best;
+		if (gunsmith::is_cyclable_sight(gunsmith::part_visual(m_gs_tree.node(i).section.c_str())))
+			out.push_back(i);
+}
+
+bool CWeapon::gs_sight_select(u8 node)
+{
+	xr_vector<u8> sights;
+	gs_sight_list(sights);
+	if (std::find(sights.begin(), sights.end(), node) == sights.end())
+		return false;
+	m_gs_tree.set_mode(0, u8((m_gs_tree.node(0).mode & 1) | (node << 1)));
+	gs_update_optic(); // zoom, overlay and lens follow; the aim correction re-predicts on its own
+	gs_sync_to_server();
+	return true;
+}
+
+bool CWeapon::gs_sight_next()
+{
+	xr_vector<u8> sights;
+	gs_sight_list(sights);
+	if (sights.size() < 2)
+		return false;
+	auto it = std::find(sights.begin(), sights.end(), gs_sight_node());
+	const u8 next = (it == sights.end() || it + 1 == sights.end()) ? sights.front() : *(it + 1);
+	return gs_sight_select(next);
 }
 
 const gunsmith::SPartVisual* CWeapon::gs_optic() const
@@ -1511,7 +1548,10 @@ bool CWeapon::gs_debug_set_part(u8 parent, u8 slot, LPCSTR section)
 
 	const int existing = m_gs_tree.find_in_slot(parent, slot);
 	if (existing >= 0)
+	{
+		gs_sight_forget();
 		m_gs_tree.remove_subtree(u8(existing));
+	}
 	if (!remove && m_gs_tree.add_node(section, parent, slot, 1.f) < 0)
 	{
 		Msg("! gunsmith: could not add [%s] (tree full?)", section);
@@ -1728,6 +1768,7 @@ bool CWeapon::gs_detach_part(u8 node, bool spawn, u16& item_id)
 	}
 	else
 	{
+		gs_sight_forget();
 		m_gs_tree.remove_subtree(node);
 		gs_rebuild_stats();
 		gs_sync_to_server();
@@ -2181,7 +2222,7 @@ bool CWeapon::gs_devices_toggle()
 {
 	if (m_gs_tree.empty() || !gs_has_devices())
 		return false;
-	m_gs_tree.set_mode(0, gs_devices_on() ? 0 : 1);
+	m_gs_tree.set_mode(0, m_gs_tree.node(0).mode ^ 1); // bit 0; bits 1-7 are the selected sight
 	gs_sync_to_server();
 	return gs_devices_on();
 }

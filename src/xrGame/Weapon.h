@@ -422,16 +422,26 @@ public:
 	virtual bool hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos);
 	virtual void DeleteHudItemData();
 
-	// The sight the weapon aims through (highest aim_priority in the tree, ties: the last), and
-	// its section; null without one. gs_optic(): the same when it magnifies and no vanilla scope
-	// addon is fitted (that one keeps its own zoom).
+	// The sight the weapon aims through (the selected sight, else the highest aim_priority in the tree,
+	// ties: the last; gunsmith::sight_node), and its section; null without one. gs_optic(): the same
+	// when it magnifies and no vanilla scope addon is fitted (that one keeps its own zoom).
 	const gunsmith::SPartVisual* gs_sight_part(shared_str* section = nullptr) const;
 	const gunsmith::SPartVisual* gs_optic() const;
 
+	// Sight switching: the fitted cyclable sights (optics and red dots, in tree order), the node aimed
+	// through (0 = none), the next one (false with fewer than two), a given one (false if not cyclable).
+	// The choice is saved in node 0's mode (bits 1-7) and reset when parts are attached or detached.
+	void gs_sight_list(xr_vector<u8>& out) const;
+	u8 gs_sight_node() const;
+	bool gs_sight_next();
+	bool gs_sight_select(u8 node);
+	// Back to automatic (the best sight): removing parts renumbers the nodes after them.
+	void gs_sight_forget() { if (!m_gs_tree.empty()) m_gs_tree.set_mode(0, u8(m_gs_tree.node(0).mode & 1)); }
+
 	// Tactical devices (gunsmith_tactical.h): flashlights and lasers fitted as parts, any number,
-	// switched together. The state lives in the tree (saved with it): node 0's mode is the on flag,
-	// each device node's mode its selected mode.
-	bool gs_devices_on() const { return !m_gs_tree.empty() && m_gs_tree.node(0).mode != 0; }
+	// switched together. The state lives in the tree (saved with it): bit 0 of node 0's mode is the on
+	// flag (bits 1-7: the selected sight), each device node's mode its selected mode.
+	bool gs_devices_on() const { return !m_gs_tree.empty() && (m_gs_tree.node(0).mode & 1) != 0; }
 	bool gs_has_devices() const;
 	// Toggles every device; returns the new state.
 	bool gs_devices_toggle();

@@ -192,9 +192,28 @@ namespace gunsmith
 		c = SContext();
 	}
 
+	u8 sight_node(const CTree& tree, u8 selected)
+	{
+		if (selected > 0 && selected < tree.size() && is_cyclable_sight(part_visual(tree.node(selected).section.c_str())))
+			return selected;
+		u8 best = 0;
+		int best_priority = 0;
+		for (u8 i = 1; i < tree.size(); ++i)
+		{
+			const SPartVisual& pv = part_visual(tree.node(i).section.c_str());
+			if (pv.has_aim && (!best || pv.aim_priority >= best_priority))
+			{
+				best = i; // highest aim_priority; among equals the last in the tree
+				best_priority = pv.aim_priority;
+			}
+		}
+		return best;
+	}
+
 	void CVisuals::ensure(int ctx, IKinematics* root, const CTree& tree, LPCSTR receiver, LPCSTR hud_sect, bool enabled)
 	{
 		SContext& c = m_ctx[ctx];
+		m_sight_node = sight_node(tree, selected_sight(tree)); // a switch changes no layout: read it every time
 
 		xr_vector<SSig> sig;
 		if (enabled)
@@ -457,6 +476,10 @@ namespace gunsmith
 
 	const CVisuals::SChild* CVisuals::pick_sight(const SContext& c) const
 	{
+		// The weapon's choice (sight_node: the selected sight, or the best one), as CWeapon::gs_sight_part
+		for (const SChild& ch : c.children)
+			if (ch.node == m_sight_node && ch.pv->has_aim)
+				return &ch;
 		const SChild* sight = nullptr;
 		for (const SChild& ch : c.children)
 			if (ch.pv->has_aim && (!sight || ch.pv->aim_priority >= sight->pv->aim_priority))
