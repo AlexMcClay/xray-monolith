@@ -2179,6 +2179,7 @@ void CWeapon::renderable_Render()
 
 // gs_aim_debug 1: log the sight calibration twice a second while aiming.
 int g_gs_aim_debug = 0;
+float g_gs_aim_speed = 6.f; // aim refinement gain, per second (gs_aim_speed)
 
 void CWeapon::RenderAttachments()
 {
@@ -3527,17 +3528,28 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 				curr_offs.y += m_gs_aim_corr.y;
 				curr_offs.z += m_gs_aim_corr.z;
 
-				// Refine once fully aimed and roughly settled, not while firing. The HUD follows
-				// the offset with a lag (InterpolateOffset); a gain well below that keeps it stable.
+				// Refine once fully aimed and settled, not while firing, and only once the camera has
+				// been still for a moment: while turning or moving, the HUD's inertia and bob push the
+				// sight off axis on purpose, and learning that offset left the sight off afterwards
+				// (until 30 Oct 2026 it refined then, at 1.5/s, and took about a second to recover).
 				Fvector s;
 				hi->m_item_transform.transform_tiny(s, sight);
 				cam_inv.transform_tiny(s); // camera space: x right, y up, z forward
 				const bool aimed = m_zoom_params.m_fZoomRotationFactor >= 0.99f;
 				const bool idle = GetState() == eIdle;
 				const bool settled = m_hud_offset[0].similar(curr_offs, 0.01f);
-				if (aimed && idle && settled)
+				const float dt = _max(Device.fTimeDelta, EPS_S);
+				bool still = gs_prev_cam_ok;
+				if (still)
 				{
-					const float k = _min(1.f, Device.fTimeDelta * 1.5f);
+					const float turn = acosf(_min(1.f, gs_prev_cam.k.dotproduct(trans.k))) / dt; // rad/s
+					const float move = gs_prev_cam.c.distance_to(trans.c) / dt; // m/s
+					still = turn < 0.1f && move < 0.3f;
+				}
+				m_gs_aim_still = still ? m_gs_aim_still + Device.fTimeDelta : 0.f;
+				if (aimed && idle && settled && m_gs_aim_still > 0.25f)
+				{
+					const float k = _min(1.f, Device.fTimeDelta * g_gs_aim_speed);
 					m_gs_aim_corr.x -= s.x * k;
 					m_gs_aim_corr.y -= s.y * k;
 				}
@@ -3545,8 +3557,8 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 				if (g_gs_aim_debug && Device.dwTimeGlobal > s_gs_aim_log + 500)
 				{
 					s_gs_aim_log = Device.dwTimeGlobal;
-					Msg("- gs_aim: sight [%s] off axis x=%.4f y=%.4f (dist %.3f), correction x=%.4f y=%.4f, aimed=%d idle=%d settled=%d",
-						key.c_str(), s.x, s.y, s.z, m_gs_aim_corr.x, m_gs_aim_corr.y, aimed, idle, settled);
+					Msg("- gs_aim: sight [%s] off axis x=%.4f y=%.4f (dist %.3f), correction x=%.4f y=%.4f, aimed=%d idle=%d settled=%d still=%.2fs",
+						key.c_str(), s.x, s.y, s.z, m_gs_aim_corr.x, m_gs_aim_corr.y, aimed, idle, settled, m_gs_aim_still);
 				}
 			}
 		}

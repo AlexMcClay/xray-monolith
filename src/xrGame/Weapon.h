@@ -22,6 +22,7 @@
 
 class CEntity;
 extern int g_gs_aim_debug;
+extern float g_gs_aim_speed;
 class ENGINE_API CMotionDef;
 class CSE_ALifeItemWeapon;
 class CSE_ALifeItemWeaponAmmo;
@@ -461,6 +462,7 @@ protected:
 	// it was made for. Predicted for the aimed pose when a sight is first aimed through (so it is
 	// right on the first aim), then refined while aiming steadily.
 	Fvector m_gs_aim_corr = { 0.f, 0.f, 0.f };
+	float m_gs_aim_still = 0.f; // seconds the camera has been still (aim refinement waits for it)
 	shared_str m_gs_aim_sight;
 	// The camera the HUD was placed with last frame (m_item_transform is last frame's).
 	Fmatrix m_gs_prev_cam;
