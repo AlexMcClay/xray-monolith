@@ -42,6 +42,12 @@ namespace
 		::luabind::object t = ::luabind::newtable(L);
 
 		t["ergonomics"] = stats.ergonomics;
+		t["stock_ergonomics"] = stats.stock_ergonomics;
+		t["recoil"] = stats.recoil_sum; // Tarkov's summed recoil percent of the fitted parts
+		t["stock_recoil"] = stats.stock_recoil_sum;
+		t["recoil_k"] = stats.recoil_k(); // the recoil multiplier against the stock build, penalty included
+		t["shoulder"] = stats.shoulder;
+		t["no_stock"] = stats.stock_shoulder && !stats.shoulder;
 		// The weapon's weight and price with these parts instead of its current ones.
 		t["weight"] = weapon->Weight() - weapon->gs_stats().weight_add + stats.weight_add;
 		t["cost"] = float(weapon->Cost()) - weapon->gs_stats().cost_add + stats.cost_add;
@@ -66,7 +72,7 @@ namespace
 			::luabind::object row = ::luabind::newtable(L);
 			row["base"] = base;
 			row["add"] = add;
-			row["mul"] = stats.mul[s];
+			row["mul"] = stats.mul[s] * stats.k(u8(s));
 			row["value"] = value;
 			list[gunsmith::stat_name(u8(s))] = row;
 		}

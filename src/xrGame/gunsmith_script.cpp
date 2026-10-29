@@ -262,6 +262,9 @@ bool gs_carries_parts(u16 id)
 	return item && item->gs_carries_parts();
 }
 
+bool gs_set_setting(LPCSTR name, float value) { return gunsmith::set_setting(name, value); }
+float gs_get_setting(LPCSTR name) { return gunsmith::get_setting(name); }
+
 bool gs_is_full_mode(LPCSTR section)
 {
 	return section && pSettings->section_exist(section) && gunsmith::is_full_mode(section);

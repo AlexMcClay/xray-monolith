@@ -102,8 +102,8 @@ void CObjectHandler::OnItemTake(CInventoryItem* inventory_item)
 		CameraRecoil cam_recoil_copy;
 		cam_recoil_copy.Clone(weapon->cam_recoil);
 		cam_recoil_copy.RelaxSpeed = cam_recoil_copy.RelaxSpeed_AI;
-		cam_recoil_copy.StepAngleHorz *= weapon->gs_stats().mul[gunsmith::eStatCamHorz];
-		cam_recoil_copy.MaxAngleHorz *= weapon->gs_stats().mul[gunsmith::eStatCamHorz];
+		cam_recoil_copy.StepAngleHorz *= weapon->gs_stats().horz_k();
+		cam_recoil_copy.MaxAngleHorz *= weapon->gs_stats().horz_k();
 		planner().object().weapon_shot_effector().Initialize(cam_recoil_copy);
 	}
 }

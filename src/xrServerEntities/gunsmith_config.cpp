@@ -420,6 +420,8 @@ namespace gunsmith
 				read_list(section, "blocks_slots", d.blocks_slots);
 			}
 
+			d.recoil = exists ? READ_IF_EXISTS(pSettings, r_float, section, "recoil", 0.f) : 0.f;
+			d.shoulder_contact = exists && !!READ_IF_EXISTS(pSettings, r_bool, section, "shoulder_contact", FALSE);
 			d.suppressor = exists && d.declared && !!READ_IF_EXISTS(pSettings, r_bool, section, "suppressor", FALSE);
 			d.ammo_mag_size = exists && d.declared ? READ_IF_EXISTS(pSettings, r_s32, section, "ammo_mag_size", -1) : -1;
 
@@ -495,20 +497,57 @@ namespace gunsmith
 		return part.jam_start_prob + t * (part.jam_end_prob - part.jam_start_prob);
 	}
 
-	const SSettings& settings()
+	namespace
 	{
-		static SSettings s;
-		static bool loaded = false;
-		if (!loaded)
+		SSettings& settings_rw()
 		{
-			LPCSTR sect = "gunsmith_settings";
-			s.ergo_base = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_base", 50.f);
-			s.ergo_aim_k = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_aim_k", 0.5f);
-			s.ergo_sway_k = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_sway_k", 0.5f);
-			s.sight_sway_factor = READ_IF_EXISTS(pSettings, r_float, sect, "sight_sway_factor", 1.0f);
-			s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
-			loaded = true;
+			static SSettings s;
+			static bool loaded = false;
+			if (!loaded)
+			{
+				LPCSTR sect = "gunsmith_settings";
+				s.ergo_base = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_base", 50.f);
+				s.ergo_aim_k = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_aim_k", 1.0f);
+				s.ergo_sway_k = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_sway_k", 1.0f);
+				s.ergo_strength = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_strength", 1.0f);
+				s.recoil_strength = READ_IF_EXISTS(pSettings, r_float, sect, "recoil_strength", 1.5f);
+				s.no_stock_recoil = READ_IF_EXISTS(pSettings, r_float, sect, "no_stock_recoil", 1.5f);
+				s.recoil_recovery = READ_IF_EXISTS(pSettings, r_float, sect, "recoil_recovery", 1.0f);
+				s.sight_sway_factor = READ_IF_EXISTS(pSettings, r_float, sect, "sight_sway_factor", 1.0f);
+				s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
+				loaded = true;
+			}
+			return s;
 		}
-		return s;
+
+		float* setting_ptr(LPCSTR name)
+		{
+			SSettings& s = settings_rw();
+			if (!name) return nullptr;
+			if (!xr_strcmp(name, "ergo_aim_k")) return &s.ergo_aim_k;
+			if (!xr_strcmp(name, "ergo_sway_k")) return &s.ergo_sway_k;
+			if (!xr_strcmp(name, "ergo_strength")) return &s.ergo_strength;
+			if (!xr_strcmp(name, "recoil_strength")) return &s.recoil_strength;
+			if (!xr_strcmp(name, "no_stock_recoil")) return &s.no_stock_recoil;
+			if (!xr_strcmp(name, "recoil_recovery")) return &s.recoil_recovery;
+			return nullptr;
+		}
+	}
+
+	const SSettings& settings() { return settings_rw(); }
+
+	bool set_setting(LPCSTR name, float value)
+	{
+		float* p = setting_ptr(name);
+		if (!p)
+			return false;
+		*p = _max(0.f, value);
+		return true;
+	}
+
+	float get_setting(LPCSTR name)
+	{
+		const float* p = setting_ptr(name);
+		return p ? *p : 0.f;
 	}
 }

@@ -1856,7 +1856,7 @@ void CWeapon::gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float
 
 	float v;
 	if (stat == gunsmith::eStatCamHorz)
-		v = b * stats.mul[stat]; // horizontal recoil only uses the multiplier
+		v = b * stats.horz_k(); // horizontal recoil only uses the multiplier
 	else if (stat == gunsmith::eStatErgonomics)
 		v = stats.ergonomics;
 	else

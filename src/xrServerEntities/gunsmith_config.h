@@ -162,6 +162,10 @@ namespace gunsmith
 
 		xr_vector<shared_str> blocks_slots;
 
+		// Handling, as Tarkov (Gunsmith Docs 02):
+		float recoil; // `recoil`: Tarkov's recoil percent (negative = less); a gun sums its parts' values
+		bool shoulder_contact; // `shoulder_contact = true`: a stock the shooter's shoulder rests on
+
 		// Need part_kind set:
 		bool suppressor; // `suppressor = true`: the gun is suppressed while this part is fitted and not
 						 // worn below its suppression_min_condition, as with a silencer addon
@@ -173,12 +177,17 @@ namespace gunsmith
 	// Jam chance of a part at this condition, from its curve.
 	float part_jam_probability(const SPartData& part, float condition);
 
-	// Engine-wide tuning, [gunsmith_settings] in system configs (all optional).
+	// Engine-wide tuning, [gunsmith_settings] in system configs (all optional). The handling ones can
+	// also be changed while playing (set_setting; the Framework's MCM page does).
 	struct SSettings
 	{
 		float ergo_base; // receiver ergonomics when the weapon has no `ergonomics` key (50)
-		float ergo_aim_k; // aim time scale per ergonomics point below/above 50 (0.5 per 100 points)
-		float ergo_sway_k; // movement sway scale, same units (0.5)
+		float ergo_aim_k; // aim time scale per 100 ergonomics points below/above the stock build's (1.0)
+		float ergo_sway_k; // movement sway scale, same units (1.0)
+		float ergo_strength; // multiplies both (1.0)
+		float recoil_strength; // scales the parts' summed recoil percent (1.0 = Tarkov's numbers; 1.5)
+		float no_stock_recoil; // recoil multiplier when the stock build has shoulder contact and the gun doesn't (1.5)
+		float recoil_recovery; // camera recoil relax speed multiplier on full-mode guns (1.0 = vanilla)
 		float sight_sway_factor; // extra zoomed sway per point of condition below a sight's threshold (1.0)
 		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
 		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
@@ -186,4 +195,8 @@ namespace gunsmith
 	};
 
 	const SSettings& settings();
+	// Handling settings by name (ergo_aim_k, ergo_sway_k, ergo_strength, recoil_strength, no_stock_recoil,
+	// recoil_recovery). False for an unknown name. Takes effect at once: stats read them live.
+	bool set_setting(LPCSTR name, float value);
+	float get_setting(LPCSTR name);
 }

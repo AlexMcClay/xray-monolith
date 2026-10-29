@@ -2951,6 +2951,8 @@ void CLevel::script_register(lua_State* L)
 		def("preview_bounds", &gs_preview_bounds_script, raw<1>()),
 		def("preview_resolution", &gs_preview_resolution),
 		def("is_full_mode", &gs_is_full_mode),
+		def("set_setting", &gs_set_setting),
+		def("get_setting", &gs_get_setting),
 		def("carries_parts", &gs_carries_parts)
 	];
 
