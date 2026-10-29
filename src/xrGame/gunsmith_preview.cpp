@@ -275,10 +275,10 @@ namespace gunsmith
 			Fvector p;
 			m_view_box.getpoint(i, p);
 			Fvector4 h;
-			vp.transform(h, p);
+			vp.transform(h, p); // x, y, z come back divided by w already
 			if (h.w <= EPS_L)
 				continue;
-			const float u = (h.x / h.w + 1.f) * 0.5f, v = (1.f - h.y / h.w) * 0.5f;
+			const float u = (h.x + 1.f) * 0.5f, v = (1.f - h.y) * 0.5f;
 			uv.x1 = _min(uv.x1, u);
 			uv.y1 = _min(uv.y1, v);
 			uv.x2 = _max(uv.x2, u);
@@ -303,6 +303,17 @@ namespace gunsmith
 			s->root = root;
 			s->tree.build_default(section, 0, 1.f);
 			s->visuals.ensure(CVisuals::eWorld, K, s->tree, section, nullptr, is_full_mode(section));
+			if (is_full_mode(section))
+			{
+				// As on a live full-mode gun (CWeapon::UpdateAddonsVisibility, addons disabled): the
+				// receiver model's old addon meshes stay hidden, e.g. the AK-12's GP-25.
+				for (LPCSTR bone : { "wpn_scope", "wpn_silencer", "wpn_launcher" })
+				{
+					const u16 id = K->LL_BoneID(bone);
+					if (id != BI_NONE)
+						K->LL_SetBoneVisible(id, FALSE, TRUE);
+				}
+			}
 		}
 		else
 		{
@@ -469,15 +480,16 @@ namespace gunsmith
 		const Fmatrix& vp = m_view_vp;
 		for (const CVisuals::SSlotPoint& p : m_view_points)
 		{
+			// Fmatrix::transform(Fvector4&, Fvector) returns x, y, z already divided by w (w kept). Dividing
+			// again (until 30 Oct 2026) scaled every dot by 1/distance: right only near the default camera.
 			Fvector4 h;
 			vp.transform(h, p.pos);
 			SViewSlot s;
 			s.node = p.node;
 			s.slot = p.slot;
 			s.visible = h.w > EPS_L;
-			const float iw = s.visible ? 1.f / h.w : 0.f;
-			s.u = (h.x * iw + 1.f) * 0.5f;
-			s.v = (1.f - h.y * iw) * 0.5f;
+			s.u = s.visible ? (h.x + 1.f) * 0.5f : 0.f;
+			s.v = s.visible ? (1.f - h.y) * 0.5f : 0.f;
 			s.visible = s.visible && s.u >= 0.f && s.u <= 1.f && s.v >= 0.f && s.v <= 1.f;
 			out.push_back(s);
 		}
