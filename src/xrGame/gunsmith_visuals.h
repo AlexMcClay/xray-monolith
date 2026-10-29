@@ -30,6 +30,8 @@ namespace gunsmith
 	//   scope_texture                      a 2D scope overlay (ui\scopes.xml); default none
 	//   aim_eye_point, aim_eye_offset      where the eye sits behind the scope (model space), and how far
 	//                                      in front of the camera that point is placed (metres, default 0)
+	//   aim_lens_diameter                  the lens disc's diameter (model space): with aim_eye_point, the
+	//                                      eye is placed at [gunsmith_settings] optic_lens_angle
 	// All positions are in the model's own space (as exported) and follow the named bone's
 	// motion; how a bone is oriented at rest doesn't matter.
 	struct SPartVisual
@@ -49,6 +51,7 @@ namespace gunsmith
 		bool has_eye;
 		Fvector eye_point;
 		float eye_offset;
+		float lens_diameter;
 		bool is_optic() const { return has_aim && (magnification > 1.f || zoom_factor > 0.f); }
 	};
 

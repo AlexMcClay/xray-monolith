@@ -180,6 +180,12 @@ namespace gunsmith
 		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
 		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
 		float optic_base_fov;
+		// Lens diameter / eye distance every optic is seen at while aiming (0.2). Shader 3D Scopes'
+		// parallax and fisheye are tuned for a lens this size from the eye; Tarkov's eye points see the
+		// lens about twice as wide, which folds the reticle into streaks near the rim. The eye is
+		// moved back to this angle and the first-person FOV narrowed by as much, so the lens keeps its
+		// size on screen. 0 keeps Tarkov's eye point.
+		float optic_lens_angle;
 	};
 
 	const SSettings& settings();

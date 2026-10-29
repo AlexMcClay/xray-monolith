@@ -91,6 +91,7 @@ namespace gunsmith
 		v.has_eye = section && pSettings->line_exist(section, "aim_eye_point");
 		v.eye_point = read_vec(section, "aim_eye_point");
 		v.eye_offset = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_eye_offset", 0.f) : 0.f;
+		v.lens_diameter = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_lens_diameter", 0.f) : 0.f;
 		return cache.insert(mk_pair(key, v)).first->second;
 	}
 
