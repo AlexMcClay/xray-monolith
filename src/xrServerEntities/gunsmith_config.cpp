@@ -506,7 +506,6 @@ namespace gunsmith
 			s.ergo_sway_k = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_sway_k", 0.5f);
 			s.sight_sway_factor = READ_IF_EXISTS(pSettings, r_float, sect, "sight_sway_factor", 1.0f);
 			s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
-			s.optic_lens_angle = READ_IF_EXISTS(pSettings, r_float, sect, "optic_lens_angle", 0.f);
 			loaded = true;
 		}
 		return s;

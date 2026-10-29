@@ -438,9 +438,6 @@ protected:
 	bool m_gs_prev_cam_ok = false;
 	// The magnifying sight the zoom was set up for; gs_update_optic() follows tree changes.
 	shared_str m_gs_optic_sect;
-	// How much further back the eye sits than the optic's own eye point (optic_lens_angle); the
-	// first-person FOV is narrowed by as much while aiming through it.
-	float m_gs_optic_hud_scale = 1.f;
 	void gs_update_optic();
 
 	// Magazine parts (`ammo_mag_size`) set the magazine size; the weapon's own comes back when

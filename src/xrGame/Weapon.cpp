@@ -572,15 +572,7 @@ float CWeapon::GetTargetHudFov()
 	// check aim state to determine easing
 	float x = IsZoomed() ? easeOutQuart(m_zoom_params.m_fZoomRotationFactor) : easeInQuart(m_zoom_params.m_fZoomRotationFactor);
 	float factor = hud_fov_aim_factor > 0 ? hud_fov_aim_factor * hud_fov_aim_multiplier : 1; // ltx hud_fov_aim_factor
-	float aimed = base * factor;
-	// Gunsmith optic seen from further back (m_gs_optic_hud_scale): narrow the first-person FOV by as
-	// much, so the lens keeps its size on screen. psHUD_FOV * 83 is the HUD projection's FOV in degrees.
-	if (m_gs_full_mode && !fsimilar(m_gs_optic_hud_scale, 1.f) && gs_optic())
-	{
-		const float half = deg2rad(aimed * 83.f) * 0.5f;
-		aimed = rad2deg(2.f * atanf(tanf(half) / m_gs_optic_hud_scale)) / 83.f;
-	}
-	base = aimed * x + base * (1 - x);
+	base = (base * factor) * x + base * (1 - x);
 
 	/*
 	if (m_zoom_params.m_fBaseZoomFactor == 0.f)
@@ -3378,21 +3370,15 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 
 					Fvector eye;
 					bool has_eye;
-					m_gs_optic_hud_scale = 1.f;
 					const gunsmith::SPartVisual* pv = m_gs_visuals.sight_eye(hi->m_model, eye, has_eye);
 					if (pv && pv->is_optic() && has_eye)
 					{
 						aimed.transform_tiny(eye);
-						// Lens (the aim point) at `scale` times its distance from the optic's eye point.
-						const float angle = gunsmith::settings().optic_lens_angle;
-						const float l_model = pv->aim_point.distance_to(pv->eye_point);
-						if (angle > 0.01f && pv->lens_diameter > 0.f && l_model > 0.001f)
-							m_gs_optic_hud_scale = _max(0.25f, _min(4.f, (pv->lens_diameter / l_model) / angle));
-						m_gs_aim_corr.z = pv->eye_offset + m_gs_optic_hud_scale * (s.z - eye.z) - s.z;
+						m_gs_aim_corr.z = pv->eye_offset - eye.z;
 					}
 					if (g_gs_aim_debug)
-						Msg("- gs_aim: sight [%s] predicted off axis x=%.4f y=%.4f, eye z correction %.4f, eye distance x%.2f",
-							key.c_str(), s.x, s.y, m_gs_aim_corr.z, m_gs_optic_hud_scale);
+						Msg("- gs_aim: sight [%s] predicted off axis x=%.4f y=%.4f, eye z correction %.4f",
+							key.c_str(), s.x, s.y, m_gs_aim_corr.z);
 				}
 				curr_offs.x += m_gs_aim_corr.x;
 				curr_offs.y += m_gs_aim_corr.y;
