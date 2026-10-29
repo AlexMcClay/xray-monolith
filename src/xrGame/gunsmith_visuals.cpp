@@ -449,7 +449,18 @@ namespace gunsmith
 				SSlotPoint p;
 				p.node = u8(i);
 				p.slot = u8(s);
-				p.pos = m.c;
+				p.pos = m.c; // an empty slot: where a part would go
+				// A filled slot whose part is drawn: on the part (the middle of its model), not on the mount
+				// point inside the parent, which drifts away from the part as the view zooms in.
+				const int occupant = tree.find_in_slot(u8(i), u8(s));
+				for (const SChild& ch : c.children)
+					if (occupant >= 0 && ch.node == u8(occupant) && ch.visual)
+					{
+						Fvector centre;
+						ch.visual->getVisData().box.getcenter(centre);
+						ch.local.transform_tiny(p.pos, centre);
+						break;
+					}
 				out.push_back(p);
 			}
 		}
