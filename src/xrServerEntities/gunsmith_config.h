@@ -177,6 +177,9 @@ namespace gunsmith
 		float ergo_aim_k; // aim time scale per ergonomics point below/above 50 (0.5 per 100 points)
 		float ergo_sway_k; // movement sway scale, same units (0.5)
 		float sight_sway_factor; // extra zoomed sway per point of condition below a sight's threshold (1.0)
+		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
+		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
+		float optic_base_fov;
 	};
 
 	const SSettings& settings();

@@ -362,10 +362,12 @@ void CWeapon::UpdateZoomParams() {
 			}
 		} else if (const gunsmith::SPartVisual* optic = gs_optic())
 		{
-			// Gunsmith optic: magnification relative to the player's own FOV, so a 4x scope is
-			// 4x whatever g_fov is. Zoom factors are FOVs in degrees divided by 0.75.
+			// Gunsmith optic: magnification relative to a fixed 1x FOV ([gunsmith_settings]
+			// optic_base_fov), so a 4x scope zooms the same whatever the player's FOV setting, and
+			// about as far as vanilla's scopes. Zoom factors are FOVs in degrees divided by 0.75.
 			auto mag_to_zoom = [](float mag) {
-				const float half = deg2rad(float(g_fov)) * 0.5f;
+				const float base = _min(float(g_fov), gunsmith::settings().optic_base_fov > 1.f ? gunsmith::settings().optic_base_fov : float(g_fov));
+				const float half = deg2rad(base) * 0.5f;
 				return rad2deg(2.f * atanf(tanf(half) / _max(mag, 0.01f))) / 0.75f;
 			};
 			m_zoom_params.m_fScopeZoomFactor = (optic->zoom_factor > 0.f ? optic->zoom_factor : mag_to_zoom(optic->magnification)) / zoom_multiple;
