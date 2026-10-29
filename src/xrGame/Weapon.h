@@ -419,13 +419,26 @@ public:
 	virtual bool hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos);
 	virtual void DeleteHudItemData();
 
+	// The sight the weapon aims through (highest aim_priority in the tree, ties: the last), and
+	// its section; null without one. gs_optic(): the same when it magnifies and no vanilla scope
+	// addon is fitted (that one keeps its own zoom).
+	const gunsmith::SPartVisual* gs_sight_part(shared_str* section = nullptr) const;
+	const gunsmith::SPartVisual* gs_optic() const;
+
 protected:
 	gunsmith::CVisuals m_gs_visuals;
 	bool m_gs_full_mode = false;
 	// Aim correction (camera space) that keeps the fitted sight on the camera axis, and the sight
-	// it was made for. Seeded from gs_aim_point, refined while aiming steadily.
+	// it was made for. Predicted for the aimed pose when a sight is first aimed through (so it is
+	// right on the first aim), then refined while aiming steadily.
 	Fvector m_gs_aim_corr = { 0.f, 0.f, 0.f };
 	shared_str m_gs_aim_sight;
+	// The camera the HUD was placed with last frame (m_item_transform is last frame's).
+	Fmatrix m_gs_prev_cam;
+	bool m_gs_prev_cam_ok = false;
+	// The magnifying sight the zoom was set up for; gs_update_optic() follows tree changes.
+	shared_str m_gs_optic_sect;
+	void gs_update_optic();
 
 	// Magazine parts (`ammo_mag_size`) set the magazine size; the weapon's own comes back when
 	// none is fitted. `live`: a change in play, so rounds that no longer fit are returned.

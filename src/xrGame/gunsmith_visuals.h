@@ -22,6 +22,14 @@ namespace gunsmith
 	//                                      last in the tree); e.g. optics 1 over iron sights 0
 	//   fire_bone, fire_point              the part is on the muzzle chain: shots and flash start
 	//                                      there when it is the last such part in the tree
+	// A sight that magnifies (an optic; see Gunsmith Docs 13-optics-and-3dss.md):
+	//   magnification                      e.g. 4 for a PSO-1; the camera zoom while aiming through it
+	//   magnification_min                  variable zoom (scroll wheel) from this up to magnification
+	//   zoom_step_count                    wheel steps across that range (default 4)
+	//   scope_zoom_factor                  overrides the zoom derived from magnification (vanilla units)
+	//   scope_texture                      a 2D scope overlay (ui\scopes.xml); default none
+	//   aim_eye_point, aim_eye_offset      where the eye sits behind the scope (model space), and how far
+	//                                      in front of the camera that point is placed (metres, default 0)
 	// All positions are in the model's own space (as exported) and follow the named bone's
 	// motion; how a bone is oriented at rest doesn't matter.
 	struct SPartVisual
@@ -35,6 +43,13 @@ namespace gunsmith
 		bool has_fire;
 		shared_str fire_bone;
 		Fvector fire_point;
+		float magnification, magnification_min, zoom_factor;
+		u32 zoom_steps;
+		shared_str scope_texture;
+		bool has_eye;
+		Fvector eye_point;
+		float eye_offset;
+		bool is_optic() const { return has_aim && (magnification > 1.f || zoom_factor > 0.f); }
 	};
 
 	const SPartVisual& part_visual(LPCSTR section);
@@ -88,6 +103,10 @@ namespace gunsmith
 		// HUD: the fitted sight's aim point in the receiver model's space, and a key that changes
 		// when a different sight (or the same sight elsewhere) is fitted.
 		bool sight_point(IKinematics* root, Fvector& point, shared_str& key);
+
+		// HUD: the fitted sight's part data and, when it has aim_eye_point, that point in the
+		// receiver model's space. Null without a sight.
+		const SPartVisual* sight_eye(IKinematics* root, Fvector& eye, bool& has_eye);
 
 		// Each child's tree node and transform in the root model's space, with the root's bones
 		// recalculated first (the model may not have been drawn), e.g. for inventory icons.

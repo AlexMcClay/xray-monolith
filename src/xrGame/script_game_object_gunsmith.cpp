@@ -204,6 +204,30 @@ bool CScriptGameObject::gs_set_condition(u8 node, float value)
 	return t;
 }
 
+// The section of the sight the weapon aims through (gs_mode = full), or nil.
+::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_sight_section");
+	shared_str section;
+	if (!weapon || !weapon->gs_sight_part(&section))
+		return ::luabind::object();
+	return ::luabind::object(L, section.c_str());
+}
+
+// The magnification of the optic the weapon aims through: { max, min } (min = max when fixed),
+// or nil when the sight doesn't magnify or a vanilla scope addon is fitted.
+::luabind::object gs_sight_magnification_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_sight_magnification");
+	const gunsmith::SPartVisual* optic = weapon ? weapon->gs_optic() : nullptr;
+	if (!optic)
+		return ::luabind::object();
+	::luabind::object t = ::luabind::newtable(L);
+	t["max"] = optic->magnification;
+	t["min"] = optic->magnification_min > 0.f ? optic->magnification_min : optic->magnification;
+	return t;
+}
+
 // Stats with the part item `item` in the slot, together with every part it carries, done
 // the way gs_attach does it (graft, then drop carried parts that don't fit) on a copy.
 // Adds `errors` ("1: <reason>" when the item itself doesn't fit), `carried` (the sections it

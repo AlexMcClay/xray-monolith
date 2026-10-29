@@ -83,6 +83,14 @@ namespace gunsmith
 		v.has_fire = section && (pSettings->line_exist(section, "fire_bone") || pSettings->line_exist(section, "fire_point"));
 		v.fire_bone = read_str(section, "fire_bone");
 		v.fire_point = read_vec(section, "fire_point");
+		v.magnification = section ? READ_IF_EXISTS(pSettings, r_float, section, "magnification", 0.f) : 0.f;
+		v.magnification_min = section ? READ_IF_EXISTS(pSettings, r_float, section, "magnification_min", 0.f) : 0.f;
+		v.zoom_factor = section ? READ_IF_EXISTS(pSettings, r_float, section, "scope_zoom_factor", 0.f) : 0.f;
+		v.zoom_steps = section ? READ_IF_EXISTS(pSettings, r_u32, section, "zoom_step_count", 0) : 0;
+		v.scope_texture = read_str(section, "scope_texture");
+		v.has_eye = section && pSettings->line_exist(section, "aim_eye_point");
+		v.eye_point = read_vec(section, "aim_eye_point");
+		v.eye_offset = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_eye_offset", 0.f) : 0.f;
 		return cache.insert(mk_pair(key, v)).first->second;
 	}
 
@@ -445,6 +453,25 @@ namespace gunsmith
 		xr_sprintf(k, "%u:%s", u32(sight->node), c.sig[sight->node].section.c_str());
 		key = k;
 		return true;
+	}
+
+	const SPartVisual* CVisuals::sight_eye(IKinematics* root, Fvector& eye, bool& has_eye)
+	{
+		has_eye = false;
+		SContext& c = m_ctx[eHud];
+		if (c.children.empty() || c.root != root)
+			return nullptr;
+		const SChild* sight = pick_sight(c);
+		if (!sight)
+			return nullptr;
+		if (sight->pv->has_eye)
+		{
+			update_local(c, root);
+			sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(eye, sight->pv->eye_point);
+			sight->local.transform_tiny(eye);
+			has_eye = true;
+		}
+		return sight->pv;
 	}
 
 	bool CVisuals::aim_delta(IKinematics* root, Fvector& delta)

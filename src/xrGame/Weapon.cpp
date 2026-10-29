@@ -360,6 +360,21 @@ void CWeapon::UpdateZoomParams() {
 				m_zoom_params.m_fMinBaseZoomFactor = READ_IF_EXISTS(pSettings, r_float, GetScopeName(), "min_scope_zoom_factor", 200.0f);
 				stepCount = READ_IF_EXISTS(pSettings, r_float, GetScopeName(), "zoom_step_count", 0);
 			}
+		} else if (const gunsmith::SPartVisual* optic = gs_optic())
+		{
+			// Gunsmith optic: magnification relative to the player's own FOV, so a 4x scope is
+			// 4x whatever g_fov is. Zoom factors are FOVs in degrees divided by 0.75.
+			auto mag_to_zoom = [](float mag) {
+				const float half = deg2rad(float(g_fov)) * 0.5f;
+				return rad2deg(2.f * atanf(tanf(half) / _max(mag, 0.01f))) / 0.75f;
+			};
+			m_zoom_params.m_fScopeZoomFactor = (optic->zoom_factor > 0.f ? optic->zoom_factor : mag_to_zoom(optic->magnification)) / zoom_multiple;
+			m_zoom_params.m_bUseDynamicZoom = optic->magnification_min > 0.f && optic->magnification_min < optic->magnification;
+			if (m_zoom_params.m_bUseDynamicZoom)
+			{
+				m_zoom_params.m_fMinBaseZoomFactor = mag_to_zoom(optic->magnification_min);
+				stepCount = optic->zoom_steps ? optic->zoom_steps : 4;
+			}
 		} else
 		{
 			m_zoom_params.m_fScopeZoomFactor = m_zoom_params.m_fBaseZoomFactor / zoom_multiple;
@@ -390,7 +405,17 @@ void CWeapon::UpdateUIScope()
 {
 	// Change or remove scope texture
 	shared_str scope_tex_name;
-	if (m_zoomtype == 0)
+	const gunsmith::SPartVisual* gs_optic_part = m_zoomtype == 0 ? gs_optic() : nullptr;
+	if (gs_optic_part)
+	{
+		scope_tex_name = gs_optic_part->scope_texture; // empty: none (3D scopes look through the model)
+		if (scope_tex_name.size() && pWpnScopeXml == nullptr)
+		{
+			pWpnScopeXml = new CUIXml();
+			pWpnScopeXml->Load(CONFIG_PATH, UI_PATH, "scopes.xml");
+		}
+	}
+	else if (m_zoomtype == 0)
 	{
 		if (0 != (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) && m_scopes.size())
 		{
@@ -1288,6 +1313,62 @@ void CWeapon::gs_rebuild_stats(bool notify)
 		m_gs_cant_fire_logged = false;
 	if (notify && was_suppressed != IsSuppressed())
 		gs_on_suppression_changed();
+	gs_update_optic();
+}
+
+const gunsmith::SPartVisual* CWeapon::gs_sight_part(shared_str* section) const
+{
+	const gunsmith::SPartVisual* best = nullptr;
+	if (!m_gs_full_mode)
+		return best;
+	for (u8 i = 1; i < m_gs_tree.size(); ++i)
+	{
+		const gunsmith::SNode& n = m_gs_tree.node(i);
+		const gunsmith::SPartVisual& pv = gunsmith::part_visual(n.section.c_str());
+		if (pv.has_aim && (!best || pv.aim_priority >= best->aim_priority))
+		{
+			best = &pv; // highest aim_priority; among equals the last in the tree (as CVisuals)
+			if (section)
+				*section = n.section;
+		}
+	}
+	return best;
+}
+
+const gunsmith::SPartVisual* CWeapon::gs_optic() const
+{
+	if (ALife::eAddonPermanent != m_eScopeStatus && 0 != (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) && m_scopes.size())
+		return nullptr; // a vanilla scope addon brings its own zoom
+	const gunsmith::SPartVisual* pv = gs_sight_part();
+	return pv && pv->is_optic() ? pv : nullptr;
+}
+
+// Zoom follows the fitted optic: re-read the zoom parameters when it changes, and when aiming
+// right now, jump to the new optic's zoom.
+void CWeapon::gs_update_optic()
+{
+	shared_str sect;
+	const gunsmith::SPartVisual* pv = gs_sight_part(&sect);
+	if (!pv || !pv->is_optic())
+		sect = nullptr;
+	if (sect == m_gs_optic_sect)
+		return;
+	m_gs_optic_sect = sect;
+	m_fRTZoomFactor = 0.f;
+	UpdateUIScope(); // ends with UpdateZoomParams()
+	if (IsZoomed())
+	{
+		firstZoomDone = true;
+		if (m_zoom_params.m_bUseDynamicZoom)
+		{
+			m_fRTZoomFactor = GetMinScopeZoomFactor();
+			SetZoomFactor(scope_radius > 0.0 ? m_fRTZoomFactor / scope_scrollpower : m_fRTZoomFactor);
+		}
+		else
+			SetZoomFactor(CurrentZoomFactor());
+	}
+	else
+		firstZoomDone = false;
 }
 
 bool CWeapon::IsSuppressed() const
@@ -3172,6 +3253,12 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 
 	u8 idx = GetCurrentHudOffsetIdx();
 
+	// Gunsmith: the camera m_item_transform was built with (it is updated after this call).
+	Fmatrix gs_prev_cam = m_gs_prev_cam;
+	const bool gs_prev_cam_ok = m_gs_prev_cam_ok;
+	m_gs_prev_cam = trans;
+	m_gs_prev_cam_ok = true;
+
 	//============= Поворот ствола во время аима =============//
 	{
 		Fvector curr_offs, curr_rot, curr_aim_rot;
@@ -3230,9 +3317,11 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 		}
 		
 		// Gunsmith: aim through the fitted sight part. Its aim point is kept on the camera's axis
-		// (where the screen centre and a collimator's dot are): a correction to the aim offset,
-		// seeded from the HUD section's gs_aim_point and refined while aiming steadily, so the
-		// sight lines up whatever the aim offset, model scale or mount chain.
+		// (where the screen centre and a collimator's dot are): a correction to the aim offset.
+		// When a sight is first aimed through, the correction is computed for the pose the HUD
+		// is moving to (the aim offset and rotation), from where the sight sits in the hands now,
+		// so it is right on the first aim; then it is refined while aiming steadily. An optic with
+		// aim_eye_point also gets its eye relief (z).
 		if (idx == 1 && !m_modular_attachments && m_gs_full_mode)
 		{
 			Fvector sight;
@@ -3241,22 +3330,57 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 			{
 				Fmatrix cam_inv;
 				cam_inv.invert(trans);
-				if (key != m_gs_aim_sight)
+				if (key != m_gs_aim_sight && gs_prev_cam_ok)
 				{
 					m_gs_aim_sight = key;
 					m_gs_aim_corr.set(0.f, 0.f, 0.f);
-					Fvector d;
-					if (m_gs_visuals.aim_delta(hi->m_model, d))
+
+					// The HUD offset as this function applies it: aim_rot, then (pos, rot Z*Y*X).
+					auto offset_xform = [](const Fvector& aim_rot, const Fvector& rot, const Fvector& pos) {
+						Fmatrix a, r, t;
+						a.identity();
+						a.setHPB(aim_rot.x, aim_rot.y, aim_rot.z);
+						r.identity();
+						r.rotateX(rot.x);
+						t.identity();
+						t.rotateY(rot.y);
+						r.mulA_43(t);
+						t.identity();
+						t.rotateZ(rot.z);
+						r.mulA_43(t);
+						r.translate_over(pos);
+						Fmatrix m;
+						m.mul_43(a, r);
+						return m;
+					};
+					// The receiver in the hands' frame, from last frame's pose: (cam * offset)^-1 * item.
+					Fmatrix prev_inv, off_inv, hands;
+					prev_inv.invert(gs_prev_cam);
+					off_inv.invert(offset_xform(m_hud_aim_rot, m_hud_offset[1], m_hud_offset[0]));
+					hands.mul_43(prev_inv, hi->m_item_transform);
+					hands.mulA_43(off_inv);
+					// Where the sight lands at the aim offset with no correction (camera space).
+					Fmatrix aimed;
+					aimed.mul_43(offset_xform(curr_aim_rot, curr_rot, curr_offs), hands);
+					Fvector s;
+					aimed.transform_tiny(s, sight);
+					m_gs_aim_corr.set(-s.x, -s.y, 0.f);
+
+					Fvector eye;
+					bool has_eye;
+					const gunsmith::SPartVisual* pv = m_gs_visuals.sight_eye(hi->m_model, eye, has_eye);
+					if (pv && pv->is_optic() && has_eye)
 					{
-						// the delta is in the model's frame; the offset is applied in the camera's
-						Fmatrix rel;
-						rel.mul_43(cam_inv, hi->m_item_transform);
-						rel.transform_dir(d);
-						m_gs_aim_corr.set(d.x, d.y, 0.f);
+						aimed.transform_tiny(eye);
+						m_gs_aim_corr.z = pv->eye_offset - eye.z;
 					}
+					if (g_gs_aim_debug)
+						Msg("- gs_aim: sight [%s] predicted off axis x=%.4f y=%.4f, eye z correction %.4f",
+							key.c_str(), s.x, s.y, m_gs_aim_corr.z);
 				}
 				curr_offs.x += m_gs_aim_corr.x;
 				curr_offs.y += m_gs_aim_corr.y;
+				curr_offs.z += m_gs_aim_corr.z;
 
 				// Refine once fully aimed and roughly settled, not while firing. The HUD follows
 				// the offset with a lag (InterpolateOffset); a gain well below that keeps it stable.
@@ -4034,7 +4158,7 @@ float CWeapon::GetMinScopeZoomFactor() const
 
 void CWeapon::ZoomInc()
 {
-	if (!IsScopeAttached()) return;
+	if (!IsScopeAttached() && !gs_optic()) return;
 	if (!m_zoom_params.m_bUseDynamicZoom) return;
 	float delta, min_zoom_factor;
 	float power = scope_radius > 0.0 ? scope_scrollpower : 1;
@@ -4057,7 +4181,7 @@ void CWeapon::ZoomInc()
 
 void CWeapon::ZoomDec()
 {
-	if (!IsScopeAttached()) return;
+	if (!IsScopeAttached() && !gs_optic()) return;
 	if (!m_zoom_params.m_bUseDynamicZoom) return;
 	float delta, min_zoom_factor;
 	float power = scope_radius > 0.0 ? scope_scrollpower : 1;

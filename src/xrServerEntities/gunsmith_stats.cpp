@@ -77,7 +77,7 @@ namespace gunsmith
 						out.suppressor_worn = true;
 				}
 			}
-			else if (!xr_strcmp(p.kind.c_str(), "sight") && condition < p.jam_start_condition)
+			else if ((!xr_strcmp(p.kind.c_str(), "sight") || !xr_strcmp(p.kind.c_str(), "optic")) && condition < p.jam_start_condition)
 				out.sight_sway += (p.jam_start_condition - condition) * settings().sight_sway_factor;
 		}
 	}
