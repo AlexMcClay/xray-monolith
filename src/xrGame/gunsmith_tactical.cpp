@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////
 //	Module 		: gunsmith_tactical.cpp
 //	Description : Gunsmith tactical devices - weapon-mounted flashlights and lasers,
-//	              any number per gun, each in its own mode (Gunsmith Docs 15)
+//	              any number per gun, each in its own mode (Gunsmith Docs 16)
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
