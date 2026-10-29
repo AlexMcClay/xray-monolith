@@ -67,7 +67,7 @@ void CServerEntityWrapper::load(IReader& stream)
 	net_packet.r_begin(ID);
 	R_ASSERT2(M_SPAWN == ID, "Invalid packet ID (!= M_SPAWN)!");
 
-	string64 s_name;
+	string256 s_name; // Gunsmith: generated part sections can be longer than 63 characters
 	net_packet.r_stringZ(s_name);
 
 	m_object = F_entity_Create(s_name);

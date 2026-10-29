@@ -103,7 +103,7 @@ CSE_ALifeDynamicObject* CALifeObjectRegistry::get_object(IReader& file_stream)
 	tNetPacket.r_begin(u_id);
 	R_ASSERT2(M_SPAWN==u_id, "Invalid packet ID (!= M_SPAWN)");
 
-	string64 s_name;
+	string256 s_name; // Gunsmith: generated part sections can be longer than 63 characters
 	tNetPacket.r_stringZ(s_name);
 #ifdef DEBUG
 	if (psAI_Flags.test(aiALife)) {
