@@ -122,7 +122,7 @@ namespace gunsmith
 		eFailNone = 0,
 		eFailMisfire, // receiver: the weapon's own misfire curve
 		eFailExtraction, // bolt, carrier, trigger, gas tube: cleared by racking the bolt
-		eFailFeed, // magazine: cleared by a full reload
+		eFailFeed, // magazine: cleared by racking the bolt (a full reload until 30 Oct 2026)
 		eFailBarrel, // barrel: cleared by racking the bolt
 	};
 

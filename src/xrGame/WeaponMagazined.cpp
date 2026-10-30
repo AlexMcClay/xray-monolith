@@ -1725,8 +1725,10 @@ void CWeaponMagazined::PlayAnimReload()
 {
 	VERIFY(GetState() == eReload);
 #ifdef NEW_ANIMS //AVO: use new animations
-	// Gunsmith: a feed jam (worn magazine) needs a full reload, not a bolt rack.
-	if (bMisfire && iAmmoElapsed != 0 && m_gs_jam_type != gunsmith::eFailFeed)
+	// Gunsmith: every jam type, a feed jam (worn magazine) included, is cleared by racking the bolt, as in
+	// Tarkov; the magazine keeps causing feed jams until it's replaced. (Until 30 Oct 2026 a feed jam needed a
+	// full reload.)
+	if (bMisfire && iAmmoElapsed != 0)
 	{
 		//Msg("AVO: ------ MISFIRE");
 		if (HudAnimationExist("anm_reload_misfire"))

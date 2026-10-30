@@ -785,8 +785,8 @@ void CWeaponMagazinedWGrenade::PlayAnimReload()
 #ifdef NEW_ANIMS //AVO: use new animations
 	if (IsGrenadeLauncherAttached())
 	{
-		// Gunsmith: a feed jam (worn magazine) needs a full reload, not a bolt rack.
-		if (bMisfire && m_gs_jam_type != gunsmith::eFailFeed)
+		// Gunsmith: every jam type is cleared by racking the bolt (CWeaponMagazined::PlayAnimReload).
+		if (bMisfire)
 		{
 			if (HudAnimationExist("anm_reload_misfire_w_gl"))
 			{
