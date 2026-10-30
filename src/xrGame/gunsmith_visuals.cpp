@@ -213,7 +213,9 @@ namespace gunsmith
 				a.zoom_steps = pv.zoom_steps;
 			}
 			a.scope_texture = pv.scope_texture;
-			a.has_eye = pv.has_eye && a.optic();
+			// every mode of an optic looks through its lens (the SpecterDR's 1x too): the eye stays where its
+			// reticle is sized for (Shader 3D Scopes' reticle size depends on the eye's distance to the lens)
+			a.has_eye = pv.has_eye && (a.optic() || pv.is_optic());
 			a.eye = pv.eye_point;
 			a.eye_offset = pv.eye_offset;
 		}
