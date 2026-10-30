@@ -23,10 +23,13 @@ namespace gunsmith
 	//     applied to the animated hand: the stock handguard keeps the animation's hold, which was tuned on it, and
 	//     the hand keeps the animation's small motions (firing, sway). (The first version moved the hand onto the
 	//     grip pose itself; Tarkov's poses are made for its bigger hand and looked wrong: user, 30 Oct 2026);
-	//   - its weight is 1 while the animated hand is near its idle place (gs_grip_idle, within 3 cm) and falls to
-	//     0 by 10 cm, so reloads, checks and inspects take the hand away as animated;
+	//   - its weight is 1 while the animated hand is near its idle place (gs_grip_idle, within 2 cm) and falls to
+	//     0 by 16 cm, so reloads, checks and inspects take the hand away as animated. It rises at most 4 per second,
+	//     so a hand coming back settles onto a grip far from the animation's (a vertical foregrip) instead of
+	//     snapping onto it (user, 30 Oct 2026: "the blending ... is a bit weird");
 	//   - the arm reaches the hand by turning the upper arm, then the forearm, the least that does it (the elbow
-	//     keeps the animation's side); the fingers blend to the grip's.
+	//     keeps the animation's side); the fingers blend to the grip's in the second half of the weight, so the
+	//     hand arrives open and then closes.
 	// Only the left arm's model (m_model_2) is changed, through bone callbacks: the left hand's bones are
 	// calculated again with the results written over them. core\anim_retarget.py grip_ik is the same in Python.
 	class CGripIK
@@ -71,5 +74,7 @@ namespace gunsmith
 			void load(LPCSTR sect);
 		};
 		SRef m_ref;
+		float m_weight = 0.f;   // the weight, rate-limited when rising
+		u32 m_weight_frame = 0;
 	};
 }

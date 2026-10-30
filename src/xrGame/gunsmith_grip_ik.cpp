@@ -22,8 +22,15 @@ namespace gunsmith
 			"bip01_l_finger3", "bip01_l_finger31", "bip01_l_finger32",
 			"bip01_l_finger4", "bip01_l_finger41", "bip01_l_finger42"};
 
-		const float NEAR_DIST = 0.03f; // the animated hand this close to its idle place: full grip
-		const float FAR_DIST = 0.10f;  // and this far: none
+		const float NEAR_DIST = 0.02f; // the animated hand this close to its idle place: full grip
+		const float FAR_DIST = 0.16f;  // and this far: none (10 cm let the hand snap onto a vertical foregrip in 0.1 s)
+		const float RISE = 4.f;        // the weight's fastest rise, per second
+
+		float ease(float x) // smoothstep
+		{
+			clamp(x, 0.f, 1.f);
+			return x * x * (3.f - 2.f * x);
+		}
 
 		// The smallest rotation taking direction `from` to `to` (axes as an Fmatrix, no translation).
 		Fmatrix rotate_onto(Fvector from, Fvector to)
@@ -213,8 +220,15 @@ namespace gunsmith
 		const Fmatrix ha0 = hands->LL_GetTransform(m_hand.id);
 
 		const float d = ha0.c.distance_to(idle.c);
-		const float w = 1.f - clampr((d - NEAR_DIST) / (FAR_DIST - NEAR_DIST), 0.f, 1.f);
-		const float weight = w * w * (3.f - 2.f * w); // smoothstep
+		const float to = ease(1.f - (d - NEAR_DIST) / (FAR_DIST - NEAR_DIST));
+		// falls with the animation, rises at most RISE a second (from 0 after a frame without a grip)
+		if (m_weight_frame + 1 < Device.dwFrame)
+			m_weight = 0.f;
+		if (m_weight_frame != Device.dwFrame)
+			m_weight = _min(to, m_weight + RISE * Device.fTimeDelta);
+		m_weight_frame = Device.dwFrame;
+		const float weight = m_weight;
+		const float finger_weight = ease((weight - 0.5f) / 0.5f); // the hand arrives open, then closes
 		if (g_gs_grip_debug)
 		{
 			static u32 last = 0;
@@ -302,7 +316,7 @@ namespace gunsmith
 			}
 			else
 				want_local = grip_local;
-			Fmatrix local = blend_rot(anim_local[f], want_local, weight);
+			Fmatrix local = blend_rot(anim_local[f], want_local, finger_weight);
 			const Fmatrix* parent = m_parent[f] == m_hand.id ? &m_hand.target : nullptr;
 			for (int p = 0; p < eFingers && !parent; ++p)
 				if (m_fingers[p].id == m_parent[f])
