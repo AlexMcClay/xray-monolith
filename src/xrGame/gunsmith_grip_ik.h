@@ -6,7 +6,7 @@
 struct attachable_hud_item;
 
 extern int g_gs_grip_ik;     // gs_grip_ik 0/1: the left hand on the fitted handguard or foregrip
-extern int g_gs_grip_type;   // gs_grip_type 0/1: which of Tarkov's grip poses (GripType) the hand takes
+extern int g_gs_grip_type;   // gs_grip_type 0/1: which of Tarkov's grip poses (GripType) the hand takes (0 Common, as Tarkov)
 extern int g_gs_grip_debug;  // gs_grip_debug 0/1: log the grip, weight and how far the hand moves
 extern Fvector g_gs_grip_offset; // gs_grip_offset x,y,z: moves the hand on the grip, in the hand's axes (metres; tuning)
 

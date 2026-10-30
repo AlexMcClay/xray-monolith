@@ -172,6 +172,8 @@ namespace gunsmith
 
 		// the grip: the fitted part with the highest grip_priority (ties: the last), its type or the other one
 		const CTree& tree = wpn->gs_tree();
+		// Tarkov's first person always takes GripType 0 (Common); 1 (Alternative) is the menu character's
+		// relaxed hold (Gunsmith Docs 20). gs_grip_type 1 is kept for comparing.
 		const int want = g_gs_grip_type ? 1 : 0;
 		int best = -1, best_prio = 0, type = 0;
 		for (u32 n = 1; n < tree.size(); ++n)
