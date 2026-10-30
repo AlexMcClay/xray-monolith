@@ -2644,6 +2644,7 @@ void CCC_RegisterCommands()
 	CMD4(CCC_Integer, "gs_grip_ik", &g_gs_grip_ik, 0, 1);
 	CMD4(CCC_Integer, "gs_grip_type", &g_gs_grip_type, 0, 1);
 	CMD4(CCC_Integer, "gs_grip_debug", &g_gs_grip_debug, 0, 1);
+	CMD4(CCC_Vector3, "gs_grip_offset", &g_gs_grip_offset, Fvector().set(-0.1f, -0.1f, -0.1f), Fvector().set(0.1f, 0.1f, 0.1f));
 	CMD4(CCC_Integer, "gs_preview_debug", &g_gs_preview_debug, 0, 1);
 	CMD1(CCC_GsSetCondition, "gs_set_condition");
 	CMD1(CCC_GsSetPart, "gs_set_part");

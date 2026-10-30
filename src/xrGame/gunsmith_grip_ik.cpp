@@ -8,6 +8,7 @@
 int g_gs_grip_ik = 1;
 int g_gs_grip_type = 0;
 int g_gs_grip_debug = 0;
+Fvector g_gs_grip_offset = {0.f, 0.f, 0.f};
 
 namespace gunsmith
 {
@@ -21,7 +22,7 @@ namespace gunsmith
 			"bip01_l_finger3", "bip01_l_finger31", "bip01_l_finger32",
 			"bip01_l_finger4", "bip01_l_finger41", "bip01_l_finger42"};
 
-		const float NEAR_DIST = 0.03f; // the animated hand this close to the reference: full grip
+		const float NEAR_DIST = 0.03f; // the animated hand this close to its idle place: full grip
 		const float FAR_DIST = 0.10f;  // and this far: none
 
 		// The smallest rotation taking direction `from` to `to` (axes as an Fmatrix, no translation).
@@ -73,20 +74,44 @@ namespace gunsmith
 			return r;
 		}
 
-		bool read_ref(LPCSTR sect, Fmatrix& out)
+		// `count` floats of a key; false when it's missing or short
+		bool read_floats(LPCSTR sect, LPCSTR key, float* out, int count)
 		{
-			if (!sect || !pSettings->line_exist(sect, "gs_grip_ref"))
+			if (!sect || !pSettings->line_exist(sect, key))
 				return false;
-			LPCSTR v = pSettings->r_string(sect, "gs_grip_ref");
-			if (_GetItemCount(v) < 6)
+			LPCSTR v = pSettings->r_string(sect, key);
+			if (_GetItemCount(v) < count)
 				return false;
-			float f[6];
 			string64 item;
-			for (int i = 0; i < 6; ++i)
-				f[i] = (float)atof(_GetItem(v, i, item));
+			for (int i = 0; i < count; ++i)
+				out[i] = (float)atof(_GetItem(v, i, item));
+			return true;
+		}
+
+		bool read_xform(LPCSTR sect, LPCSTR key, Fmatrix& out)
+		{
+			float f[6];
+			if (!read_floats(sect, key, f, 6))
+				return false;
 			out.setHPB(deg2rad(f[3]), deg2rad(f[4]), deg2rad(f[5]));
 			out.translate_over(f[0], f[1], f[2]);
 			return true;
+		}
+	}
+
+	void CGripIK::SRef::load(LPCSTR sect)
+	{
+		section = sect;
+		ok = read_xform(sect, "gs_grip_idle", idle);
+		for (int t = 0; t < 2; ++t)
+		{
+			string32 hand_key, fingers_key;
+			xr_sprintf(hand_key, "gs_grip_ref_%d", t);
+			xr_sprintf(fingers_key, "gs_grip_ref_fingers_%d", t);
+			float f[eFingers * 3];
+			has[t] = read_xform(sect, hand_key, hand[t]) && read_floats(sect, fingers_key, f, eFingers * 3);
+			for (int i = 0; has[t] && i < eFingers; ++i)
+				fingers[t][i].setHPB(deg2rad(f[i * 3]), deg2rad(f[i * 3 + 1]), deg2rad(f[i * 3 + 2]));
 		}
 	}
 
@@ -139,22 +164,20 @@ namespace gunsmith
 		if (!wpn || !wpn->gs_full_mode() || !item->m_model)
 			return;
 
-		// the reference: where the animation has the hand at idle (receiver model space)
-		if (m_ref_sect != item->m_sect_name)
-		{
-			m_ref_sect = item->m_sect_name;
-			m_has_ref = read_ref(m_ref_sect.c_str(), m_ref);
-		}
-		if (!m_has_ref)
+		// the receiver's references (HUD section)
+		if (m_ref.section != item->m_sect_name)
+			m_ref.load(item->m_sect_name.c_str());
+		if (!m_ref.ok)
 			return;
 
 		// the grip: the fitted part with the highest grip_priority (ties: the last), its type or the other one
 		const CTree& tree = wpn->gs_tree();
+		const int want = g_gs_grip_type ? 1 : 0;
 		int best = -1, best_prio = 0, type = 0;
 		for (u32 n = 1; n < tree.size(); ++n)
 		{
 			const SPartVisual& pv = part_visual(tree.node(u8(n)).section.c_str());
-			const int t = pv.has_grip[g_gs_grip_type ? 1 : 0] ? (g_gs_grip_type ? 1 : 0) : (pv.has_grip[0] ? 0 : (pv.has_grip[1] ? 1 : -1));
+			const int t = pv.has_grip[want] ? want : (pv.has_grip[0] ? 0 : (pv.has_grip[1] ? 1 : -1));
 			if (t >= 0 && pv.grip_priority >= best_prio)
 			{
 				best = int(n);
@@ -168,21 +191,26 @@ namespace gunsmith
 		if (!wpn->gs_visuals().part_frame(CVisuals::eHud, item->m_model, u8(best), part))
 			return;
 		const SPartVisual& pv = part_visual(tree.node(u8(best)).section.c_str());
+		// Relative to the stock build's grip of the same type when the receiver has it: the stock handguard then
+		// leaves the animation's hand as it is, and another grip moves it by how Tarkov's two poses differ.
+		// Without it, the grip's pose itself, relative to the idle hand.
+		const bool relative = m_ref.has[type];
 
 		// everything in the left-arm model's space
 		Fmatrix inv_hands, gun;
 		inv_hands.invert(hands_xform);
 		gun.mul_43(inv_hands, item->m_item_transform);
-		Fmatrix target, ref, tmp;
+		Fmatrix target, ref, idle, tmp;
 		tmp.mul_43(part, pv.grip_hand[type]);
 		target.mul_43(gun, tmp);
-		ref.mul_43(gun, m_ref);
+		ref.mul_43(gun, relative ? m_ref.hand[type] : m_ref.idle);
+		idle.mul_43(gun, m_ref.idle);
 
 		const Fmatrix up0 = hands->LL_GetTransform(m_upper.id);
 		const Fmatrix fo0 = hands->LL_GetTransform(m_fore.id);
 		const Fmatrix ha0 = hands->LL_GetTransform(m_hand.id);
 
-		const float d = ha0.c.distance_to(ref.c);
+		const float d = ha0.c.distance_to(idle.c);
 		const float w = 1.f - clampr((d - NEAR_DIST) / (FAR_DIST - NEAR_DIST), 0.f, 1.f);
 		const float weight = w * w * (3.f - 2.f * w); // smoothstep
 		if (g_gs_grip_debug)
@@ -191,8 +219,9 @@ namespace gunsmith
 			if (Device.dwTimeGlobal > last + 500)
 			{
 				last = Device.dwTimeGlobal;
-				Msg("- gs_grip: [%s] type %d, hand %.1f cm from the reference, weight %.2f, target %.1f cm from the hand",
-					tree.node(u8(best)).section.c_str(), type, d * 100.f, weight, target.c.distance_to(ha0.c) * 100.f);
+				Msg("- gs_grip: [%s] type %d (%s), hand %.1f cm from its idle place, weight %.2f, moved %.1f cm",
+					tree.node(u8(best)).section.c_str(), type, relative ? "relative to the stock grip" : "absolute",
+					d * 100.f, weight, target.c.distance_to(ref.c) * 100.f);
 			}
 		}
 		if (weight <= 0.f)
@@ -205,6 +234,9 @@ namespace gunsmith
 		full.mul_43(ha0, corr);
 		Fmatrix hand = blend_rot(ha0, full, weight);
 		hand.c.lerp(ha0.c, full.c, weight);
+		Fvector extra;
+		hand.transform_dir(extra, g_gs_grip_offset);
+		hand.c.mad(extra, weight);
 
 		// the arm: two bones, the elbow on the animation's side
 		const Fvector S = up0.c, E0 = fo0.c, H0 = ha0.c;
@@ -241,7 +273,8 @@ namespace gunsmith
 		m_hand.target = hand;
 		m_hand.target.c = W;
 
-		// the fingers: their animated rotations blended to the grip's, from the new hand down
+		// the fingers: the animated ones turned by how the grip's differ from the stock grip's (or the grip's own),
+		// blended by the weight, from the new hand down
 		Fmatrix anim_local[eFingers];
 		for (int f = 0; f < eFingers; ++f)
 		{
@@ -256,9 +289,18 @@ namespace gunsmith
 			if (m_fingers[f].id == BI_NONE || m_parent[f] == BI_NONE)
 				continue;
 			const Fvector& g = pv.grip_fingers[type][f];
-			Fmatrix grip_local;
+			Fmatrix grip_local, want_local;
 			grip_local.setHPB(g.x, g.y, g.z);
-			Fmatrix local = blend_rot(anim_local[f], grip_local, weight);
+			if (relative)
+			{
+				Fmatrix ref_inv_f, delta;
+				ref_inv_f.invert(m_ref.fingers[type][f]);
+				delta.mul_43(ref_inv_f, grip_local);
+				want_local.mul_43(rot_only(anim_local[f]), delta);
+			}
+			else
+				want_local = grip_local;
+			Fmatrix local = blend_rot(anim_local[f], want_local, weight);
 			const Fmatrix* parent = m_parent[f] == m_hand.id ? &m_hand.target : nullptr;
 			for (int p = 0; p < eFingers && !parent; ++p)
 				if (m_fingers[p].id == m_parent[f])
