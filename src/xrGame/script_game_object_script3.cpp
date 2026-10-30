@@ -568,6 +568,8 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		.def("gs_part_layout", &gs_part_layout_script, raw<1>())
 		.def("gs_sight_section", &gs_sight_section_script, raw<1>())
 		.def("gs_sight_magnification", &gs_sight_magnification_script, raw<1>())
+		.def("gs_sight_mode", &gs_sight_mode_script, raw<1>())
+		.def("gs_sight_mode_next", &gs_sight_mode_next_script, raw<1>())
 		.def("gs_sights", &gs_sights_script, raw<1>())
 		.def("gs_sight_node", &gs_sight_node_script, raw<1>())
 		.def("gs_sight_next", &gs_sight_next_script, raw<1>())

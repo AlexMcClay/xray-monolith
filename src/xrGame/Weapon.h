@@ -429,6 +429,13 @@ public:
 	// when it magnifies and no vanilla scope addon is fitted (that one keeps its own zoom).
 	const gunsmith::SPartVisual* gs_sight_part(shared_str* section = nullptr) const;
 	const gunsmith::SPartVisual* gs_optic() const;
+	// What aiming uses for that part's chosen sight and mode (gunsmith::sight_aim): false without a sight.
+	bool gs_sight_aim(gunsmith::SSightAim& out) const;
+
+	// Sight modes (Gunsmith Docs 13): the sight aimed through's next mode (false when it has only one),
+	// and its current mode (count: how many it has). Saved in the part's node mode.
+	bool gs_sight_mode_next();
+	u8 gs_sight_mode(u8* count = nullptr) const;
 
 	// Sight switching: the fitted cyclable sights (optics and red dots, in tree order), the node aimed
 	// through (0 = none), the next one (false with fewer than two), a given one (false if not cyclable).

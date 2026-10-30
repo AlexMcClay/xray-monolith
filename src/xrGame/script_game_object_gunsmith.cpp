@@ -234,13 +234,40 @@ bool CScriptGameObject::gs_set_parts_condition(float value)
 ::luabind::object gs_sight_magnification_script(lua_State* L, CScriptGameObject* self)
 {
 	CWeapon* weapon = gs_weapon(self, "gs_sight_magnification");
-	const gunsmith::SPartVisual* optic = weapon ? weapon->gs_optic() : nullptr;
-	if (!optic)
+	gunsmith::SSightAim optic; // the chosen sight and mode
+	if (!weapon || !weapon->gs_optic() || !weapon->gs_sight_aim(optic))
 		return ::luabind::object();
 	::luabind::object t = ::luabind::newtable(L);
-	t["max"] = optic->magnification;
-	t["min"] = optic->magnification_min > 0.f ? optic->magnification_min : optic->magnification;
+	t["max"] = optic.magnification;
+	t["min"] = optic.magnification_min > 0.f ? optic.magnification_min : optic.magnification;
 	return t;
+}
+
+// Sight modes (Gunsmith Docs 13): the sight aimed through's mode, { mode, count, zoom, sight } (mode from 0; zoom
+// its magnification, 1 = none; sight: which of the part's sights, from 0), or nil without a sight.
+::luabind::object gs_sight_mode_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_sight_mode");
+	gunsmith::SSightAim aim;
+	if (!weapon || !weapon->gs_sight_aim(aim))
+		return ::luabind::object();
+	u8 count;
+	const u8 mode = weapon->gs_sight_mode(&count);
+	::luabind::object t = ::luabind::newtable(L);
+	t["mode"] = int(mode);
+	t["count"] = int(count);
+	t["zoom"] = aim.magnification > 1.f ? aim.magnification : 1.f;
+	const u8 node = weapon->gs_sight_node();
+	const gunsmith::SNode& n = weapon->gs_tree().node(node);
+	t["sight"] = int(gunsmith::node_sight(gunsmith::part_visual(n.section.c_str()), n.mode));
+	return t;
+}
+
+// To the sight aimed through's next mode; false when it has only one.
+::luabind::object gs_sight_mode_next_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_sight_mode_next");
+	return ::luabind::object(L, weapon ? weapon->gs_sight_mode_next() : false);
 }
 
 // Sight switching (Gunsmith Docs 13): the cyclable sights fitted, { { node, section }, ... } in tree order.

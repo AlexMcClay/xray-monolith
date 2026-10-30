@@ -38,6 +38,8 @@ class CScriptGameObject;
 ::luabind::object gs_part_layout_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_magnification_script(lua_State* L, CScriptGameObject* self);
+::luabind::object gs_sight_mode_script(lua_State* L, CScriptGameObject* self);
+::luabind::object gs_sight_mode_next_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sights_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_node_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_next_script(lua_State* L, CScriptGameObject* self);

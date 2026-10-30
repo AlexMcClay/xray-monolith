@@ -33,6 +33,17 @@ namespace gunsmith
 	//   scope_texture                      a 2D scope overlay (ui\scopes.xml); default none
 	//   aim_eye_point, aim_eye_offset      where the eye sits behind the scope (model space), and how far
 	//                                      in front of the camera that point is placed (metres, default 0)
+	// Sight modes and dual sights (Gunsmith Docs 13, "Sight modes"; the gs_sight_mode key switches modes):
+	//   gs_sight_modes                     modes of the part's first sight (default 1): the SpecterDR 4x/1x,
+	//                                      the HHS-1's magnifier in line/aside, the PS-320 6x/1x
+	//   gs_sight_mode_zooms                each mode's magnification (1 = none), e.g. "4, 1"
+	//   gs_sight_mode_bones                the bone each mode's meshes are on: only the current mode's is shown
+	//   gs_sights                          sights on the part (default 1): a second one is cycled with the
+	//                                      other sights (the NcStar's red dot over its scope, the SpecterDR's
+	//                                      backup irons)
+	//   gs_sight_<s>_aim_point, gs_sight_<s>_aim_dir, gs_sight_<s>_magnification   sight s (from 1)
+	// The part's node mode holds the choice: bits 0-3 the mode, bits 4-5 the sight (tactical devices use
+	// their node's mode for themselves: a part that is both keeps its first sight and mode).
 	// A tactical device (flashlight, laser; see gunsmith_tactical.h):
 	//   tactical_modes                     its modes, e.g. "light | light, laser | laser"
 	//   light_point, light_section         where the light comes out (model space; it shines along -Z)
@@ -59,6 +70,16 @@ namespace gunsmith
 		Fvector eye_point;
 		float eye_offset;
 		bool is_optic() const { return has_aim && (magnification > 1.f || zoom_factor > 0.f); }
+		xr_vector<float> mode_zooms; // per mode of the first sight (empty: one mode)
+		xr_vector<shared_str> mode_bones;
+		struct SExtraSight
+		{
+			Fvector aim_point, aim_fwd, aim_up;
+			float magnification;
+		};
+		xr_vector<SExtraSight> extra_sights; // sights 1.. (sight 0 is aim_point, aim_dir, ...)
+		u8 sight_count() const { return u8(1 + extra_sights.size()); }
+		u8 mode_count() const { return mode_zooms.empty() ? u8(1) : u8(mode_zooms.size()); }
 
 		enum { eTacLight = 1, eTacLaser = 2 };
 		xr_vector<u8> tac_modes; // per mode: eTacLight | eTacLaser
@@ -81,6 +102,26 @@ namespace gunsmith
 	};
 
 	const SPartVisual& part_visual(LPCSTR section);
+
+	// A part's chosen sight and mode, from its node mode (see SPartVisual): the sight index and the mode,
+	// clamped to what the part has.
+	inline u8 node_sight(const SPartVisual& pv, u8 node_mode) { return pv.is_tactical() ? 0 : u8(_min(u32((node_mode >> 4) & 3), u32(pv.sight_count() - 1))); }
+	inline u8 node_sight_mode(const SPartVisual& pv, u8 node_mode) { return pv.is_tactical() ? 0 : u8(_min(u32(node_mode & 15), u32(pv.mode_count() - 1))); }
+	inline u8 make_sight_mode(u8 sight, u8 mode) { return u8(((sight & 3) << 4) | (mode & 15)); }
+
+	// What aiming through a part's chosen sight and mode uses.
+	struct SSightAim
+	{
+		Fvector point, fwd, up;
+		bool has_eye;
+		Fvector eye;
+		float eye_offset;
+		float magnification, magnification_min, zoom_factor;
+		u32 zoom_steps;
+		shared_str scope_texture;
+		bool optic() const { return magnification > 1.f || zoom_factor > 0.f; }
+	};
+	SSightAim sight_aim(const SPartVisual& pv, u8 node_mode);
 
 	// Sight switching (Gunsmith Docs 13). A gun cycles through its fitted cyclable sights (an aim point and
 	// aim_priority >= 1: optics and red dots, not iron sights) with vanilla's wpn_func key. The chosen
@@ -187,6 +228,8 @@ namespace gunsmith
 			Fmatrix xform; // world/HUD transform handed to the renderer; must outlive the frame
 			const SPartVisual* pv;
 			u16 aim_bone, fire_bone;
+			xr_vector<u16> mode_bones; // per mode (BI_NONE: not in the model)
+			u8 shown_mode;             // the mode whose bone is shown (0xff: none set yet)
 		};
 
 		struct SSig
@@ -210,8 +253,11 @@ namespace gunsmith
 
 		SContext m_ctx[2];
 		u8 m_sight_node = 0; // the node the gun aims through (sight_node), set by ensure()
+		u8 m_sight_mode = 0; // that node's mode (its sight and mode), set by ensure()
 
 		void update_local(SContext& c, IKinematics* root);
+		void show_modes(SContext& c, const CTree& tree);
+		SSightAim aim_of(const SChild& ch) const;
 		const SChild* pick_sight(const SContext& c) const;
 	};
 }

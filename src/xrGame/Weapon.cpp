@@ -349,6 +349,7 @@ void CWeapon::UpdateZoomParams() {
 	{
 		m_zoom_params.m_bUseDynamicZoom = m_zoom_params.m_bUseDynamicZoom_Primary || READ_IF_EXISTS(pSettings, r_bool, cNameSect(), "scope_dynamic_zoom", false);
 		u32 stepCount = 0;
+		gunsmith::SSightAim optic_aim; // a Gunsmith optic: its chosen sight and mode (a mode has its own zoom)
 		if (g_player_hud->m_adjust_mode)
 		{
 			m_zoom_params.m_fScopeZoomFactor = g_player_hud->m_adjust_zoom_factor[0] / zoom_multiple;
@@ -360,8 +361,9 @@ void CWeapon::UpdateZoomParams() {
 				m_zoom_params.m_fMinBaseZoomFactor = READ_IF_EXISTS(pSettings, r_float, GetScopeName(), "min_scope_zoom_factor", 200.0f);
 				stepCount = READ_IF_EXISTS(pSettings, r_float, GetScopeName(), "zoom_step_count", 0);
 			}
-		} else if (const gunsmith::SPartVisual* optic = gs_optic())
+		} else if (gs_optic() && gs_sight_aim(optic_aim))
 		{
+			const gunsmith::SSightAim* optic = &optic_aim;
 			// Gunsmith optic: magnification relative to a fixed 1x FOV ([gunsmith_settings]
 			// optic_base_fov), so a 4x scope zooms the same whatever the player's FOV setting, and
 			// about as far as vanilla's scopes. Zoom factors are FOVs in degrees divided by 0.75.
@@ -407,10 +409,10 @@ void CWeapon::UpdateUIScope()
 {
 	// Change or remove scope texture
 	shared_str scope_tex_name;
-	const gunsmith::SPartVisual* gs_optic_part = m_zoomtype == 0 ? gs_optic() : nullptr;
-	if (gs_optic_part)
+	gunsmith::SSightAim gs_optic_aim;
+	if (m_zoomtype == 0 && gs_optic() && gs_sight_aim(gs_optic_aim))
 	{
-		scope_tex_name = gs_optic_part->scope_texture; // empty: none (3D scopes look through the model)
+		scope_tex_name = gs_optic_aim.scope_texture; // empty: none (3D scopes look through the model)
 		if (scope_tex_name.size() && pWpnScopeXml == nullptr)
 		{
 			pWpnScopeXml = new CUIXml();
@@ -1373,21 +1375,68 @@ bool CWeapon::gs_sight_select(u8 node)
 
 bool CWeapon::gs_sight_next()
 {
-	xr_vector<u8> sights;
-	gs_sight_list(sights);
+	// every sight of every cyclable part, in tree order (a dual optic's second sight after its first)
+	xr_vector<u8> nodes;
+	gs_sight_list(nodes);
+	xr_vector<std::pair<u8, u8>> sights;
+	for (u8 n : nodes)
+	{
+		const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(n).section.c_str());
+		for (u8 s = 0; s < (pv.is_tactical() ? 1 : pv.sight_count()); ++s)
+			sights.push_back(std::make_pair(n, s));
+	}
 	if (sights.size() < 2)
 		return false;
-	auto it = std::find(sights.begin(), sights.end(), gs_sight_node());
-	const u8 next = (it == sights.end() || it + 1 == sights.end()) ? sights.front() : *(it + 1);
-	return gs_sight_select(next);
+	const u8 cur = gs_sight_node();
+	const u8 cur_s = cur ? gunsmith::node_sight(gunsmith::part_visual(m_gs_tree.node(cur).section.c_str()), m_gs_tree.node(cur).mode) : 0;
+	auto it = std::find(sights.begin(), sights.end(), std::make_pair(cur, cur_s));
+	const std::pair<u8, u8> next = (it == sights.end() || it + 1 == sights.end()) ? sights.front() : *(it + 1);
+	const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(next.first).section.c_str());
+	if (!pv.is_tactical())
+		m_gs_tree.set_mode(next.first, gunsmith::make_sight_mode(next.second, gunsmith::node_sight_mode(pv, m_gs_tree.node(next.first).mode)));
+	return gs_sight_select(next.first);
+}
+
+bool CWeapon::gs_sight_aim(gunsmith::SSightAim& out) const
+{
+	const u8 node = gs_sight_node();
+	if (!node)
+		return false;
+	const gunsmith::SNode& n = m_gs_tree.node(node);
+	out = gunsmith::sight_aim(gunsmith::part_visual(n.section.c_str()), n.mode);
+	return true;
+}
+
+u8 CWeapon::gs_sight_mode(u8* count) const
+{
+	const u8 node = gs_sight_node();
+	const gunsmith::SPartVisual* pv = node ? &gunsmith::part_visual(m_gs_tree.node(node).section.c_str()) : nullptr;
+	const bool modes = pv && !pv->is_tactical() && gunsmith::node_sight(*pv, m_gs_tree.node(node).mode) == 0;
+	if (count)
+		*count = modes ? pv->mode_count() : 1;
+	return modes ? gunsmith::node_sight_mode(*pv, m_gs_tree.node(node).mode) : 0;
+}
+
+bool CWeapon::gs_sight_mode_next()
+{
+	u8 count;
+	const u8 mode = gs_sight_mode(&count);
+	if (count < 2)
+		return false;
+	const u8 node = gs_sight_node();
+	m_gs_tree.set_mode(node, gunsmith::make_sight_mode(0, u8((mode + 1) % count)));
+	gs_update_optic(); // zoom and lens follow; the aim correction re-predicts on its own (its key has the mode)
+	gs_sync_to_server();
+	return true;
 }
 
 const gunsmith::SPartVisual* CWeapon::gs_optic() const
 {
 	if (ALife::eAddonPermanent != m_eScopeStatus && 0 != (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) && m_scopes.size())
 		return nullptr; // a vanilla scope addon brings its own zoom
+	gunsmith::SSightAim aim;
 	const gunsmith::SPartVisual* pv = gs_sight_part();
-	return pv && pv->is_optic() ? pv : nullptr;
+	return pv && gs_sight_aim(aim) && aim.optic() ? pv : nullptr; // (its chosen sight and mode magnify)
 }
 
 // Zoom follows the fitted optic: re-read the zoom parameters when it changes, and when aiming
@@ -1396,8 +1445,15 @@ void CWeapon::gs_update_optic()
 {
 	shared_str sect;
 	const gunsmith::SPartVisual* pv = gs_sight_part(&sect);
-	if (!pv || !pv->is_optic())
+	gunsmith::SSightAim aim;
+	if (!pv || !gs_sight_aim(aim) || !aim.optic())
 		sect = nullptr;
+	else
+	{
+		string256 k; // the section, sight and mode: a mode switch is a different optic
+		xr_sprintf(k, "%s:%u", sect.c_str(), u32(m_gs_tree.node(gs_sight_node()).mode));
+		sect = k;
+	}
 	if (sect == m_gs_optic_sect)
 		return;
 	m_gs_optic_sect = sect;

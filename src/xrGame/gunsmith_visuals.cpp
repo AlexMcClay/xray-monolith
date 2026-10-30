@@ -80,18 +80,20 @@ namespace gunsmith
 		v.aim_bone = read_str(section, "aim_bone");
 		v.aim_priority = section ? READ_IF_EXISTS(pSettings, r_s32, section, "aim_priority", 0) : 0;
 		v.aim_point = read_vec(section, "aim_point");
-		v.aim_fwd.set(0.f, 0.f, -1.f); // a part's bore
-		v.aim_up.set(0.f, 1.f, 0.f);
-		if (section && pSettings->line_exist(section, "aim_dir"))
-		{
+		// a sight line: forward x,y,z, up x,y,z (default a part's bore)
+		auto read_dir = [section](LPCSTR key, Fvector& fwd, Fvector& up) {
+			fwd.set(0.f, 0.f, -1.f);
+			up.set(0.f, 1.f, 0.f);
 			Fvector f, u;
-			if (sscanf(pSettings->r_string(section, "aim_dir"), "%f,%f,%f,%f,%f,%f", &f.x, &f.y, &f.z, &u.x, &u.y, &u.z) == 6
+			if (section && pSettings->line_exist(section, key)
+				&& sscanf(pSettings->r_string(section, key), "%f,%f,%f,%f,%f,%f", &f.x, &f.y, &f.z, &u.x, &u.y, &u.z) == 6
 				&& f.magnitude() > EPS && u.magnitude() > EPS)
 			{
-				v.aim_fwd = f.normalize();
-				v.aim_up = u.normalize();
+				fwd = f.normalize();
+				up = u.normalize();
 			}
-		}
+		};
+		read_dir("aim_dir", v.aim_fwd, v.aim_up);
 		v.has_fire = section && (pSettings->line_exist(section, "fire_bone") || pSettings->line_exist(section, "fire_point"));
 		v.fire_bone = read_str(section, "fire_bone");
 		v.fire_point = read_vec(section, "fire_point");
@@ -154,7 +156,76 @@ namespace gunsmith
 										 deg2rad((float)atof(_GetItem(f, i * 3 + 2, item))));
 			v.has_grip[t] = true;
 		}
+		// sight modes (of the first sight) and further sights
+		if (section && READ_IF_EXISTS(pSettings, r_u32, section, "gs_sight_modes", 1) > 1)
+		{
+			LPCSTR zooms = READ_IF_EXISTS(pSettings, r_string, section, "gs_sight_mode_zooms", "");
+			LPCSTR bones = READ_IF_EXISTS(pSettings, r_string, section, "gs_sight_mode_bones", "");
+			const u32 n = _min(pSettings->r_u32(section, "gs_sight_modes"), 16u);
+			string64 item;
+			for (u32 m = 0; m < n; ++m)
+			{
+				v.mode_zooms.push_back(m < u32(_GetItemCount(zooms)) ? (float)atof(_GetItem(zooms, m, item)) : 1.f);
+				v.mode_bones.push_back(m < u32(_GetItemCount(bones)) ? shared_str(_Trim(_GetItem(bones, m, item))) : shared_str());
+			}
+		}
+		const u32 sights = section ? _min(READ_IF_EXISTS(pSettings, r_u32, section, "gs_sights", 1), 4u) : 1;
+		for (u32 s = 1; s < sights; ++s)
+		{
+			string64 k_point, k_dir, k_mag;
+			xr_sprintf(k_point, "gs_sight_%u_aim_point", s);
+			xr_sprintf(k_dir, "gs_sight_%u_aim_dir", s);
+			xr_sprintf(k_mag, "gs_sight_%u_magnification", s);
+			if (!pSettings->line_exist(section, k_point))
+				break;
+			SPartVisual::SExtraSight es;
+			es.aim_point = read_vec(section, k_point);
+			read_dir(k_dir, es.aim_fwd, es.aim_up);
+			es.magnification = READ_IF_EXISTS(pSettings, r_float, section, k_mag, 1.f);
+			v.extra_sights.push_back(es);
+		}
 		return cache.insert(mk_pair(key, v)).first->second;
+	}
+
+	SSightAim sight_aim(const SPartVisual& pv, u8 node_mode)
+	{
+		SSightAim a;
+		const u8 s = node_sight(pv, node_mode);
+		a.zoom_factor = 0.f;
+		a.zoom_steps = 0;
+		a.magnification_min = 0.f;
+		a.has_eye = false;
+		a.eye.set(0.f, 0.f, 0.f);
+		a.eye_offset = 0.f;
+		if (s == 0)
+		{
+			a.point = pv.aim_point;
+			a.fwd = pv.aim_fwd;
+			a.up = pv.aim_up;
+			const u8 m = node_sight_mode(pv, node_mode);
+			if (pv.mode_zooms.size() > 1)
+				a.magnification = pv.mode_zooms[m]; // a mode's fixed zoom
+			else
+			{
+				a.magnification = pv.magnification; // the sight's own (variable) zoom
+				a.magnification_min = pv.magnification_min;
+				a.zoom_factor = pv.zoom_factor;
+				a.zoom_steps = pv.zoom_steps;
+			}
+			a.scope_texture = pv.scope_texture;
+			a.has_eye = pv.has_eye && a.optic();
+			a.eye = pv.eye_point;
+			a.eye_offset = pv.eye_offset;
+		}
+		else
+		{
+			const SPartVisual::SExtraSight& es = pv.extra_sights[s - 1];
+			a.point = es.aim_point;
+			a.fwd = es.aim_fwd;
+			a.up = es.aim_up;
+			a.magnification = es.magnification;
+		}
+		return a;
 	}
 
 	bool read_virtual_mount(LPCSTR section, LPCSTR name, Fmatrix& out, shared_str* bone)
@@ -251,6 +322,7 @@ namespace gunsmith
 	{
 		SContext& c = m_ctx[ctx];
 		m_sight_node = sight_node(tree, selected_sight(tree)); // a switch changes no layout: read it every time
+		m_sight_mode = m_sight_node && m_sight_node < tree.size() ? tree.node(m_sight_node).mode : 0;
 
 		xr_vector<SSig> sig;
 		if (enabled)
@@ -263,7 +335,10 @@ namespace gunsmith
 			}
 		}
 		if (c.built && c.root == root && c.receiver == receiver && c.sig == sig)
+		{
+			show_modes(c, tree); // a mode switch changes no layout either
 			return;
+		}
 
 		clear(ctx);
 		c.built = true;
@@ -371,9 +446,42 @@ namespace gunsmith
 				else
 					warn_once(n.section.c_str(), "has no fire bone", pv.fire_bone.c_str());
 			}
+			ch.shown_mode = 0xff;
+			for (const shared_str& b : pv.mode_bones)
+			{
+				const u16 id = b.size() ? K->LL_BoneID(b) : BI_NONE;
+				if (b.size() && id == BI_NONE)
+					warn_once(n.section.c_str(), "has no sight mode bone", b.c_str());
+				ch.mode_bones.push_back(id);
+			}
 			child_of[i] = int(c.children.size());
 			c.children.push_back(ch);
 		}
+		show_modes(c, tree);
+	}
+
+	// Only the current sight mode's meshes are shown (each mode's are on its own bone).
+	void CVisuals::show_modes(SContext& c, const CTree& tree)
+	{
+		for (SChild& ch : c.children)
+		{
+			if (ch.mode_bones.empty() || ch.node >= tree.size())
+				continue;
+			const u8 m = node_sight_mode(*ch.pv, tree.node(ch.node).mode);
+			if (m == ch.shown_mode)
+				continue;
+			ch.shown_mode = m;
+			for (u32 i = 0; i < ch.mode_bones.size(); ++i)
+				if (ch.mode_bones[i] != BI_NONE)
+					ch.K->LL_SetBoneVisible(ch.mode_bones[i], i == m, TRUE);
+			ch.K->CalculateBones_Invalidate();
+			ch.K->CalculateBones(TRUE);
+		}
+	}
+
+	SSightAim CVisuals::aim_of(const SChild& ch) const
+	{
+		return sight_aim(*ch.pv, ch.node == m_sight_node ? m_sight_mode : 0);
 	}
 
 	void CVisuals::update_local(SContext& c, IKinematics* root)
@@ -544,10 +652,12 @@ namespace gunsmith
 		if (!sight)
 			return false;
 		update_local(c, root);
-		sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(point, sight->pv->aim_point);
+		const SSightAim aim = aim_of(*sight);
+		sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(point, aim.point);
 		sight->local.transform_tiny(point);
 		string256 k;
-		xr_sprintf(k, "%u:%s", u32(sight->node), c.sig[sight->node].section.c_str());
+		xr_sprintf(k, "%u:%s:%u", u32(sight->node), c.sig[sight->node].section.c_str(),
+				   u32(sight->node == m_sight_node ? m_sight_mode : 0));
 		key = k;
 		return true;
 	}
@@ -561,9 +671,10 @@ namespace gunsmith
 		if (!sight)
 			return false;
 		update_local(c, root);
+		const SSightAim aim = aim_of(*sight);
 		const Fmatrix& bone = sight->K->LL_GetTransform_R(sight->aim_bone);
-		bone.transform_dir(fwd, sight->pv->aim_fwd);
-		bone.transform_dir(up, sight->pv->aim_up);
+		bone.transform_dir(fwd, aim.fwd);
+		bone.transform_dir(up, aim.up);
 		sight->local.transform_dir(fwd);
 		sight->local.transform_dir(up);
 		fwd.normalize_safe();
@@ -596,10 +707,11 @@ namespace gunsmith
 		const SChild* sight = pick_sight(c);
 		if (!sight)
 			return nullptr;
-		if (sight->pv->has_eye)
+		const SSightAim aim = aim_of(*sight); // (a 1x mode of a scope, or its second sight: no eye relief)
+		if (aim.has_eye)
 		{
 			update_local(c, root);
-			sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(eye, sight->pv->eye_point);
+			sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(eye, aim.eye);
 			sight->local.transform_tiny(eye);
 			has_eye = true;
 		}
