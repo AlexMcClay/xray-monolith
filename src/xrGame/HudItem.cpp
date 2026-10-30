@@ -547,8 +547,60 @@ void CHudItem::UpdateNearWall()
 	}
 }
 
+void CHudItem::gs_snd_start(const shared_str& anm, u32 length)
+{
+	string256 key;
+	xr_sprintf(key, "gs_snd_%s", anm.c_str());
+	if (!hud_sect.size() || !pSettings->line_exist(hud_sect, key))
+		return;
+	m_gs_snd.clear();
+	LPCSTR v = pSettings->r_string(hud_sect, key);
+	const int n = _GetItemCount(v);
+	string512 item, file;
+	for (int i = 0; i + 1 < n; i += 2)
+	{
+		SGsSndEvent e;
+		e.at = (float)atof(_GetItem(v, i, item));
+		_GetItem(v, i + 1, item);
+		for (int k = 0, m = _GetItemCount(item, '|'); k < m; ++k)
+			e.files.push_back(_GetItem(item, k, file, '|'));
+		m_gs_snd.push_back(e);
+	}
+	m_gs_snd_start = Device.dwTimeGlobal;
+	m_gs_snd_length = length;
+	m_gs_snd_next = 0;
+	m_sounds.StopAllSounds(); // the state's own sound (snd_reload, snd_draw, ...) started just before
+	gs_snd_update();
+}
+
+void CHudItem::gs_snd_update()
+{
+	if (m_gs_snd_next >= m_gs_snd.size())
+		return;
+	if (!IsAttachedToHUD())
+	{
+		m_gs_snd.clear();
+		return;
+	}
+	const float t = float(Device.dwTimeGlobal - m_gs_snd_start) / float(_max(m_gs_snd_length, 1u));
+	const float volume = READ_IF_EXISTS(pSettings, r_float, hud_sect.c_str(), "gs_snd_volume", 1.f);
+	while (m_gs_snd_next < m_gs_snd.size() && m_gs_snd[m_gs_snd_next].at <= t)
+	{
+		const SGsSndEvent& e = m_gs_snd[m_gs_snd_next++];
+		if (e.files.empty())
+			continue;
+		const shared_str& f = e.files[e.files.size() > 1 ? Random.randI(int(e.files.size())) : 0];
+		ref_sound& snd = m_gs_snd_cache[f];
+		if (!snd._handle())
+			snd.create(f.c_str(), st_Effect, sg_SourceType);
+		float vol = volume;
+		snd.play_no_feedback(object().H_Root(), sm_2D, 0.f, &Fvector().set(0.f, 0.f, 0.f), &vol);
+	}
+}
+
 void CHudItem::UpdateCL()
 {
+	gs_snd_update();
 	if (m_current_motion_def)
 	{
 		if (m_bStopAtEndAnimIsRunning)
@@ -626,6 +678,7 @@ void CHudItem::OnH_B_Chield()
 void CHudItem::OnH_B_Independent(bool just_before_destroy)
 {
 	m_sounds.StopAllSounds();
+	m_gs_snd.clear();
 	UpdateXForm();
 	m_nearwall_factor = 0.f;
 
@@ -756,6 +809,8 @@ u32 CHudItem::PlayHUDMotion(shared_str M, BOOL bMixIn, CHudItem* W, u32 state, f
 	}
 
 	u32 anim_time = PlayHUDMotion_noCB(M, bMixIn, speed, bMixIn2);
+	if (anim_time > 0 && IsAttachedToHUD())
+		gs_snd_start(M, anim_time);
 	if (anim_time > 0)
 	{
 		m_bStopAtEndAnimIsRunning = true;

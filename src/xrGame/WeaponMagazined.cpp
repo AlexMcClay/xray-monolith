@@ -178,6 +178,15 @@ void CWeaponMagazined::Load(LPCSTR section)
 		
 	}
 
+	// Gunsmith: Tarkov's shot for the actor, from the HUD section (Gunsmith Docs 21): each shot plays one period
+	// of Tarkov's firing loop, and the tail plays when firing stops, as Tarkov does
+	m_sounds.LoadSound(*hud_sect, "gs_snd_shot", "sndGsShot", false, m_eSoundShot);
+	m_sounds.LoadSound(*hud_sect, "gs_snd_shot_tail", "sndGsShotTail", false, m_eSoundShot);
+	m_sounds.LoadSound(*hud_sect, "gs_snd_silencer_shot", "sndGsSilencerShot", false, m_eSoundShot);
+	m_sounds.LoadSound(*hud_sect, "gs_snd_silencer_shot_tail", "sndGsSilencerShotTail", false, m_eSoundShot);
+	m_sounds.LoadSound(*hud_sect, "gs_snd_empty", "sndGsEmptyClick", true, m_eSoundEmptyClick);
+	m_sounds.LoadSound(*hud_sect, "gs_snd_misfire", "sndGsMisfireClick", true, m_eSoundEmptyClick);
+
 	m_iBaseDispersionedBulletsCount = READ_IF_EXISTS(pSettings, r_u8, section, "base_dispersioned_bullets_count", 0);
 	m_fBaseDispersionedBulletsSpeed = READ_IF_EXISTS(pSettings, r_float, section, "base_dispersioned_bullets_speed",
 	                                                 m_fStartBulletSpeed);
@@ -862,6 +871,13 @@ void CWeaponMagazined::PlaySoundShot()
 {
 	if (ParentIsActor())
 	{
+		LPCSTR gs = xr_strcmp(m_sSndShotCurrent, "sndSilencerShot") ? "sndGsShot" : "sndGsSilencerShot";
+		if (m_sounds.FindSoundItem(gs, false))
+		{
+			m_sounds.PlaySound(gs, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+			return;
+		}
+
 		if (bMisfire)
 		{
 			string128 sndNameMisfire;
@@ -943,7 +959,10 @@ void CWeaponMagazined::OnShot()
 
 void CWeaponMagazined::OnEmptyClick()
 {
-	if (ParentIsActor())
+	LPCSTR gs_click = bMisfire ? "sndGsMisfireClick" : "sndGsEmptyClick"; // Gunsmith: Tarkov's (HUD section)
+	if (ParentIsActor() && m_sounds.FindSoundItem(gs_click, false))
+		PlaySound(gs_click, get_LastFP());
+	else if (ParentIsActor())
 	{
 		if (bMisfire)
 		{
@@ -1017,6 +1036,13 @@ void CWeaponMagazined::UpdateFireMode()
 
 void CWeaponMagazined::switch2_Idle()
 {
+	// Gunsmith: the shot's tail when firing stops (Tarkov's Tail)
+	if (m_iShotNum > 0 && ParentIsActor())
+	{
+		LPCSTR gs = xr_strcmp(m_sSndShotCurrent, "sndSilencerShot") ? "sndGsShotTail" : "sndGsSilencerShotTail";
+		if (m_sounds.FindSoundItem(gs, false))
+			m_sounds.PlaySound(gs, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+	}
 	m_iShotNum = 0;
 	if (m_fOldBulletSpeed != 0.f)
 		SetBulletSpeed(m_fOldBulletSpeed);
