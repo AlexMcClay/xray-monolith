@@ -2642,6 +2642,7 @@ void CCC_RegisterCommands()
 	CMD1(CCC_GsAimEye, "gs_aim_eye");
 	CMD4(CCC_Integer, "gs_aim_debug", &g_gs_aim_debug, 0, 1);
 	CMD4(CCC_Float, "gs_aim_speed", &g_gs_aim_speed, 0.5f, 30.f);
+	CMD4(CCC_Integer, "gs_aim_rot", &g_gs_aim_rot, 0, 1);
 	CMD4(CCC_Integer, "gs_grip_ik", &g_gs_grip_ik, 0, 1);
 	CMD4(CCC_Integer, "gs_grip_type", &g_gs_grip_type, -1, 1);
 	CMD4(CCC_Integer, "gs_grip_debug", &g_gs_grip_debug, 0, 1);

@@ -2180,6 +2180,51 @@ void CWeapon::renderable_Render()
 // gs_aim_debug 1: log the sight calibration twice a second while aiming.
 int g_gs_aim_debug = 0;
 float g_gs_aim_speed = 6.f; // aim refinement gain, per second (gs_aim_speed)
+int g_gs_aim_rot = 1;       // gs_aim_rot 0: aim with the position correction only (no turn onto the sight line)
+
+namespace
+{
+	// The camera-space rotation that lays a sight line (forward f, up u, unit, camera space: x right, y up,
+	// z forward) along the view: forward onto +z, then, from 1 degree (Tarkov's SCOPE_ROTATION_THRESHOLD),
+	// up onto +y (a canted sight rolls the gun upright). turn and roll are the angles applied (radians).
+	void gs_sight_line_rotation(const Fvector& f, const Fvector& u, Fmatrix& out, float& turn, float& roll)
+	{
+		const Fvector z = {0.f, 0.f, 1.f};
+		Fmatrix r1;
+		r1.identity();
+		turn = acosf(_max(-1.f, _min(1.f, f.dotproduct(z))));
+		if (turn > EPS_L)
+		{
+			Fvector axis;
+			axis.crossproduct(f, z);
+			if (axis.magnitude() > EPS_L)
+			{
+				axis.normalize();
+				r1.rotation(axis, turn);
+				Fvector t;
+				r1.transform_dir(t, f);
+				if (t.dotproduct(z) < 1.f - 1e-4f) // the other way round
+					r1.rotation(axis, -turn);
+			}
+		}
+		Fvector u1;
+		r1.transform_dir(u1, u);
+		roll = atan2f(u1.x, u1.y); // the sight's up, off the camera's up
+		Fmatrix r2;
+		r2.identity();
+		if (_abs(roll) >= deg2rad(1.f))
+		{
+			r2.rotation(z, roll);
+			Fvector t;
+			r2.transform_dir(t, u1);
+			if (_abs(atan2f(t.x, t.y)) > deg2rad(0.1f))
+				r2.rotation(z, -roll);
+		}
+		else
+			roll = 0.f;
+		out.mul_43(r2, r1);
+	}
+}
 
 void CWeapon::RenderAttachments()
 {
@@ -3480,6 +3525,7 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 				{
 					m_gs_aim_sight = key;
 					m_gs_aim_corr.set(0.f, 0.f, 0.f);
+					m_gs_aim_rot.set(curr_aim_rot);
 
 					// The HUD offset as this function applies it: aim_rot, then (pos, rot Z*Y*X).
 					auto offset_xform = [](const Fvector& aim_rot, const Fvector& rot, const Fvector& pos) {
@@ -3505,12 +3551,36 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 					off_inv.invert(offset_xform(m_hud_aim_rot, m_hud_offset[1], m_hud_offset[0]));
 					hands.mul_43(prev_inv, hi->m_item_transform);
 					hands.mulA_43(off_inv);
-					// Where the sight lands at the aim offset with no correction (camera space).
+					// The sight line at the aim offset: turned onto the view (pitch, yaw; roll from 1 degree)
+					// by an aim rotation, applied first in camera space (Gunsmith Docs 13, "Aim direction").
 					Fmatrix aimed;
 					aimed.mul_43(offset_xform(curr_aim_rot, curr_rot, curr_offs), hands);
+					Fvector fwd, up;
+					if (g_gs_aim_rot && m_gs_visuals.sight_dir(hi->m_model, fwd, up))
+					{
+						Fvector f, u;
+						aimed.transform_dir(f, fwd);
+						aimed.transform_dir(u, up);
+						f.normalize_safe();
+						u.normalize_safe();
+						Fmatrix line, base, turned;
+						float turn, roll;
+						gs_sight_line_rotation(f, u, line, turn, roll);
+						if (turn < deg2rad(20.f)) // larger: bad data, not a sight line worth turning the gun to
+						{
+							base.setHPB(curr_aim_rot.x, curr_aim_rot.y, curr_aim_rot.z);
+							turned.mul_43(line, base);
+							turned.getHPB(m_gs_aim_rot);
+						}
+						if (g_gs_aim_debug)
+							Msg("- gs_aim: sight [%s] line %.2f deg off the view, roll %.2f deg%s", key.c_str(),
+								rad2deg(turn), rad2deg(roll), turn < deg2rad(20.f) ? "" : " (too far: not turned)");
+					}
+					// Where the sight lands with that rotation and no position correction (camera space).
+					aimed.mul_43(offset_xform(m_gs_aim_rot, curr_rot, curr_offs), hands);
 					Fvector s;
 					aimed.transform_tiny(s, sight);
-					m_gs_aim_corr.set(-s.x, -s.y, 0.f);
+					Fvector d = {-s.x, -s.y, 0.f};
 
 					Fvector eye;
 					bool has_eye;
@@ -3518,12 +3588,19 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 					if (pv && pv->is_optic() && has_eye)
 					{
 						aimed.transform_tiny(eye);
-						m_gs_aim_corr.z = pv->eye_offset - eye.z;
+						d.z = pv->eye_offset - eye.z;
 					}
+					// The offset's position is applied inside the aim rotation: the camera-space move d, there.
+					Fmatrix a;
+					a.setHPB(m_gs_aim_rot.x, m_gs_aim_rot.y, m_gs_aim_rot.z);
+					Fmatrix a_inv;
+					a_inv.invert(a);
+					a_inv.transform_dir(m_gs_aim_corr, d);
 					if (g_gs_aim_debug)
 						Msg("- gs_aim: sight [%s] predicted off axis x=%.4f y=%.4f, eye z correction %.4f",
-							key.c_str(), s.x, s.y, m_gs_aim_corr.z);
+							key.c_str(), s.x, s.y, d.z);
 				}
+				curr_aim_rot.set(m_gs_aim_rot);
 				curr_offs.x += m_gs_aim_corr.x;
 				curr_offs.y += m_gs_aim_corr.y;
 				curr_offs.z += m_gs_aim_corr.z;
@@ -3550,8 +3627,13 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 				if (aimed && idle && settled && m_gs_aim_still > 0.25f)
 				{
 					const float k = _min(1.f, Device.fTimeDelta * g_gs_aim_speed);
-					m_gs_aim_corr.x -= s.x * k;
-					m_gs_aim_corr.y -= s.y * k;
+					Fvector d = {-s.x * k, -s.y * k, 0.f}, dl;
+					Fmatrix a;
+					a.setHPB(m_gs_aim_rot.x, m_gs_aim_rot.y, m_gs_aim_rot.z);
+					Fmatrix a_inv;
+					a_inv.invert(a);
+					a_inv.transform_dir(dl, d); // (in the offset's frame, inside the aim rotation)
+					m_gs_aim_corr.add(dl);
 				}
 				static u32 s_gs_aim_log = 0;
 				if (g_gs_aim_debug && Device.dwTimeGlobal > s_gs_aim_log + 500)

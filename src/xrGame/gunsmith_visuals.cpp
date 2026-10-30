@@ -80,6 +80,18 @@ namespace gunsmith
 		v.aim_bone = read_str(section, "aim_bone");
 		v.aim_priority = section ? READ_IF_EXISTS(pSettings, r_s32, section, "aim_priority", 0) : 0;
 		v.aim_point = read_vec(section, "aim_point");
+		v.aim_fwd.set(0.f, 0.f, -1.f); // a part's bore
+		v.aim_up.set(0.f, 1.f, 0.f);
+		if (section && pSettings->line_exist(section, "aim_dir"))
+		{
+			Fvector f, u;
+			if (sscanf(pSettings->r_string(section, "aim_dir"), "%f,%f,%f,%f,%f,%f", &f.x, &f.y, &f.z, &u.x, &u.y, &u.z) == 6
+				&& f.magnitude() > EPS && u.magnitude() > EPS)
+			{
+				v.aim_fwd = f.normalize();
+				v.aim_up = u.normalize();
+			}
+		}
 		v.has_fire = section && (pSettings->line_exist(section, "fire_bone") || pSettings->line_exist(section, "fire_point"));
 		v.fire_bone = read_str(section, "fire_bone");
 		v.fire_point = read_vec(section, "fire_point");
@@ -537,6 +549,25 @@ namespace gunsmith
 		string256 k;
 		xr_sprintf(k, "%u:%s", u32(sight->node), c.sig[sight->node].section.c_str());
 		key = k;
+		return true;
+	}
+
+	bool CVisuals::sight_dir(IKinematics* root, Fvector& fwd, Fvector& up)
+	{
+		SContext& c = m_ctx[eHud];
+		if (c.children.empty() || c.root != root)
+			return false;
+		const SChild* sight = pick_sight(c);
+		if (!sight)
+			return false;
+		update_local(c, root);
+		const Fmatrix& bone = sight->K->LL_GetTransform_R(sight->aim_bone);
+		bone.transform_dir(fwd, sight->pv->aim_fwd);
+		bone.transform_dir(up, sight->pv->aim_up);
+		sight->local.transform_dir(fwd);
+		sight->local.transform_dir(up);
+		fwd.normalize_safe();
+		up.normalize_safe();
 		return true;
 	}
 
