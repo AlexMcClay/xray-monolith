@@ -66,10 +66,12 @@ namespace gunsmith
 		//   grip_hand_<type>    = x, y, z, h, p, b   the left hand bone in the model's space
 		//   grip_fingers_<type> = h, p, b x 15       the fingers' rotations relative to their parents (degrees)
 		//   grip_priority                            which fitted part the hand goes to (foregrips 2, handguards 1)
+		//   grip_type                                the pose the part looks best with (default 0; gs_grip_type -1)
 		bool has_grip[2];
 		Fmatrix grip_hand[2];
 		Fvector grip_fingers[2][15]; // radians
 		int grip_priority;
+		int grip_type;
 		// The flags of mode `mode` (clamped to the last mode).
 		u8 tac_flags(u8 mode) const { return tac_modes.empty() ? 0 : tac_modes[_min(u32(mode), u32(tac_modes.size() - 1))]; }
 	};

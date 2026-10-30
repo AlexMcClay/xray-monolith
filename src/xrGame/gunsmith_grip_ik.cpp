@@ -6,7 +6,7 @@
 #include "../xrEngine/bone.h"
 
 int g_gs_grip_ik = 1;
-int g_gs_grip_type = 0;
+int g_gs_grip_type = -1; // -1: each part's grip_type; 0, 1: that Tarkov GripType on every part (for comparing)
 int g_gs_grip_debug = 0;
 Fvector g_gs_grip_offset = {0.f, 0.f, 0.f};
 
@@ -25,6 +25,11 @@ namespace gunsmith
 		const float NEAR_DIST = 0.02f; // the animated hand this close to its idle place: full grip
 		const float FAR_DIST = 0.16f;  // and this far: none (10 cm let the hand snap onto a vertical foregrip in 0.1 s)
 		const float RISE = 4.f;        // the weight's fastest rise, per second
+		// The elbow swivels about the shoulder-hand line toward where the hand's own forearm direction (the
+		// animation's wrist bend) would put it, at most this far, so a hand turned onto a grip bends the wrist about as
+		// the animation does instead of all of the turn landing there (user, 30 Oct 2026: "the wrist is messy")
+		const float SWIVEL_MAX = deg2rad(60.f);
+		const float TWIST = 0.6f;      // share of the hand's extra twist about the forearm that forearm_twist takes
 
 		float ease(float x) // smoothstep
 		{
@@ -143,6 +148,7 @@ namespace gunsmith
 			return b.id != BI_NONE;
 		};
 		bool ok = hook(m_upper, "l_upperarm") & hook(m_fore, "l_forearm") & hook(m_hand, "l_hand");
+		hook(m_twist, "l_forearm_twist");
 		for (int f = 0; f < eFingers; ++f)
 		{
 			ok = hook(m_fingers[f], FINGER_BONES[f]) && ok;
@@ -156,7 +162,7 @@ namespace gunsmith
 	{
 		if (!m_any)
 			return;
-		m_upper.active = m_fore.active = m_hand.active = false;
+		m_upper.active = m_fore.active = m_hand.active = m_twist.active = false;
 		for (SBone& f : m_fingers)
 			f.active = false;
 		m_any = false;
@@ -179,13 +185,14 @@ namespace gunsmith
 
 		// the grip: the fitted part with the highest grip_priority (ties: the last), its type or the other one
 		const CTree& tree = wpn->gs_tree();
-		// Tarkov's first person always takes GripType 0 (Common); 1 (Alternative) is the menu character's
-		// relaxed hold (Gunsmith Docs 20). gs_grip_type 1 is kept for comparing.
-		const int want = g_gs_grip_type ? 1 : 0;
+		// Tarkov's first person takes GripType 0 (Common), 1 (Alternative) being the menu character's relaxed hold
+		// (Gunsmith Docs 20); on Anomaly's hand either may look better depending on the part, so each part names its
+		// own (grip_type, the pipeline's pick). gs_grip_type 0 or 1 takes that type on every part, for comparing.
 		int best = -1, best_prio = 0, type = 0;
 		for (u32 n = 1; n < tree.size(); ++n)
 		{
 			const SPartVisual& pv = part_visual(tree.node(u8(n)).section.c_str());
+			const int want = g_gs_grip_type >= 0 ? g_gs_grip_type : pv.grip_type;
 			const int t = pv.has_grip[want] ? want : (pv.has_grip[0] ? 0 : (pv.has_grip[1] ? 1 : -1));
 			if (t >= 0 && pv.grip_priority >= best_prio)
 			{
@@ -268,6 +275,28 @@ namespace gunsmith
 		pole.sub(E0, S);
 		pole.mad(dir, -pole.dotproduct(dir));
 		pole.normalize_safe();
+		{
+			// the swivel (SWIVEL_MAX): the elbow that keeps the animation's forearm direction in the hand's axes
+			Fvector fa, f_loc, want_f, Ed, n2;
+			fa.sub(H0, E0).normalize_safe();
+			f_loc.set(fa.dotproduct(ha0.i), fa.dotproduct(ha0.j), fa.dotproduct(ha0.k));
+			want_f.mul(hand.i, f_loc.x).mad(hand.j, f_loc.y).mad(hand.k, f_loc.z);
+			Ed.mad(S, dir, dist).mad(want_f, -b);
+			n2.sub(Ed, S);
+			n2.mad(dir, -n2.dotproduct(dir));
+			if (n2.magnitude() > 1e-6f)
+			{
+				n2.normalize();
+				Fvector c;
+				c.crossproduct(pole, n2);
+				float ang = atan2f(dir.dotproduct(c), pole.dotproduct(n2));
+				clamp(ang, -SWIVEL_MAX, SWIVEL_MAX);
+				Fmatrix sw;
+				sw.rotation(dir, ang * weight);
+				sw.transform_dir(pole);
+				pole.normalize_safe();
+			}
+		}
 		const float ca = (a * a + dist * dist - b * b) / (2.f * a * dist);
 		const float sa = _sqrt(_max(0.f, 1.f - ca * ca));
 		Fvector E;
@@ -288,6 +317,39 @@ namespace gunsmith
 		m_fore.target.c = E;
 		m_hand.target = hand;
 		m_hand.target.c = W;
+
+		// forearm_twist: its share of the hand's twist about the forearm beyond the animation's (the hand as the
+		// animation holds it relative to the new forearm is R21 ha0)
+		if (m_twist.id != BI_NONE)
+		{
+			const Fmatrix tw0 = hands->LL_GetTransform(m_twist.id);
+			Fmatrix fo_inv, tw_local;
+			fo_inv.invert(fo0);
+			tw_local.mul_43(fo_inv, tw0);
+			Fmatrix kept, kept_inv, extra;
+			kept.mul_43(R21, rot_only(ha0));
+			kept_inv.invert(kept);
+			extra.mul_43(rot_only(hand), kept_inv);
+			Fvector ax;
+			ax.sub(W, E).normalize_safe();
+			Fvector v;
+			v.crossproduct(ax, _abs(ax.y) < 0.9f ? Fvector().set(0.f, 1.f, 0.f) : Fvector().set(1.f, 0.f, 0.f));
+			v.normalize_safe();
+			Fvector dv;
+			extra.transform_dir(dv, v);
+			dv.mad(ax, -dv.dotproduct(ax));
+			dv.normalize_safe();
+			Fvector c;
+			c.crossproduct(v, dv);
+			const float ang = atan2f(ax.dotproduct(c), v.dotproduct(dv));
+			Fmatrix twist, tw;
+			twist.rotation(ax, ang * TWIST);
+			tw.mul_43(m_fore.target, tw_local);
+			const Fvector at = tw.c;
+			m_twist.target.mul_43(twist, rot_only(tw));
+			m_twist.target.c = at;
+			m_twist.active = true;
+		}
 
 		// the fingers: the animated ones turned by how the grip's differ from the stock grip's (or the grip's own),
 		// blended by the weight, from the new hand down

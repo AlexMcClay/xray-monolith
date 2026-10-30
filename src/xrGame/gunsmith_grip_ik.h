@@ -55,6 +55,7 @@ namespace gunsmith
 
 		IKinematics* m_hands = nullptr;
 		SBone m_upper, m_fore, m_hand;
+		SBone m_twist; // l_forearm_twist (optional): takes part of the hand's twist about the forearm
 		SBone m_fingers[eFingers];
 		u16 m_parent[eFingers] = {}; // each finger's parent bone
 		bool m_any = false;

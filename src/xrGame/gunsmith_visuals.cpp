@@ -118,6 +118,8 @@ namespace gunsmith
 		v.light_section = read_str(section, "light_section");
 		v.laser_section = read_str(section, "laser_section");
 		v.grip_priority = section ? READ_IF_EXISTS(pSettings, r_s32, section, "grip_priority", 1) : 1;
+		v.grip_type = section ? READ_IF_EXISTS(pSettings, r_s32, section, "grip_type", 0) : 0;
+		clamp(v.grip_type, 0, 1);
 		for (int t = 0; t < 2; ++t)
 		{
 			v.has_grip[t] = false;
