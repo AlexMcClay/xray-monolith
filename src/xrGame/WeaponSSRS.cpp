@@ -33,6 +33,7 @@ extern BOOL g_launcher_dynamic_range_zoom;
 #include "WeaponSSRS.h"
 
 #include "ai/stalker/ai_stalker.h"
+extern BOOL g_exact_fire_rate;
 
 #ifdef DEBUG
 #	include "phdebug.h"
@@ -522,6 +523,9 @@ void CWeaponSSRS::state_Fire(float dt)
 
 			m_bFireSingleShot = false;
 
+			// the time this shot is late by (at most a frame) comes off the next (g_exact_fire_rate)
+			const float late = g_exact_fire_rate ? _max(fShotTimeCounter, -dt) : 0.f;
+
 			//Alundaio: Use fModeShotTime instead of fOneShotTime if current fire mode is 2-shot burst
 			//Alundaio: Cycle down RPM after two shots; used for Abakan/AN-94
 			// demonized: Add support for arbitrary shot burst at rpm_mode_2
@@ -535,6 +539,7 @@ void CWeaponSSRS::state_Fire(float dt)
 			else
 				fShotTimeCounter = fOneShotTime;
 			//Alundaio: END
+			fShotTimeCounter += late;
 
 			if (E)
 			{

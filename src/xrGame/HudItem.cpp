@@ -569,7 +569,8 @@ void CHudItem::gs_snd_start(const shared_str& anm, u32 length)
 	m_gs_snd_start = Device.dwTimeGlobal;
 	m_gs_snd_length = length;
 	m_gs_snd_next = 0;
-	m_sounds.StopAllSounds(); // the state's own sound (snd_reload, snd_draw, ...) started just before
+	// the state's own sound (snd_reload, snd_draw, ...) started just before; a shot still ringing out keeps playing
+	m_sounds.StopAllSounds(SOUND_TYPE_SHOOTING);
 	gs_snd_update();
 }
 

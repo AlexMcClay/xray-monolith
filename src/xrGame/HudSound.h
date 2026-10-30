@@ -95,7 +95,8 @@ public:
 	void PlaySound(LPCSTR alias, const Fvector& position, const CObject* parent, bool hud_mode, bool looped = false,
 	               u8 index = u8(-1), float volume_mult = 1.f, float frequency = 1.f, float delay_mult = 1.f);
 	void StopSound(LPCSTR alias);
-	void StopAllSounds();
+	// keep_types: sounds whose type has any of these bits keep playing
+	void StopAllSounds(u32 keep_types = 0);
 	void LoadSound(LPCSTR section, LPCSTR line, LPCSTR alias, bool exclusive = false, int type = sg_SourceType);
 	void LoadSound(CInifile const* ini, LPCSTR section, LPCSTR line, LPCSTR alias, bool exclusive = false,
 	               int type = sg_SourceType);

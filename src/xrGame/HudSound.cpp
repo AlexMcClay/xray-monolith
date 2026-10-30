@@ -261,14 +261,21 @@ HUD_SOUND_COLLECTION_LAYERED::~HUD_SOUND_COLLECTION_LAYERED()
 	m_sound_items.clear();
 }
 
-void HUD_SOUND_COLLECTION_LAYERED::StopAllSounds()
+void HUD_SOUND_COLLECTION_LAYERED::StopAllSounds(u32 keep_types)
 {
 	xr_vector<HUD_SOUND_COLLECTION>::iterator it = m_sound_items.begin();
 	xr_vector<HUD_SOUND_COLLECTION>::iterator it_e = m_sound_items.end();
 
 	for (; it != it_e; ++it)
 	{
-		it->StopAllSounds();
+		if (!keep_types)
+		{
+			it->StopAllSounds();
+			continue;
+		}
+		for (HUD_SOUND_ITEM& s : it->m_sound_items)
+			if (!(u32(s.m_type) & keep_types))
+				HUD_SOUND_ITEM::StopSound(s);
 	}
 }
 

@@ -31,6 +31,9 @@ extern ENGINE_API bool g_dedicated_server;
 ENGINE_API extern float psHUD_FOV_def;
 
 BOOL g_auto_reload = FALSE;
+// Each shot's overshoot past its frame is carried into the next shot's time, so automatic fire keeps the
+// weapon's rpm at any frame rate (otherwise every shot waits for a whole frame: 650 rpm fires at 514 at 60 fps)
+BOOL g_exact_fire_rate = TRUE;
 
 CUIXml* pWpnScopeXml = NULL;
 
@@ -105,20 +108,31 @@ void CWeaponMagazined::Load(LPCSTR section)
 	m_sounds.LoadSound(section, "snd_draw", "sndShow", true, m_eSoundShow);
 	m_sounds.LoadSound(section, "snd_holster", "sndHide", true, m_eSoundHide);
 
+	// The actor's sounds (the *_actor keys) may also be set in the HUD section, which wins, so guns sharing a HUD
+	// model share its first-person sounds. snd_shoot_actor_exclusive = true (in either section): each of the actor's
+	// shots stops the last one's sound of the same key, so a whole recorded shot with its tail can play on every shot
+	// of automatic fire without the tails piling up
+	auto actor_sect = [&](LPCSTR line) -> LPCSTR
+	{
+		return hud_sect.size() && pSettings->line_exist(hud_sect.c_str(), line) ? hud_sect.c_str() : section;
+	};
+	const bool shot_excl = READ_IF_EXISTS(pSettings, r_bool, actor_sect("snd_shoot_actor_exclusive"),
+	                                      "snd_shoot_actor_exclusive", false);
+
 	//Alundaio: LAYERED_SND_SHOOT
 	m_sounds.LoadSound(section, "snd_shoot", "sndShot", false, m_eSoundShot);
-	if (WeaponSoundExist(section, "snd_shoot_actor"))
-		m_sounds.LoadSound(section, "snd_shoot_actor", "sndShotActor", false, m_eSoundShot);
+	if (WeaponSoundExist(actor_sect("snd_shoot_actor"), "snd_shoot_actor"))
+		m_sounds.LoadSound(actor_sect("snd_shoot_actor"), "snd_shoot_actor", "sndShotActor", shot_excl, m_eSoundShot);
 	//-Alundaio
 	// Cyclic fire sounds
-	if (WeaponSoundExist(section, "snd_shoot_actor_first"))
-		m_sounds.LoadSound(section, "snd_shoot_actor_first", "sndShotActorFirst", false, m_eSoundShot);
+	if (WeaponSoundExist(actor_sect("snd_shoot_actor_first"), "snd_shoot_actor_first"))
+		m_sounds.LoadSound(actor_sect("snd_shoot_actor_first"), "snd_shoot_actor_first", "sndShotActorFirst", shot_excl, m_eSoundShot);
 
 	//misfire shot
 	if (WeaponSoundExist(section, "snd_shot_misfire"))
 		m_sounds.LoadSound(section, "snd_shot_misfire", "sndShotMisfire", false, m_eSoundShot);
-	if (WeaponSoundExist(section, "snd_shot_misfire_actor"))
-		m_sounds.LoadSound(section, "snd_shot_misfire_actor", "sndShotMisfireActor", false, m_eSoundShot);
+	if (WeaponSoundExist(actor_sect("snd_shot_misfire_actor"), "snd_shot_misfire_actor"))
+		m_sounds.LoadSound(actor_sect("snd_shot_misfire_actor"), "snd_shot_misfire_actor", "sndShotMisfireActor", shot_excl, m_eSoundShot);
 
 	m_sounds.LoadSound(section, "snd_empty", "sndEmptyClick", true, m_eSoundEmptyClick);
 	m_sounds.LoadSound(section, "snd_reload", "sndReload", true, m_eSoundReload);
@@ -132,21 +146,21 @@ void CWeaponMagazined::Load(LPCSTR section)
 	if (WeaponSoundExist(section, "snd_misfire"))
 		m_sounds.LoadSound(section, "snd_misfire", "sndClickMisfire", true, m_eSoundEmptyClick);
 
-	if (WeaponSoundExist(section, "snd_reload_actor"))
-		m_sounds.LoadSound(section, "snd_reload_actor", "sndReloadActor", true, m_eSoundReload);
-	if (WeaponSoundExist(section, "snd_reload_empty_actor"))
-		m_sounds.LoadSound(section, "snd_reload_empty_actor", "sndReloadEmptyActor", true, m_eSoundReloadEmpty);
-	if (WeaponSoundExist(section, "snd_reload_misfire_actor"))
-		m_sounds.LoadSound(section, "snd_reload_misfire_actor", "sndReloadMisfireActor", true, m_eSoundReloadMisfire);
-	if (WeaponSoundExist(section, "snd_empty_actor"))
-		m_sounds.LoadSound(section, "snd_empty_actor", "sndEmptyClickActor", true, m_eSoundEmptyClick);
-	if (WeaponSoundExist(section, "snd_misfire_actor"))
-		m_sounds.LoadSound(section, "snd_misfire_actor", "sndClickMisfireActor", true, m_eSoundEmptyClick);
+	if (WeaponSoundExist(actor_sect("snd_reload_actor"), "snd_reload_actor"))
+		m_sounds.LoadSound(actor_sect("snd_reload_actor"), "snd_reload_actor", "sndReloadActor", true, m_eSoundReload);
+	if (WeaponSoundExist(actor_sect("snd_reload_empty_actor"), "snd_reload_empty_actor"))
+		m_sounds.LoadSound(actor_sect("snd_reload_empty_actor"), "snd_reload_empty_actor", "sndReloadEmptyActor", true, m_eSoundReloadEmpty);
+	if (WeaponSoundExist(actor_sect("snd_reload_misfire_actor"), "snd_reload_misfire_actor"))
+		m_sounds.LoadSound(actor_sect("snd_reload_misfire_actor"), "snd_reload_misfire_actor", "sndReloadMisfireActor", true, m_eSoundReloadMisfire);
+	if (WeaponSoundExist(actor_sect("snd_empty_actor"), "snd_empty_actor"))
+		m_sounds.LoadSound(actor_sect("snd_empty_actor"), "snd_empty_actor", "sndEmptyClickActor", true, m_eSoundEmptyClick);
+	if (WeaponSoundExist(actor_sect("snd_misfire_actor"), "snd_misfire_actor"))
+		m_sounds.LoadSound(actor_sect("snd_misfire_actor"), "snd_misfire_actor", "sndClickMisfireActor", true, m_eSoundEmptyClick);
 
-	if (WeaponSoundExist(section, "snd_draw_actor"))
-		m_sounds.LoadSound(section, "snd_draw_actor", "sndShowActor", true, m_eSoundShow);
-	if (WeaponSoundExist(section, "snd_holster_actor"))
-		m_sounds.LoadSound(section, "snd_holster_actor", "sndHideActor", true, m_eSoundHide);
+	if (WeaponSoundExist(actor_sect("snd_draw_actor"), "snd_draw_actor"))
+		m_sounds.LoadSound(actor_sect("snd_draw_actor"), "snd_draw_actor", "sndShowActor", true, m_eSoundShow);
+	if (WeaponSoundExist(actor_sect("snd_holster_actor"), "snd_holster_actor"))
+		m_sounds.LoadSound(actor_sect("snd_holster_actor"), "snd_holster_actor", "sndHideActor", true, m_eSoundHide);
 
 	m_sSndShotCurrent = IsSuppressed() ? "sndSilencerShot" : "sndShot";
 
@@ -162,30 +176,21 @@ void CWeaponMagazined::Load(LPCSTR section)
 
 		//Alundaio: LAYERED_SND_SHOOT Silencer
 		m_sounds.LoadSound(section, "snd_silncer_shot", "sndSilencerShot", false, m_eSoundShot);
-		if (WeaponSoundExist(section, "snd_silncer_shot_actor"))
-			m_sounds.LoadSound(section, "snd_silncer_shot_actor", "sndSilencerShotActor", false, m_eSoundShot);
+		if (WeaponSoundExist(actor_sect("snd_silncer_shot_actor"), "snd_silncer_shot_actor"))
+			m_sounds.LoadSound(actor_sect("snd_silncer_shot_actor"), "snd_silncer_shot_actor", "sndSilencerShotActor", shot_excl, m_eSoundShot);
 		//-Alundaio
 
 		// Cyclic fire sounds w/ silencer
-		if (WeaponSoundExist(section, "snd_silncer_shoot_actor_first"))
-			m_sounds.LoadSound(section, "snd_silncer_shoot_actor_first", "sndSilencerShotActorFirst", false, m_eSoundShot);
+		if (WeaponSoundExist(actor_sect("snd_silncer_shoot_actor_first"), "snd_silncer_shoot_actor_first"))
+			m_sounds.LoadSound(actor_sect("snd_silncer_shoot_actor_first"), "snd_silncer_shoot_actor_first", "sndSilencerShotActorFirst", shot_excl, m_eSoundShot);
 
 		//misfire shot
 		if (WeaponSoundExist(section, "snd_silncer_shot_misfire"))
 			m_sounds.LoadSound(section, "snd_silncer_shot_misfire", "sndSilencerShotMisfire", false, m_eSoundShot);
-		if (WeaponSoundExist(section, "snd_silncer_shot_misfire_actor"))
-			m_sounds.LoadSound(section, "snd_silncer_shot_misfire_actor", "sndSilencerShotMisfireActor", false, m_eSoundShot);
+		if (WeaponSoundExist(actor_sect("snd_silncer_shot_misfire_actor"), "snd_silncer_shot_misfire_actor"))
+			m_sounds.LoadSound(actor_sect("snd_silncer_shot_misfire_actor"), "snd_silncer_shot_misfire_actor", "sndSilencerShotMisfireActor", shot_excl, m_eSoundShot);
 		
 	}
-
-	// Gunsmith: Tarkov's shot for the actor, from the HUD section (Gunsmith Docs 21): each shot plays one period
-	// of Tarkov's firing loop, and the tail plays when firing stops, as Tarkov does
-	m_sounds.LoadSound(*hud_sect, "gs_snd_shot", "sndGsShot", false, m_eSoundShot);
-	m_sounds.LoadSound(*hud_sect, "gs_snd_shot_tail", "sndGsShotTail", false, m_eSoundShot);
-	m_sounds.LoadSound(*hud_sect, "gs_snd_silencer_shot", "sndGsSilencerShot", false, m_eSoundShot);
-	m_sounds.LoadSound(*hud_sect, "gs_snd_silencer_shot_tail", "sndGsSilencerShotTail", false, m_eSoundShot);
-	m_sounds.LoadSound(*hud_sect, "gs_snd_empty", "sndGsEmptyClick", true, m_eSoundEmptyClick);
-	m_sounds.LoadSound(*hud_sect, "gs_snd_misfire", "sndGsMisfireClick", true, m_eSoundEmptyClick);
 
 	m_iBaseDispersionedBulletsCount = READ_IF_EXISTS(pSettings, r_u8, section, "base_dispersioned_bullets_count", 0);
 	m_fBaseDispersionedBulletsSpeed = READ_IF_EXISTS(pSettings, r_float, section, "base_dispersioned_bullets_speed",
@@ -801,6 +806,9 @@ void CWeaponMagazined::state_Fire(float dt)
 		{
 			m_bFireSingleShot = false;
 
+			// the time this shot is late by (at most a frame) comes off the next (g_exact_fire_rate)
+			const float late = g_exact_fire_rate ? _max(fShotTimeCounter, -dt) : 0.f;
+
 			//Alundaio: Use fModeShotTime instead of fOneShotTime if current fire mode is 2-shot burst
 			//Alundaio: Cycle down RPM after two shots; used for Abakan/AN-94
 			// demonized: Add support for arbitrary shot burst at rpm_mode_2
@@ -811,6 +819,7 @@ void CWeaponMagazined::state_Fire(float dt)
 			else
 				fShotTimeCounter = gs_shot_time(fOneShotTime);
 			//Alundaio: END
+			fShotTimeCounter += late;
 
 			++m_iShotNum;
 
@@ -871,13 +880,6 @@ void CWeaponMagazined::PlaySoundShot()
 {
 	if (ParentIsActor())
 	{
-		LPCSTR gs = xr_strcmp(m_sSndShotCurrent, "sndSilencerShot") ? "sndGsShot" : "sndGsSilencerShot";
-		if (m_sounds.FindSoundItem(gs, false))
-		{
-			m_sounds.PlaySound(gs, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
-			return;
-		}
-
 		if (bMisfire)
 		{
 			string128 sndNameMisfire;
@@ -959,10 +961,7 @@ void CWeaponMagazined::OnShot()
 
 void CWeaponMagazined::OnEmptyClick()
 {
-	LPCSTR gs_click = bMisfire ? "sndGsMisfireClick" : "sndGsEmptyClick"; // Gunsmith: Tarkov's (HUD section)
-	if (ParentIsActor() && m_sounds.FindSoundItem(gs_click, false))
-		PlaySound(gs_click, get_LastFP());
-	else if (ParentIsActor())
+	if (ParentIsActor())
 	{
 		if (bMisfire)
 		{
@@ -1036,13 +1035,6 @@ void CWeaponMagazined::UpdateFireMode()
 
 void CWeaponMagazined::switch2_Idle()
 {
-	// Gunsmith: the shot's tail when firing stops (Tarkov's Tail)
-	if (m_iShotNum > 0 && ParentIsActor())
-	{
-		LPCSTR gs = xr_strcmp(m_sSndShotCurrent, "sndSilencerShot") ? "sndGsShotTail" : "sndGsSilencerShotTail";
-		if (m_sounds.FindSoundItem(gs, false))
-			m_sounds.PlaySound(gs, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
-	}
 	m_iShotNum = 0;
 	if (m_fOldBulletSpeed != 0.f)
 		SetBulletSpeed(m_fOldBulletSpeed);

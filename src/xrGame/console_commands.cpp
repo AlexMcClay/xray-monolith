@@ -301,6 +301,7 @@ extern float movement_manager_move_along_path_query_pos_threshold_sqr;
 ENGINE_API extern float g_console_sensitive;
 
 extern BOOL g_auto_reload;
+extern BOOL g_exact_fire_rate;
 BOOL g_launcher_dynamic_range_zoom = TRUE;
 u32 g_dead_body_collision = 1;
 
@@ -3007,6 +3008,7 @@ void CCC_RegisterCommands()
 	CMD4(CCC_Integer, "g_nearwall_trace", &g_nearwall_trace, 0, 1);
 
 	CMD4(CCC_Integer, "g_auto_reload", &g_auto_reload, 0, 1);
+	CMD4(CCC_Integer, "g_exact_fire_rate", &g_exact_fire_rate, 0, 1);
 	CMD3(CCC_Mask, "g_crosshair_show_always", &psCrosshair_Flags, CROSSHAIR_SHOW_ALWAYS);
 	CMD3(CCC_Mask, "g_crosshair_independent", &psCrosshair_Flags, CROSSHAIR_INDEPENDENT);
 	
