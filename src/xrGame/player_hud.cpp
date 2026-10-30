@@ -874,6 +874,7 @@ void player_hud::load(const shared_str& player_hud_sect, bool force)
 	// hides the unused arm meshes
 	m_model->dcast_PKinematics()->LL_SetBoneVisible(l_arm, FALSE, TRUE);
 	m_model_2->dcast_PKinematics()->LL_SetBoneVisible(r_arm, FALSE, TRUE);
+	m_gs_grip.init(m_model_2->dcast_PKinematics());
 
 	CInifile::Sect& _sect = pSettings->r_section(player_hud_sect);
 	CInifile::SectCIt _b = _sect.Data.begin();
@@ -1212,6 +1213,7 @@ void player_hud::update(const Fmatrix& cam_trans)
 	m_transform.mul(trans, m_attach_offset);
 	m_transform_2.mul(trans_2, m_attach_offset_2);
 
+	m_gs_grip.begin_frame(); // the left arm as animated; the grip IK below changes it again
 	m_model->UpdateTracks();
 	m_model->dcast_PKinematics()->CalculateBones_Invalidate();
 	m_model->dcast_PKinematics()->CalculateBones(TRUE);
@@ -1352,6 +1354,11 @@ void player_hud::update(const Fmatrix& cam_trans)
 
 	if (m_attached_items[SCOPE_ATTACH_IDX])
 		m_attached_items[SCOPE_ATTACH_IDX]->update(true);
+
+	// Gunsmith: the left hand on the fitted grip, once the gun is placed (not while the left hand holds
+	// something else, or a script animation has the hands)
+	if (m_attached_items[0] && !m_attached_items[1] && script_anim_part == u8(-1))
+		m_gs_grip.update(m_model_2->dcast_PKinematics(), m_transform_2, m_attached_items[0]);
 
 	if (script_anim_item_attached && script_anim_item_model)
 		update_script_item();

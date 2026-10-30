@@ -5,6 +5,7 @@
 #include "../Include/xrRender/KinematicsAnimated.h"
 #include "actor_defs.h"
 #include "player_hud_legs.h"
+#include "gunsmith_grip_ik.h"
 
 #define SCOPE_ATTACH_IDX 2
 
@@ -449,6 +450,7 @@ private:
 public:
 	IKinematicsAnimated* m_model;
 	IKinematicsAnimated* m_model_2;
+	gunsmith::CGripIK m_gs_grip; // the left hand on the fitted handguard or foregrip (m_model_2)
 	Fvector m_adjust_offset[2][10]; // pos,rot/ normal,aim,GL,aim_alt,safemode, normal2, attach_base, attach_mount, aim for attach, alt aim for attach
 	Fvector m_adjust_obj[2]; // pos,rot; used for the item/weapon itself
 	Fvector m_adjust_ui_offset[2]; // pos,rot; used for custom device ui
