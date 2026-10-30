@@ -490,6 +490,12 @@ void CUIActorMenu::clear_highlight_lists()
 		m_ArtefactSlotsHighlight[i]->Show(false);
 
 	m_pInventoryBagList->clear_select_armament();
+	// Gunsmith highlights equipped guns too (the slot cells), which vanilla never marks
+	for (u8 i = 1; i <= m_slot_count; ++i)
+	{
+		if (m_pInvList[i])
+			m_pInvList[i]->clear_select_armament();
+	}
 
 	switch (m_currMenuMode)
 	{

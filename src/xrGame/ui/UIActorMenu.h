@@ -376,6 +376,9 @@ public:
 	LPCSTR RepairQuestion(PIItem item, bool can_repair);
 	void HighlightSectionInSlot(LPCSTR section, u8 type, u16 slot_id = 0);
 	void HighlightForEachInSlot(const ::luabind::functor<bool>& functor, u8 type, u16 slot_id);
+	// Gunsmith: as HighlightForEachInSlot, but marks the cells with the dimmer highlight (fits, blocked or broken now)
+	void HighlightForEachInSlotDim(const ::luabind::functor<bool>& functor, u8 type, u16 slot_id);
+	void HighlightForEachInSlotImpl(const ::luabind::functor<bool>& functor, u8 type, u16 slot_id, bool dim);
 
 	//-AxelDominator && Alundaio consumable use condition
 	void DonateCurrentItem(CUICellItem* cell_item); //Alundaio: Donate item via context menu while in trade menu
