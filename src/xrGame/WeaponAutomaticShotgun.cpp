@@ -12,8 +12,14 @@
 
 CWeaponAutomaticShotgun::CWeaponAutomaticShotgun()
 {
+	m_eSoundOpen = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
 	m_eSoundClose = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
 	m_eSoundAddCartridge = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
+	// Gunsmith: these were left uninitialised
+	BeginReloadWasEmpty = false;
+	ClickInterruptFlag = false;
+	MotionMarked = false;
+	m_bGsClearJam = false;
 }
 
 CWeaponAutomaticShotgun::~CWeaponAutomaticShotgun()
@@ -60,9 +66,10 @@ bool CWeaponAutomaticShotgun::Action(u16 cmd, u32 flags)
 	}
 	if (inherited::Action(cmd, flags)) return true;
 
+	// Gunsmith: the sub-states in brackets (the || bound loosest, so eSubstateReloadInProcessEmptyEnd alone passed)
 	if (m_bTriStateReload && GetState() == eReload &&
         ClickInterruptFlag && // ver
-		m_sub_state == eSubstateReloadInProcess || m_sub_state == eSubstateReloadInProcessEmptyEnd) //постановить перезагрузку
+		(m_sub_state == eSubstateReloadInProcess || m_sub_state == eSubstateReloadInProcessEmptyEnd)) //постановить перезагрузку
 	{	
 		AddCartridge(1);
 		m_sub_state = eSubstateReloadEnd;
@@ -76,6 +83,17 @@ void CWeaponAutomaticShotgun::OnAnimationEnd(u32 state)
 {
 	if (!m_bTriStateReload || state != eReload)
 		return inherited::OnAnimationEnd(state);
+
+	if (m_bGsClearJam)
+	{
+		// Gunsmith: the misfire is cleared; the tube is as it was
+		m_bGsClearJam = false;
+		bMisfire = false;
+		m_sub_state = eSubstateReloadBegin;
+		SetPending(FALSE);
+		SwitchState(eIdle);
+		return;
+	}
 
     if (ClickInterruptFlag && MotionMarked)
     {
@@ -138,6 +156,17 @@ void CWeaponAutomaticShotgun::Reload()
 
 void CWeaponAutomaticShotgun::TriStateReload()
 {
+	// Gunsmith: a misfire is cleared by working the action once (anm_reload_misfire), as the magazine guns do
+	// (CWeaponMagazined::PlayAnimReload), whether the tube is full or not: a jammed full tube had no way out
+	// (31 Oct 2026). Without the animation, the reload as before (it clears the misfire as it adds a shell).
+	if (IsMisfire() && iAmmoElapsed && HudAnimationExist("anm_reload_misfire"))
+	{
+		CWeapon::Reload();
+		m_bGsClearJam = true;
+		m_sub_state = eSubstateReloadBegin;
+		SwitchState(eReload);
+		return;
+	}
 	if (m_magazine.size() == (u32)iMagazineSize || !HaveCartridgeInInventory(1))return;
 	CWeapon::Reload();
 	m_sub_state = eSubstateReloadBegin;
@@ -148,11 +177,19 @@ void CWeaponAutomaticShotgun::OnStateSwitch(u32 S, u32 oldState)
 {
 	if (!m_bTriStateReload || S != eReload)
 	{
+		m_bGsClearJam = false;
 		inherited::OnStateSwitch(S, oldState);
 		return;
 	}
 
 	CWeapon::OnStateSwitch(S, oldState);
+
+	if (m_bGsClearJam)
+	{
+		SetPending(TRUE);
+		PlayHUDMotion("anm_reload_misfire", TRUE, this, GetState());
+		return;
+	}
 
 	if (m_magazine.size() == (u32)iMagazineSize || !HaveCartridgeInInventory(1))
 	{
@@ -284,6 +321,8 @@ void CWeaponAutomaticShotgun::OnMotionMark(u32 state, const motion_marks& M)
     // what the fuckkkk
 
     //Msg("motion mark detected on reload!");
+    if (m_bGsClearJam)
+        return; // Gunsmith: clearing a misfire adds no shell
     inherited::OnMotionMark(state, M);
     
     if (state == eIdle)

@@ -38,6 +38,8 @@ protected:
 	virtual u8 AddCartridge(u8 cnt);
     bool ClickInterruptFlag; // ver
     bool MotionMarked; // ver
+	// Gunsmith: anm_reload_misfire is playing (a misfire cleared by working the action, full tube or not)
+	bool m_bGsClearJam;
 
 	ESoundTypes m_eSoundOpen;
 	ESoundTypes m_eSoundAddCartridge;
