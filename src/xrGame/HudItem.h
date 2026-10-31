@@ -316,6 +316,11 @@ private:
 	void gs_snd_start(const shared_str& anm, u32 length);
 	void gs_snd_update();
 
+protected:
+	// the HUD section times its own sounds for this motion (gs_snd_<anm>), on the actor's HUD: the item's vanilla
+	// sound for it isn't started (a non-exclusive one can't be stopped once playing)
+	bool gs_snd_covers(LPCSTR anm) const;
+
 public:
 	virtual void OnFrame();
 	void net_Relcase(CObject* O);

@@ -570,11 +570,19 @@ void CHudItem::gs_snd_start(const shared_str& anm, u32 length)
 	m_gs_snd_length = length;
 	m_gs_snd_next = 0;
 	// the state's own sound (snd_reload, snd_draw, ...) started just before; a shot still ringing out keeps playing.
-	// The shotguns' reload sounds are typed as shots too (vanilla): stopped by name
+	// The double barrel's one-shell reload sound is typed as a shot (vanilla): stopped by name. (The tri-state
+	// shotguns' open, add and close sounds are too, but non-exclusive, so they can't be stopped: they aren't started,
+	// gs_snd_covers)
 	m_sounds.StopAllSounds(SOUND_TYPE_SHOOTING);
-	for (LPCSTR alias : {"sndOpen", "sndAddCartridge", "sndClose", "sndCloseEmpty", "sndReload1"})
-		m_sounds.StopSound(alias);
+	m_sounds.StopSound("sndReload1");
 	gs_snd_update();
+}
+
+bool CHudItem::gs_snd_covers(LPCSTR anm) const
+{
+	string256 key;
+	xr_sprintf(key, "gs_snd_%s", anm);
+	return hud_sect.size() && const_cast<CHudItem*>(this)->IsAttachedToHUD() && pSettings->line_exist(hud_sect, key);
 }
 
 void CHudItem::gs_snd_update()

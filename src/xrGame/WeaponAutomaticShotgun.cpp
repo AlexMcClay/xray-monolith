@@ -253,7 +253,8 @@ void CWeaponAutomaticShotgun::PlaySoundShot()
 void CWeaponAutomaticShotgun::switch2_StartReload()
 {
 	BeginReloadWasEmpty = !m_magazine.size();
-	PlaySound("sndOpen", get_LastFP());
+	if (!gs_snd_covers("anm_open"))
+		PlaySound("sndOpen", get_LastFP());
 	PlayAnimOpenWeapon();
 	SetPending(TRUE);
 }
@@ -261,7 +262,8 @@ void CWeaponAutomaticShotgun::switch2_StartReload()
 void CWeaponAutomaticShotgun::switch2_AddCartgidge()
 {
 	if (ParentIsActor()) Actor()->callback(GameObject::eWeaponNoAmmoAvailable)(lua_game_object(), GetSuitableAmmoTotal());
-	PlaySound("sndAddCartridge", get_LastFP());
+	if (!gs_snd_covers("anm_add_cartridge"))
+		PlaySound("sndAddCartridge", get_LastFP());
 	PlayAnimAddOneCartridgeWeapon();
 	SetPending(TRUE);
 }
@@ -269,7 +271,9 @@ void CWeaponAutomaticShotgun::switch2_AddCartgidge()
 void CWeaponAutomaticShotgun::switch2_EndReload()
 {
 	SetPending(FALSE);
-	if (BeginReloadWasEmpty && m_sounds.FindSoundItem("sndCloseEmpty", false))
+	if (gs_snd_covers("anm_close"))
+		; // Gunsmith: Tarkov's sounds for the close (JSRS's MP-133 close was a shell in and a pump: user, 31 Oct 2026)
+	else if (BeginReloadWasEmpty && m_sounds.FindSoundItem("sndCloseEmpty", false))
 		PlaySound("sndCloseEmpty", get_LastFP());
 	else
 		PlaySound("sndClose", get_LastFP());
