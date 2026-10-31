@@ -26,6 +26,7 @@
         min_scope_zoom_factor - Minimal zoom factor
         snd_shoot_actor_first - custom sound for the first shot
         snd_silncer_shoot_actor_first - custom sound for the first shot with silencer
+        snd_shoot_actor_exclusive - Each of the actor's shots stops the previous one's sound of the same key (snd_shoot_actor, snd_shoot_actor_first, the silencer and misfire versions), so a recorded shot with its tail can play on every shot of automatic fire. Default false. Also read from the HUD section
         base_hud_offset_pos - Editable variables that allow weapon position adjustements that don't require aim tweaks
         base_hud_offset_pos_16x9 - Editable variables that allow weapon position adjustements that don't require aim tweaks
         base_hud_offset_rot - Editable variables that allow weapon position adjustements that don't require aim tweaks
@@ -58,6 +59,7 @@
 
     Weapon HUD sections (the section referenced by hud)
         shell_particles - Override the weapon's shell particle effect in first person. Omit to inherit the weapon effect; an explicitly empty value disables HUD shell particles.
+        snd_*_actor - The actor's first-person sound keys of magazine-fed weapons (snd_shoot_actor, snd_shoot_actor_first, snd_shot_misfire_actor, snd_silncer_shot_actor, snd_silncer_shoot_actor_first, snd_silncer_shot_misfire_actor, snd_reload_actor, snd_reload_empty_actor, snd_reload_misfire_actor, snd_empty_actor, snd_misfire_actor, snd_draw_actor, snd_holster_actor) may be set here; a key in the HUD section wins over the weapon section's, so weapons sharing a HUD section share its first-person sounds.
         fire_bone_silencer - Silenced muzzle bone; falls back to fire_bone, then wpn_body.
         fire_point_silencer - Silenced muzzle offset (x,y,z); falls back to fire_point.
 
