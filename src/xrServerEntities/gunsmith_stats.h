@@ -63,5 +63,12 @@ namespace gunsmith
 
 	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out);
 
+	// compute() in two halves for a shot, which changes only part conditions (1 Nov 2026): the stats as if every
+	// part were new (relative to the stock build, as compute()), then the condition terms of the tree's parts
+	// (spread from worn parts, a worn suppressor, sight sway). Together they make compute()'s result, up to the
+	// order of the float multiplications.
+	void compute_structure(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out);
+	void apply_conditions(const CTree& tree, SWeaponStats& out);
+
 	void dump(const SWeaponStats& stats);
 }

@@ -1257,6 +1257,16 @@ void CWeapon::gs_sync_to_server()
 	se->m_addon_flags.flags = m_flagsAddOnState;
 }
 
+void CWeapon::gs_sync_conditions_to_server()
+{
+	CSE_ALifeItemWeapon* se = gs_server_entity();
+	if (!se)
+		return;
+	if (!se->m_gs_tree.copy_conditions_from(m_gs_tree))
+		se->m_gs_tree = m_gs_tree; // different parts or modes there: the whole tree, as gs_sync_to_server
+	se->m_addon_flags.flags = m_flagsAddOnState;
+}
+
 void CWeapon::gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition)
 {
 	const bool detach = !part || !*part;
@@ -1287,7 +1297,7 @@ void CWeapon::gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition)
 	}
 }
 
-void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out) const
+void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out, bool conditions) const
 {
 	// Attached old-style addons the tree has no slot for (e.g. made attachable by
 	// an upgrade) still count, as they did before the tree.
@@ -1307,7 +1317,10 @@ void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponSta
 	add_extra(gunsmith::eLegacySilencer, m_eSilencerStatus, m_sSilencerName);
 	add_extra(gunsmith::eLegacyLauncher, m_eGrenadeLauncherStatus, m_sGrenadeLauncherName);
 
-	gunsmith::compute(tree, extra, out);
+	if (conditions)
+		gunsmith::compute(tree, extra, out);
+	else
+		gunsmith::compute_structure(tree, extra, out);
 }
 
 void CWeapon::gs_rebuild_stats(bool notify)
@@ -1317,6 +1330,12 @@ void CWeapon::gs_rebuild_stats(bool notify)
 
 	const bool was_suppressed = IsSuppressed();
 	gs_compute_stats(m_gs_tree, m_gs_stats);
+	// and the structural half a shot refolds its condition terms onto (gs_refresh_condition_stats)
+	gs_compute_stats(m_gs_tree, m_gs_struct_stats, false);
+	m_gs_struct_rev = m_gs_tree.layout_revision();
+	m_gs_struct_flags = m_flagsAddOnState;
+	m_gs_struct_scope = m_cur_scope;
+	m_gs_struct_valid = true;
 
 	// Magazine parts set the magazine size; without one the weapon's own size comes back.
 	// Guns that never had one are left alone, so upgrades that change the size keep working.
@@ -1536,9 +1555,80 @@ void CWeapon::gs_apply_shot_wear(float impair)
 		parts_wore = true;
 	}
 
-	gs_rebuild_stats();
+	// A shot changes only conditions: refold their terms instead of rebuilding every stat, and give the server
+	// copy the conditions instead of the whole tree (both ran in full on every shot until 1 Nov 2026).
+	gs_refresh_condition_stats();
 	if (parts_wore)
-		gs_sync_to_server();
+		gs_sync_conditions_to_server();
+}
+
+// gs_stats_check 1: after every shot, compare the refolded stats with a full rebuild and log differences.
+int g_gs_stats_check = 0;
+
+void CWeapon::gs_refresh_condition_stats()
+{
+	if (!m_gs_struct_valid || m_gs_struct_rev != m_gs_tree.layout_revision() || m_gs_struct_flags != m_flagsAddOnState
+		|| m_gs_struct_scope != m_cur_scope)
+	{
+		gs_rebuild_stats();
+		return;
+	}
+	if (!m_gs_tree.empty())
+		m_gs_tree.set_condition(0, GetCondition()); // the receiver is the gun
+
+	const bool was_suppressed = IsSuppressed();
+	m_gs_stats = m_gs_struct_stats;
+	gunsmith::apply_conditions(m_gs_tree, m_gs_stats);
+	if (was_suppressed != IsSuppressed())
+		gs_on_suppression_changed();
+	if (g_gs_stats_check)
+		gs_check_stats();
+}
+
+void CWeapon::gs_check_stats() const
+{
+	static u32 s_checked = 0, s_different = 0;
+	gunsmith::SWeaponStats full;
+	gs_compute_stats(m_gs_tree, full);
+	const gunsmith::SWeaponStats& fast = m_gs_stats;
+
+	u32 different = 0;
+	auto check = [&](LPCSTR what, float a, float b)
+	{
+		if (_abs(a - b) <= 1e-4f * _max(1.f, _max(_abs(a), _abs(b))))
+			return;
+		if (different++ < 8)
+			Msg("! [gunsmith] gs_stats_check [%s]: %s per shot %.6g, full rebuild %.6g", cNameSect().c_str(), what, a, b);
+	};
+	for (u32 s = 0; s < gunsmith::eStatCount; ++s)
+	{
+		string64 name;
+		xr_sprintf(name, "%s add", gunsmith::stat_name(u8(s)));
+		check(name, fast.add[s], full.add[s]);
+		xr_sprintf(name, "%s mul", gunsmith::stat_name(u8(s)));
+		check(name, fast.mul[s], full.mul[s]);
+	}
+	check("ergonomics", fast.ergonomics, full.ergonomics);
+	check("recoil_sum", fast.recoil_sum, full.recoil_sum);
+	check("stock_ergonomics", fast.stock_ergonomics, full.stock_ergonomics);
+	check("stock_recoil_sum", fast.stock_recoil_sum, full.stock_recoil_sum);
+	check("weight_add", fast.weight_add, full.weight_add);
+	check("cost_add", fast.cost_add, full.cost_add);
+	check("barrel_wear_mul", fast.barrel_wear_mul, full.barrel_wear_mul);
+	check("muzzle_condition", fast.muzzle_condition, full.muzzle_condition);
+	check("sight_sway", fast.sight_sway, full.sight_sway);
+	check("mag_size", float(fast.mag_size), float(full.mag_size));
+	check("shoulder", fast.shoulder ? 1.f : 0.f, full.shoulder ? 1.f : 0.f);
+	check("stock_shoulder", fast.stock_shoulder ? 1.f : 0.f, full.stock_shoulder ? 1.f : 0.f);
+	check("suppressor_worn", fast.suppressor_worn ? 1.f : 0.f, full.suppressor_worn ? 1.f : 0.f);
+	check("suppressor_part", fast.suppressor_part ? 1.f : 0.f, full.suppressor_part ? 1.f : 0.f);
+	check("can_fire", fast.can_fire ? 1.f : 0.f, full.can_fire ? 1.f : 0.f);
+
+	++s_checked;
+	if (different)
+		++s_different;
+	if (different || s_checked % 100 == 0)
+		Msg("- [gunsmith] gs_stats_check: %u shots checked, %u with differences", s_checked, s_different);
 }
 
 void CWeapon::gs_set_parts_condition(float value)

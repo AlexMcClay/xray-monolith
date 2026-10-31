@@ -22,6 +22,7 @@
 
 class CEntity;
 extern int g_gs_aim_debug;
+extern int g_gs_stats_check;
 extern float g_gs_aim_speed;
 extern int g_gs_aim_rot;
 class ENGINE_API CMotionDef;
@@ -360,12 +361,19 @@ public:
 	const gunsmith::CTree& gs_tree() const { return m_gs_tree; }
 	CSE_ALifeItemWeapon* gs_server_entity() const;
 	void gs_sync_to_server();
+	// After a shot's wear: the server copy takes the part conditions only, when it holds the same parts
+	void gs_sync_conditions_to_server();
 
 	// Stat modifiers from the parts. Read sites use gs_stats().apply(stat, base).
 	const gunsmith::SWeaponStats& gs_stats() const { return m_gs_stats; }
 	// Recomputes gs_stats() from the tree; `notify` re-applies suppressed sound and
 	// particles when a worn suppressor crosses its threshold.
 	void gs_rebuild_stats(bool notify = true);
+	// After a shot's wear (only part conditions changed): refolds the condition terms onto the cached structural
+	// stats; a full gs_rebuild_stats when the parts, addon flags or scope changed since they were made
+	void gs_refresh_condition_stats();
+	// gs_stats_check 1: compares the refolded stats with a full rebuild after every shot, logging differences
+	void gs_check_stats() const;
 
 	// A silencer is attached and not worn below its suppression threshold.
 	bool IsSuppressed() const;
@@ -408,7 +416,7 @@ public:
 	// Fires on_gs_part_attached. The caller destroys the item.
 	bool gs_attach_item(CInventoryItem* item, u8 parent, u8 slot);
 	// Stats a tree would give this weapon (the live tree, or a preview copy).
-	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out) const;
+	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out, bool conditions = true) const;
 	// One stat in display units (degrees for angles, rounds per minute for rpm):
 	// the weapon's own value, the parts' add, and the effective value.
 	void gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float& base, float& add, float& value) const;
@@ -498,6 +506,13 @@ protected:
 protected:
 	gunsmith::CTree m_gs_tree;
 	gunsmith::SWeaponStats m_gs_stats;
+	// m_gs_stats without the part-condition terms, which a shot refolds (gs_refresh_condition_stats), and what it
+	// was made for: the tree's layout revision, the addon flags and the scope
+	gunsmith::SWeaponStats m_gs_struct_stats;
+	u32 m_gs_struct_rev = 0;
+	u8 m_gs_struct_flags = 0;
+	u8 m_gs_struct_scope = 0;
+	bool m_gs_struct_valid = false;
 	u8 m_gs_jam_type = 0;
 	u8 m_gs_jam_node = 0;
 	bool m_gs_cant_fire_logged = false;

@@ -62,6 +62,9 @@ namespace gunsmith
 		// Every node, the receiver included (a found gun's parts match the gun).
 		void set_all_conditions(float condition);
 		void set_mode(u8 index, u8 mode);
+		// Takes other's node conditions when both trees hold the same parts and modes (the same revisions: one is a
+		// copy of the other). Returns false, changing nothing, when they don't.
+		bool copy_conditions_from(const CTree& other);
 
 		// A node's slots (the cached list of its section; empty for a node that doesn't exist)
 		const SLOTS& node_slots(u8 index) const;

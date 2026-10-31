@@ -106,6 +106,15 @@ namespace gunsmith
 		}
 	}
 
+	bool CTree::copy_conditions_from(const CTree& other)
+	{
+		if (m_state_rev != other.m_state_rev || m_nodes.size() != other.m_nodes.size())
+			return false;
+		for (u32 i = 0; i < m_nodes.size(); ++i)
+			m_nodes[i].condition = other.m_nodes[i].condition;
+		return true;
+	}
+
 	const SLOTS& CTree::node_slots(u8 index) const
 	{
 		static const SLOTS none;
