@@ -654,15 +654,22 @@ namespace gunsmith
 		return sight;
 	}
 
+	bool CVisuals::use_root_line(const SContext& c, const SChild* sight) const
+	{
+		if (!c.has_root_aim || !c.has_root_dir)
+			return false;
+		return !sight || (sight->pv->aim_priority <= 0 && !aim_of(*sight).optic());
+	}
+
 	bool CVisuals::sight_point(IKinematics* root, Fvector& point, shared_str& key)
 	{
 		SContext& c = m_ctx[eHud];
 		if (c.children.empty() || c.root != root)
 			return false;
 		const SChild* sight = pick_sight(c);
-		if (!sight && c.has_root_aim && c.has_root_dir)
+		if (use_root_line(c, sight))
 		{
-			// no part is a sight: the receiver's own sight line (a shotgun's bead over its receiver, the UMP's irons)
+			// the receiver's own sight line (a shotgun's bead over its receiver, the UMP's and AK-12's irons)
 			root->LL_GetTransform_R(c.root_aim_bone).transform_tiny(point, c.root_aim);
 			key = "receiver";
 			return true;
@@ -686,7 +693,7 @@ namespace gunsmith
 		if (c.children.empty() || c.root != root)
 			return false;
 		const SChild* sight = pick_sight(c);
-		if (!sight && c.has_root_aim && c.has_root_dir)
+		if (use_root_line(c, sight))
 		{
 			const Fmatrix& bone = root->LL_GetTransform_R(c.root_aim_bone);
 			bone.transform_dir(fwd, c.root_fwd);
@@ -732,7 +739,7 @@ namespace gunsmith
 		if (c.children.empty() || c.root != root)
 			return nullptr;
 		const SChild* sight = pick_sight(c);
-		if (!sight)
+		if (!sight || use_root_line(c, sight))
 			return nullptr;
 		const SSightAim aim = aim_of(*sight); // (a 1x mode of a scope, or its second sight: no eye relief)
 		if (aim.has_eye)

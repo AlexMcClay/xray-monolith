@@ -262,5 +262,8 @@ namespace gunsmith
 		void show_modes(SContext& c, const CTree& tree);
 		SSightAim aim_of(const SChild& ch) const;
 		const SChild* pick_sight(const SContext& c) const;
+		// the receiver's own sight line (gs_aim_point + gs_aim_dir) is aimed along when no part is a sight, or the
+		// part is an iron sight (aim_priority 0, no magnification): the AK-12's rear sight onto its front post
+		bool use_root_line(const SContext& c, const SChild* sight) const;
 	};
 }
