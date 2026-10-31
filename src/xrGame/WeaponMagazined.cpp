@@ -109,10 +109,10 @@ void CWeaponMagazined::Load(LPCSTR section)
 	m_sounds.LoadSound(section, "snd_draw", "sndShow", true, m_eSoundShow);
 	m_sounds.LoadSound(section, "snd_holster", "sndHide", true, m_eSoundHide);
 
-	// The actor's sounds (the *_actor keys) may also be set in the HUD section, which wins, so guns sharing a HUD
-	// model share its first-person sounds. snd_shoot_actor_exclusive = true (in either section): each of the actor's
-	// shots stops the last one's sound of the same key, so a whole recorded shot with its tail can play on every shot
-	// of automatic fire without the tails piling up
+	// The actor's sounds (the *_actor keys) may also be set in the weapon's HUD section, which wins, so weapons
+	// sharing a HUD section share its first-person sounds. snd_shoot_actor_exclusive = true (in either section):
+	// each of the actor's shots stops the last one's sound of the same key, so a whole recorded shot with its tail
+	// can play on every shot of automatic fire without the tails piling up.
 	auto actor_sect = [&](LPCSTR line) -> LPCSTR
 	{
 		return hud_sect.size() && pSettings->line_exist(hud_sect.c_str(), line) ? hud_sect.c_str() : section;
