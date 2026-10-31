@@ -15,7 +15,7 @@ CSE_Abstract* xrServer::Process_spawn(NET_Packet& P, ClientID sender, BOOL bSpaw
 	if (!E)
 	{
 		// read spawn information
-		string256 s_name; // Gunsmith: generated part sections can be longer than 63 characters
+		string256 s_name; // a section name: may be longer than 63 characters
 		P.r_stringZ(s_name);
 		// create entity
 		E = entity_Create(s_name);
