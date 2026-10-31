@@ -1963,7 +1963,7 @@ void CWeapon::UpdateAddonsVisibility()
 	pWeaponVisual->CalculateBones_Invalidate();
 
 	bone_id = pWeaponVisual->LL_BoneID(wpn_scope);
-    if (ScopeAttachable())
+    if (ScopeAttachable() && bone_id != BI_NONE) // a model without the addon's bone: nothing to show or hide
 	{
 		if (IsScopeAttached())
 		{
@@ -1983,7 +1983,7 @@ void CWeapon::UpdateAddonsVisibility()
 		//		Log("scope", pWeaponVisual->LL_GetBoneVisible		(bone_id));
 	}
 	bone_id = pWeaponVisual->LL_BoneID(wpn_silencer);
-	if (SilencerAttachable())
+	if (SilencerAttachable() && bone_id != BI_NONE)
 	{
 		if (IsSilencerAttached())
 		{
@@ -2008,13 +2008,13 @@ void CWeapon::UpdateAddonsVisibility()
 	{
 		if (IsGrenadeLauncherAttached())
 		{
-			if (!pWeaponVisual->LL_GetBoneVisible(bone_id))
+			if (bone_id != BI_NONE && !pWeaponVisual->LL_GetBoneVisible(bone_id))
 				pWeaponVisual->LL_SetBoneVisible(bone_id, TRUE, TRUE);
 		}
 		else
 		{
 			isGrenadeLauncherActive = false;
-			if (pWeaponVisual->LL_GetBoneVisible(bone_id))
+			if (bone_id != BI_NONE && pWeaponVisual->LL_GetBoneVisible(bone_id))
 				pWeaponVisual->LL_SetBoneVisible(bone_id, FALSE, TRUE);
 		}
 	}
