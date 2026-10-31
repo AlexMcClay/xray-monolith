@@ -198,7 +198,7 @@ bool CWeapon::gs_sight_select(u8 node)
 	gs_sight_list(sights);
 	if (std::find(sights.begin(), sights.end(), node) == sights.end())
 		return false;
-	m_gs_tree.set_mode(0, u8((m_gs_tree.node(0).mode & 1) | (node << 1)));
+	m_gs_tree.set_selected_sight(node);
 	gs_update_optic(); // zoom, overlay and lens follow; the aim correction re-predicts on its own
 	gs_sync_to_server();
 	return true;
@@ -356,7 +356,7 @@ void CWeapon::gs_apply_shot_wear(float impair)
 		if (!p.wears_on_shot || p.wear_per_shot <= 0.f)
 			continue;
 		float wear = p.wear_per_shot * impair * f_weapon_deterioration;
-		if (!xr_strcmp(p.kind.c_str(), "barrel"))
+		if (p.kind_id == gunsmith::eKindBarrel)
 			wear *= m_gs_stats.barrel_wear_mul;
 		m_gs_tree.set_condition(u8(i), n.condition - wear);
 		parts_wore = true;
@@ -960,7 +960,7 @@ bool CWeapon::gs_devices_toggle()
 {
 	if (m_gs_tree.empty() || !gs_has_devices())
 		return false;
-	m_gs_tree.set_mode(0, m_gs_tree.node(0).mode ^ 1); // bit 0; bits 1-7 are the selected sight
+	m_gs_tree.set_devices_on(!m_gs_tree.devices_on());
 	gs_sync_to_server();
 	return gs_devices_on();
 }

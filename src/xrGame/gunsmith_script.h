@@ -39,6 +39,12 @@ class CScriptGameObject;
 ::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self);
 // The build's state revision (gunsmith_tree.h): a new number whenever its parts or modes change; 0 for other objects
 u32 gs_revision_script(CScriptGameObject* self);
+// Whether part section `section` fits the current build of a gun or a part item carrying parts: 2 a slot takes it
+// (an empty one it can go into now, or a filled one it can replace), 1 a slot takes its kind but is blocked or the
+// place is refused, 0 none (also for anything else). The Framework's highlight rules, in one call.
+int gs_fit_verdict_script(CScriptGameObject* self, LPCSTR section);
+// The jam type of a jammed gun ("barrel", "feed", "extraction"...), "none" when it isn't jammed or isn't a gun.
+LPCSTR gs_jam_type_script(CScriptGameObject* self);
 ::luabind::object gs_sight_magnification_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_mode_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_mode_next_script(lua_State* L, CScriptGameObject* self);

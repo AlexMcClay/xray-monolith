@@ -141,9 +141,19 @@ namespace gunsmith
 	// Weight and cost: old-style addons count their item `inv_weight` and `cost`,
 	// as before. Other parts count `weight` and `part_cost` (default 0), so
 	// internal parts that are also items don't add their item price to the gun.
+	// The part kinds the engine itself acts on (SPartData::kind_id); every other kind is eKindOther.
+	enum EPartKind : u8
+	{
+		eKindOther,
+		eKindMuzzle,
+		eKindSight,  // "sight" or "optic"
+		eKindBarrel,
+	};
+
 	struct SPartData
 	{
 		shared_str kind; // part_kind, or inferred from the item class, or "generic"
+		u8 kind_id; // kind as an EPartKind, resolved once (was compared as a string per shot and rebuild)
 		bool declared; // part_kind was set: durability applies
 
 		float add[eStatCount];
@@ -192,6 +202,10 @@ namespace gunsmith
 		float no_stock_recoil; // recoil multiplier when the stock build has shoulder contact and the gun doesn't (1.5)
 		float recoil_recovery; // camera recoil relax speed multiplier on full-mode guns (1.0 = vanilla)
 		float sight_sway_factor; // extra zoomed sway per point of condition below a sight's threshold (1.0)
+		// 1: call the part misfire script hook (xr_weapon_jam.GetPartMisfireProbability, the
+		// weapon_get_part_misfire_probability callback) for every part that can fail, on every shot. 0 (default):
+		// skipped, as nothing uses it; a script that does turns it on with gunsmith.set_setting("part_misfire_hook", 1).
+		float part_misfire_hook;
 		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
 		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
 		float optic_base_fov;
@@ -199,7 +213,7 @@ namespace gunsmith
 
 	const SSettings& settings();
 	// Handling settings by name (ergo_aim_k, ergo_sway_k, ergo_strength, recoil_strength, no_stock_recoil,
-	// recoil_recovery). False for an unknown name. Takes effect at once: stats read them live.
+	// recoil_recovery, part_misfire_hook). False for an unknown name. Takes effect at once: stats read them live.
 	bool set_setting(LPCSTR name, float value);
 	float get_setting(LPCSTR name);
 }

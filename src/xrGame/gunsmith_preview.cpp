@@ -527,6 +527,31 @@ namespace gunsmith
 		}
 		// The view is drawn while the workbench keeps ticking it.
 		if (!m_failed && Device.dwFrame - m_view_tick <= 1 && (m_view_id != u16(-1) || m_view_section.size()))
-			draw_view();
+		{
+			// Only when what it shows changed (gun, build, camera, size), when the builder was just opened, and every
+			// 30 frames anyway, so a render target the driver dropped comes back (1 Nov 2026; drawn every frame before).
+			SViewKey key;
+			key.id = m_view_id;
+			key.section = m_view_section;
+			SSource src;
+			if (m_view_id != u16(-1) && object_source(m_view_id, src))
+				key.revision = src.tree->state_revision();
+			key.yaw = m_yaw;
+			key.pitch = m_pitch;
+			key.zoom = m_zoom;
+			key.pan_x = m_pan_x;
+			key.pan_y = m_pan_y;
+			key.aspect = m_aspect;
+			key.w = m_view_w;
+			key.h = m_view_h;
+			const bool reopened = m_view_active + 1 < Device.dwFrame;
+			m_view_active = Device.dwFrame;
+			if (reopened || !(key == m_view_key) || Device.dwFrame - m_view_drawn >= 30)
+			{
+				m_view_key = key;
+				m_view_drawn = Device.dwFrame;
+				draw_view();
+			}
+		}
 	}
 }

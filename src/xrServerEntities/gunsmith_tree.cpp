@@ -74,6 +74,17 @@ namespace gunsmith
 			kept.push_back(n);
 		}
 		m_nodes.swap(kept);
+
+		// The selected sight follows its node's new number, or goes back to automatic with it removed.
+		if (!m_part_root && !m_nodes.empty())
+		{
+			const u8 sel = u8(m_nodes[0].mode >> 1);
+			if (sel)
+			{
+				const u8 to = sel < count && !removed[sel] ? remap[sel] : 0;
+				m_nodes[0].mode = u8((m_nodes[0].mode & 1) | (to << 1));
+			}
+		}
 		touch_layout();
 	}
 
@@ -104,6 +115,18 @@ namespace gunsmith
 			m_nodes[index].mode = mode;
 			touch_state();
 		}
+	}
+
+	void CTree::set_devices_on(bool on)
+	{
+		if (!m_part_root && !m_nodes.empty())
+			set_mode(0, u8((m_nodes[0].mode & ~1) | (on ? 1 : 0)));
+	}
+
+	void CTree::set_selected_sight(u8 node)
+	{
+		if (!m_part_root && !m_nodes.empty())
+			set_mode(0, u8((m_nodes[0].mode & 1) | (u8(_min(u32(node), 127u)) << 1)));
 	}
 
 	bool CTree::copy_conditions_from(const CTree& other)

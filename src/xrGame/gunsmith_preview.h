@@ -112,5 +112,22 @@ namespace gunsmith
 		xr_vector<CVisuals::SSlotPoint> m_view_points; // its slots, in the receiver model's space
 		Fmatrix m_view_vp; // projection * view the last view was drawn with
 		float m_view_zoom = 1.f, m_view_pan_x = 0.f, m_view_pan_y = 0.f; // its camera (debug log)
+		// What the last view was drawn for: it is redrawn when any of it changes (it was redrawn every frame)
+		struct SViewKey
+		{
+			u16 id = u16(-1);
+			shared_str section;
+			u32 revision = 0;
+			float yaw = 0.f, pitch = 0.f, zoom = 0.f, pan_x = 0.f, pan_y = 0.f, aspect = 0.f;
+			u32 w = 0, h = 0;
+			bool operator==(const SViewKey& o) const
+			{
+				return id == o.id && section == o.section && revision == o.revision && yaw == o.yaw && pitch == o.pitch &&
+					zoom == o.zoom && pan_x == o.pan_x && pan_y == o.pan_y && aspect == o.aspect && w == o.w && h == o.h;
+			}
+		};
+		SViewKey m_view_key;
+		u32 m_view_drawn = 0; // frame of the last draw
+		u32 m_view_active = 0; // last frame the view was ticked and checked
 	};
 }

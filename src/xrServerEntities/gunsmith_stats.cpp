@@ -41,7 +41,7 @@ namespace gunsmith
 			if (p.condition_dispersion_factor > 0.f)
 				out.mul[eStatFireDispersion] *= 1.f + p.condition_dispersion_factor * (1.f - condition);
 
-			if (!xr_strcmp(p.kind.c_str(), "muzzle"))
+			if (p.kind_id == eKindMuzzle)
 			{
 				if (p.suppression_min_condition > 0.f)
 				{
@@ -50,7 +50,7 @@ namespace gunsmith
 						out.suppressor_worn = true;
 				}
 			}
-			else if ((!xr_strcmp(p.kind.c_str(), "sight") || !xr_strcmp(p.kind.c_str(), "optic")) && condition < p.jam_start_condition)
+			else if (p.kind_id == eKindSight && condition < p.jam_start_condition)
 				out.sight_sway += (p.jam_start_condition - condition) * settings().sight_sway_factor;
 		}
 
@@ -87,7 +87,7 @@ namespace gunsmith
 			if (p.ammo_mag_size >= 0)
 				out.mag_size = p.ammo_mag_size;
 
-			if (!xr_strcmp(p.kind.c_str(), "muzzle"))
+			if (p.kind_id == eKindMuzzle)
 				out.barrel_wear_mul *= p.barrel_wear_mul;
 			if (conditions)
 				take_condition(p, condition, out);

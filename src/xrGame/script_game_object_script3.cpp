@@ -555,6 +555,8 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		// Gunsmith part tree
 		.def("gs_get_tree", &gs_get_tree_script, raw<1>())
 		.def("gs_revision", &gs_revision_script)
+		.def("gs_fit_verdict", &gs_fit_verdict_script)
+		.def("gs_jam_type", &gs_jam_type_script)
 		.def("gs_can_attach", SAFE_WRAP(&CScriptGameObject::gs_can_attach))
 		.def("gs_can_attach_reason", SAFE_WRAP(&CScriptGameObject::gs_can_attach_reason))
 		.def("gs_attach", SAFE_WRAP(&CScriptGameObject::gs_attach))

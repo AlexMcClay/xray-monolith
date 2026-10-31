@@ -595,7 +595,7 @@ void CHudItem::gs_snd_update()
 		return;
 	}
 	const float t = float(Device.dwTimeGlobal - m_gs_snd_start) / float(_max(m_gs_snd_length, 1u));
-	const float volume = READ_IF_EXISTS(pSettings, r_float, hud_sect.c_str(), "gs_snd_volume", 1.f);
+	float volume = -1.f; // read when a sound plays, not on every frame events are pending
 	while (m_gs_snd_next < m_gs_snd.size() && m_gs_snd[m_gs_snd_next].at <= t)
 	{
 		const SGsSndEvent& e = m_gs_snd[m_gs_snd_next++];
@@ -605,6 +605,8 @@ void CHudItem::gs_snd_update()
 		ref_sound& snd = m_gs_snd_cache[f];
 		if (!snd._handle())
 			snd.create(f.c_str(), st_Effect, sg_SourceType);
+		if (volume < 0.f)
+			volume = READ_IF_EXISTS(pSettings, r_float, hud_sect.c_str(), "gs_snd_volume", 1.f);
 		float vol = volume;
 		snd.play_no_feedback(object().H_Root(), sm_2D, 0.f, &Fvector().set(0.f, 0.f, 0.f), &vol);
 	}

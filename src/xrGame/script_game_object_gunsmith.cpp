@@ -230,6 +230,46 @@ u32 gs_revision_script(CScriptGameObject* self)
 	return 0;
 }
 
+int gs_fit_verdict_script(CScriptGameObject* self, LPCSTR section)
+{
+	if (!self || !section || !*section)
+		return 0;
+	CWeapon* weapon = smart_cast<CWeapon*>(&self->object());
+	const CInventoryItemObject* item = weapon ? nullptr : smart_cast<const CInventoryItemObject*>(&self->object());
+	const gunsmith::CTree* tree = weapon ? &weapon->gs_tree() : item ? &item->gs_subtree() : nullptr;
+	if (!tree || tree->empty())
+		return 0;
+	LPCSTR receiver = tree->node(0).section.c_str();
+	int best = 0;
+	for (u32 i = 0; i < tree->size(); ++i)
+	{
+		const gunsmith::SLOTS& slots = tree->node_slots(u8(i));
+		for (u32 s = 0; s < slots.size(); ++s)
+		{
+			const gunsmith::SSlotInfo& slot = slots[s];
+			if (slot.legacy_addon != gunsmith::eLegacyNone || !gunsmith::part_fits_slot(section, slot, receiver, true))
+				continue;
+			bool ok;
+			if (tree->is_slot_blocked(slot.section))
+				ok = false;
+			else if (weapon && tree->find_in_slot(u8(i), u8(s)) < 0)
+				ok = !*weapon->gs_check_place(*tree, section, u8(i), u8(s), false); // the rules gs_can_attach applies
+			else
+				ok = true;
+			if (ok)
+				return 2;
+			best = 1;
+		}
+	}
+	return best;
+}
+
+LPCSTR gs_jam_type_script(CScriptGameObject* self)
+{
+	const CWeapon* weapon = self ? smart_cast<const CWeapon*>(&self->object()) : nullptr;
+	return weapon && weapon->IsMisfire() ? gunsmith::failure_name(weapon->gs_jam_type()) : "none";
+}
+
 ::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self)
 {
 	CWeapon* weapon = gs_weapon(self, "gs_sight_section");

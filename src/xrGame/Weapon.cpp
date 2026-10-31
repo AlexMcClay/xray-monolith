@@ -1904,10 +1904,10 @@ BOOL CWeapon::CheckForMisfire()
 
 	if (m_gs_tree.size() > 1)
 	{
-		// The script hook is looked up once, at the first part that can fail (not on every shot of a gun whose
-		// parts can't; 1 Nov 2026).
+		// The script hook is opt-in (gunsmith_settings part_misfire_hook; nothing used it, and it cost a Lua call
+		// per part per shot), and looked up once, at the first part that can fail.
 		::luabind::functor<float> part_hook;
-		bool has_hook = false, hook_looked_up = false;
+		bool has_hook = false, hook_looked_up = gunsmith::settings().part_misfire_hook <= 0.f;
 		CGameObject* owner = smart_cast<CGameObject*>(H_Parent());
 
 		for (u32 i = 1; i < m_gs_tree.size() && count < gunsmith::GS_MAX_NODES + 1; ++i)

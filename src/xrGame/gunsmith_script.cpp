@@ -19,6 +19,12 @@ namespace gunsmith
 	{
 		::luabind::object result = ::luabind::newtable(L);
 
+		// Every slot section a fitted part blocks, worked out once (is_slot_blocked per slot walked every part)
+		xr_vector<shared_str> blocked;
+		for (u32 i = 1; i < tree.size(); ++i)
+			for (const shared_str& b : part_data(tree.node(u8(i)).section).blocks_slots)
+				blocked.push_back(b);
+
 		for (u32 i = 0; i < tree.size(); ++i)
 		{
 			const SNode& n = tree.node(u8(i));
@@ -59,7 +65,7 @@ namespace gunsmith
 				const int occupant = tree.find_in_slot(u8(i), u8(s));
 				if (occupant >= 0)
 					st["occupant"] = occupant;
-				st["blocked"] = tree.is_slot_blocked(info.section);
+				st["blocked"] = std::find(blocked.begin(), blocked.end(), info.section) != blocked.end();
 				slot_list[s + 1] = st;
 			}
 			t["slots"] = slot_list;

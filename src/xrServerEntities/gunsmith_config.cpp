@@ -64,8 +64,16 @@ namespace gunsmith
 
 	bool is_full_mode(LPCSTR receiver)
 	{
-		LPCSTR mode = READ_IF_EXISTS(pSettings, r_string, receiver, "gs_mode", (LPCSTR)nullptr);
-		return mode && !xr_strcmp(mode, "full");
+		// per section, read once (scripts ask on every tooltip and inventory event)
+		static xr_map<shared_str, bool> cache;
+		const shared_str key(receiver ? receiver : "");
+		auto it = cache.find(key);
+		if (it != cache.end())
+			return it->second;
+		LPCSTR mode = receiver ? READ_IF_EXISTS(pSettings, r_string, receiver, "gs_mode", (LPCSTR)nullptr) : nullptr;
+		const bool full = mode && !xr_strcmp(mode, "full");
+		cache.insert(mk_pair(key, full));
+		return full;
 	}
 
 	static void slots_of_uncached(LPCSTR section, bool is_receiver, SLOTS& out)
@@ -149,9 +157,17 @@ namespace gunsmith
 
 	bool part_fits_slot(LPCSTR part, const SSlotInfo& slot, LPCSTR receiver, bool strict)
 	{
-		xr_vector<shared_str> tags;
-		tags_of(part, tags);
-		for (const shared_str& tag : tags)
+		// A part's tags, read once per section (configs don't change while the game runs)
+		static xr_map<shared_str, xr_vector<shared_str>> tag_cache;
+		const shared_str key(part ? part : "");
+		auto it = tag_cache.find(key);
+		if (it == tag_cache.end())
+		{
+			xr_vector<shared_str> t;
+			tags_of(part, t);
+			it = tag_cache.insert(mk_pair(key, t)).first;
+		}
+		for (const shared_str& tag : it->second)
 			for (const shared_str& accepted : slot.accepts)
 				if (tag == accepted)
 					return true;
@@ -390,6 +406,10 @@ namespace gunsmith
 					: "generic";
 			}
 			d.kind = kind;
+			d.kind_id = !xr_strcmp(kind, "muzzle") ? eKindMuzzle
+				: (!xr_strcmp(kind, "sight") || !xr_strcmp(kind, "optic")) ? eKindSight
+				: !xr_strcmp(kind, "barrel") ? eKindBarrel
+				: eKindOther;
 
 			SKindDefaults k = d.declared ? kind_defaults(kind) : builtin_kind_defaults("generic");
 			if (!d.declared)
@@ -524,6 +544,7 @@ namespace gunsmith
 				s.recoil_recovery = READ_IF_EXISTS(pSettings, r_float, sect, "recoil_recovery", 1.0f);
 				s.sight_sway_factor = READ_IF_EXISTS(pSettings, r_float, sect, "sight_sway_factor", 1.0f);
 				s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
+				s.part_misfire_hook = READ_IF_EXISTS(pSettings, r_float, sect, "part_misfire_hook", 0.f);
 				loaded = true;
 			}
 			return s;
@@ -539,6 +560,7 @@ namespace gunsmith
 			if (!xr_strcmp(name, "recoil_strength")) return &s.recoil_strength;
 			if (!xr_strcmp(name, "no_stock_recoil")) return &s.no_stock_recoil;
 			if (!xr_strcmp(name, "recoil_recovery")) return &s.recoil_recovery;
+			if (!xr_strcmp(name, "part_misfire_hook")) return &s.part_misfire_hook;
 			return nullptr;
 		}
 	}

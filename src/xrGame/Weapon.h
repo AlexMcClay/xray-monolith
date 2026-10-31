@@ -453,12 +453,12 @@ public:
 	bool gs_sight_next();
 	bool gs_sight_select(u8 node);
 	// Back to automatic (the best sight): removing parts renumbers the nodes after them.
-	void gs_sight_forget() { if (!m_gs_tree.empty()) m_gs_tree.set_mode(0, u8(m_gs_tree.node(0).mode & 1)); }
+	void gs_sight_forget() { m_gs_tree.set_selected_sight(0); }
 
 	// Tactical devices (gunsmith_tactical.h): flashlights and lasers fitted as parts, any number,
 	// switched together. The state lives in the tree (saved with it): bit 0 of node 0's mode is the on
 	// flag (bits 1-7: the selected sight), each device node's mode its selected mode.
-	bool gs_devices_on() const { return !m_gs_tree.empty() && (m_gs_tree.node(0).mode & 1) != 0; }
+	bool gs_devices_on() const { return m_gs_tree.devices_on(); }
 	bool gs_has_devices() const;
 	// Toggles every device; returns the new state.
 	bool gs_devices_toggle();

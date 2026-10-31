@@ -529,15 +529,16 @@ void CWeaponSSRS::state_Fire(float dt)
 			//Alundaio: Use fModeShotTime instead of fOneShotTime if current fire mode is 2-shot burst
 			//Alundaio: Cycle down RPM after two shots; used for Abakan/AN-94
 			// demonized: Add support for arbitrary shot burst at rpm_mode_2
+			// gs_shot_time: parts that change the rate of fire (as CWeaponMagazined; this class missed it until 1 Nov 2026)
 			if (GetCurrentFireMode() >= 2 || cycleDownCheck())
 			{
-				fShotTimeCounter = fModeShotTime;
+				fShotTimeCounter = gs_shot_time(fModeShotTime);
 			}
 			// NPCs fire at ai_rpm and leave the weapon's own rpm alone
 			else if (fAiOneShotTime > 0.f && smart_cast<CAI_Stalker*>(H_Parent()))
-				fShotTimeCounter = 60.f / fAiOneShotTime;
+				fShotTimeCounter = gs_shot_time(60.f / fAiOneShotTime);
 			else
-				fShotTimeCounter = fOneShotTime;
+				fShotTimeCounter = gs_shot_time(fOneShotTime);
 			//Alundaio: END
 			fShotTimeCounter = _max(fShotTimeCounter + late, 0.f); // never into this frame: no burst after a hitch
 

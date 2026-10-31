@@ -128,7 +128,7 @@ namespace gunsmith
 	// aim_priority >= 1: optics and red dots, not iron sights) with vanilla's wpn_func key. The chosen
 	// sight's node is saved in node 0's mode, bits 1-7 (bit 0 is the tactical devices' on/off; 0 = automatic).
 	inline bool is_cyclable_sight(const SPartVisual& pv) { return pv.has_aim && pv.aim_priority >= 1; }
-	inline u8 selected_sight(const CTree& tree) { return tree.empty() ? 0 : u8(tree.node(0).mode >> 1); }
+	inline u8 selected_sight(const CTree& tree) { return tree.selected_sight(); }
 	// The node a gun aims through: `selected` when it is a fitted cyclable sight, else the highest
 	// aim_priority (ties: the last in the tree). 0 without a sight.
 	u8 sight_node(const CTree& tree, u8 selected);

@@ -62,6 +62,15 @@ namespace gunsmith
 		// Every node, the receiver included (a found gun's parts match the gun).
 		void set_all_conditions(float condition);
 		void set_mode(u8 index, u8 mode);
+
+		// A weapon tree's own state, saved in node 0's mode: bit 0 its tactical devices are on, bits 1-7 the node the
+		// player selected to aim through (0: automatic). Not for a part-root tree, whose node 0 is a part with a mode
+		// of its own. The selection follows its node when nodes are removed and renumbered (remove_subtree), and
+		// goes back to automatic when that node is removed (it pointed at whatever took the number until 1 Nov 2026).
+		bool devices_on() const { return !m_part_root && !m_nodes.empty() && (m_nodes[0].mode & 1) != 0; }
+		void set_devices_on(bool on);
+		u8 selected_sight() const { return m_part_root || m_nodes.empty() ? 0 : u8(m_nodes[0].mode >> 1); }
+		void set_selected_sight(u8 node);
 		// Takes other's node conditions when both trees hold the same parts and modes (the same revisions: one is a
 		// copy of the other). Returns false, changing nothing, when they don't.
 		bool copy_conditions_from(const CTree& other);
