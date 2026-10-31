@@ -9356,6 +9356,9 @@
     <ClCompile Include="Weapon.cpp">
       <Filter>Core\Client\Objects\items &amp; weapons\Weapons\Custom Weapon\Weapon Generic</Filter>
     </ClCompile>
+    <ClCompile Include="Weapon_gunsmith.cpp">
+      <Filter>Core\Client\Objects\items &amp; weapons\Weapons\Custom Weapon\Weapon Generic</Filter>
+    </ClCompile>
     <ClCompile Include="WeaponDispersion.cpp">
       <Filter>Core\Client\Objects\items &amp; weapons\Weapons\Custom Weapon\Weapon Generic</Filter>
     </ClCompile>

@@ -471,6 +471,9 @@ public:
 protected:
 	gunsmith::CTacticalDevices m_gs_devices;
 	void gs_update_devices();
+	// Aiming through a fitted sight part: corrects UpdateHudAdditional's aim offset (Weapon_gunsmith.cpp)
+	void gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const Fmatrix& gs_prev_cam, bool gs_prev_cam_ok,
+		Fvector& curr_offs, const Fvector& curr_rot, Fvector& curr_aim_rot);
 
 	gunsmith::CVisuals m_gs_visuals;
 	bool m_gs_full_mode = false;
