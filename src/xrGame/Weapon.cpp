@@ -1080,6 +1080,11 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 
 	gs_match_scope_part();
 	gs_rebuild_stats(false); // InitAddons below picks the suppressed or plain effects
+	// A new gun is spawned with its section's rounds (ammo_elapsed), which can be more than its magazine part holds
+	// (the EFT mod's M870 has 8, the stock Gunsmith tube 5): the tube stayed "full", and no reload until three were
+	// fired (user, 31 Oct 2026). What doesn't fit is dropped
+	if (m_gs_applied_mag_size >= 0 && iAmmoElapsed > iMagazineSize)
+		iAmmoElapsed = iMagazineSize;
 
 	m_ammoType = E->ammo_type;
 	SetState(E->wpn_state);

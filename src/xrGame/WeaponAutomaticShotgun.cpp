@@ -20,6 +20,7 @@ CWeaponAutomaticShotgun::CWeaponAutomaticShotgun()
 	ClickInterruptFlag = false;
 	MotionMarked = false;
 	m_bGsClearJam = false;
+	m_bGsStopReload = false;
 }
 
 CWeaponAutomaticShotgun::~CWeaponAutomaticShotgun()
@@ -66,6 +67,16 @@ bool CWeaponAutomaticShotgun::Action(u16 cmd, u32 flags)
 	}
 	if (inherited::Action(cmd, flags)) return true;
 
+	// Gunsmith: on a full-mode gun, fire stops the reload as Tarkov's does: the shell in the hand still goes in, then
+	// the close plays. (Below, a shell was added at the press and the clip played out to idle with no close: user,
+	// 31 Oct 2026, "reloading feels very buggy and unresponsive")
+	if (gs_full_mode() && m_bTriStateReload && GetState() == eReload && ClickInterruptFlag && !m_bGsClearJam &&
+		m_sub_state != eSubstateReloadEnd)
+	{
+		m_bGsStopReload = true;
+		return true;
+	}
+
 	// Gunsmith: the sub-states in brackets (the || bound loosest, so eSubstateReloadInProcessEmptyEnd alone passed)
 	if (m_bTriStateReload && GetState() == eReload &&
         ClickInterruptFlag && // ver
@@ -104,14 +115,14 @@ void CWeaponAutomaticShotgun::OnAnimationEnd(u32 state)
 	{
 	case eSubstateReloadBegin:
 		{
-			m_sub_state = eSubstateReloadInProcess;
+			m_sub_state = m_bGsStopReload ? eSubstateReloadEnd : eSubstateReloadInProcess;
 			SwitchState(eReload);
 		}
 		break;
 
 	case eSubstateReloadInProcess:
 		{
-			if (0 != AddCartridge(1))
+			if (0 != AddCartridge(1) || m_bGsStopReload)
 			{
 				m_sub_state = eSubstateReloadEnd;
                 MotionMarked = false; // ver
@@ -129,6 +140,7 @@ void CWeaponAutomaticShotgun::OnAnimationEnd(u32 state)
 	case eSubstateReloadEnd:
 		{
 			BeginReloadWasEmpty = false;
+			m_bGsStopReload = false;
 			m_sub_state = eSubstateReloadBegin;
 			SwitchState(eIdle);
             ClickInterruptFlag = false; // ver
@@ -168,6 +180,7 @@ void CWeaponAutomaticShotgun::TriStateReload()
 		return;
 	}
 	if (m_magazine.size() == (u32)iMagazineSize || !HaveCartridgeInInventory(1))return;
+	m_bGsStopReload = false;
 	CWeapon::Reload();
 	m_sub_state = eSubstateReloadBegin;
 	SwitchState(eReload);

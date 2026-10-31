@@ -40,6 +40,8 @@ protected:
     bool MotionMarked; // ver
 	// Gunsmith: anm_reload_misfire is playing (a misfire cleared by working the action, full tube or not)
 	bool m_bGsClearJam;
+	// Gunsmith: fire was pressed during the reload (full-mode guns): the shell being loaded goes in, then the close
+	bool m_bGsStopReload;
 
 	ESoundTypes m_eSoundOpen;
 	ESoundTypes m_eSoundAddCartridge;

@@ -249,6 +249,9 @@ namespace gunsmith
 			bool has_root_aim = false;
 			u16 root_aim_bone = 0;
 			Fvector root_aim;
+			// the receiver's own sight line (gs_aim_dir: forward, up), aimed through when no part is a sight
+			bool has_root_dir = false;
+			Fvector root_fwd, root_up;
 		};
 
 		SContext m_ctx[2];

@@ -569,8 +569,11 @@ void CHudItem::gs_snd_start(const shared_str& anm, u32 length)
 	m_gs_snd_start = Device.dwTimeGlobal;
 	m_gs_snd_length = length;
 	m_gs_snd_next = 0;
-	// the state's own sound (snd_reload, snd_draw, ...) started just before; a shot still ringing out keeps playing
+	// the state's own sound (snd_reload, snd_draw, ...) started just before; a shot still ringing out keeps playing.
+	// The shotguns' reload sounds are typed as shots too (vanilla): stopped by name
 	m_sounds.StopAllSounds(SOUND_TYPE_SHOOTING);
+	for (LPCSTR alias : {"sndOpen", "sndAddCartridge", "sndClose", "sndCloseEmpty", "sndReload1"})
+		m_sounds.StopSound(alias);
 	gs_snd_update();
 }
 

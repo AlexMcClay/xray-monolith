@@ -363,6 +363,15 @@ namespace gunsmith
 					warn_once(hud_sect, "has no aim bone", bone.c_str());
 				c.root_aim_bone = root->LL_GetBoneRoot();
 			}
+			Fvector f, u;
+			if (pSettings->line_exist(hud_sect, "gs_aim_dir")
+				&& sscanf(pSettings->r_string(hud_sect, "gs_aim_dir"), "%f,%f,%f,%f,%f,%f", &f.x, &f.y, &f.z, &u.x, &u.y, &u.z) == 6
+				&& f.magnitude() > EPS && u.magnitude() > EPS)
+			{
+				c.has_root_dir = true;
+				c.root_fwd = f.normalize();
+				c.root_up = u.normalize();
+			}
 		}
 
 		int child_of[GS_MAX_NODES];
@@ -651,6 +660,13 @@ namespace gunsmith
 		if (c.children.empty() || c.root != root)
 			return false;
 		const SChild* sight = pick_sight(c);
+		if (!sight && c.has_root_aim && c.has_root_dir)
+		{
+			// no part is a sight: the receiver's own sight line (a shotgun's bead over its receiver, the UMP's irons)
+			root->LL_GetTransform_R(c.root_aim_bone).transform_tiny(point, c.root_aim);
+			key = "receiver";
+			return true;
+		}
 		if (!sight)
 			return false;
 		update_local(c, root);
@@ -670,6 +686,15 @@ namespace gunsmith
 		if (c.children.empty() || c.root != root)
 			return false;
 		const SChild* sight = pick_sight(c);
+		if (!sight && c.has_root_aim && c.has_root_dir)
+		{
+			const Fmatrix& bone = root->LL_GetTransform_R(c.root_aim_bone);
+			bone.transform_dir(fwd, c.root_fwd);
+			bone.transform_dir(up, c.root_up);
+			fwd.normalize_safe();
+			up.normalize_safe();
+			return true;
+		}
 		if (!sight)
 			return false;
 		update_local(c, root);
