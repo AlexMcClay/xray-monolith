@@ -13,7 +13,7 @@ CWeaponShotgun::CWeaponShotgun()
 	m_eSoundOpen = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
 	m_eSoundClose = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
 	m_eSoundAddCartridge = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
-	BeginReloadWasEmpty = false; // Gunsmith: was left uninitialised
+	BeginReloadWasEmpty = false;
 }
 
 CWeaponShotgun::~CWeaponShotgun()
