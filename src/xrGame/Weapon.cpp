@@ -2116,7 +2116,7 @@ void CWeapon::UpdateAddonsVisibility()
 	pWeaponVisual->CalculateBones_Invalidate();
 
 	bone_id = pWeaponVisual->LL_BoneID(wpn_scope);
-    if (ScopeAttachable() && bone_id != BI_NONE) // a gunsmith receiver may have no addon bones
+    if (ScopeAttachable() && bone_id != BI_NONE) // a model without the addon's bone: nothing to show or hide
 	{
 		if (IsScopeAttached())
 		{
@@ -2157,17 +2157,17 @@ void CWeapon::UpdateAddonsVisibility()
 	}
 
 	bone_id = pWeaponVisual->LL_BoneID(wpn_grenade_launcher);
-	if (GrenadeLauncherAttachable() && bone_id != BI_NONE)
+	if (GrenadeLauncherAttachable())
 	{
 		if (IsGrenadeLauncherAttached())
 		{
-			if (!pWeaponVisual->LL_GetBoneVisible(bone_id))
+			if (bone_id != BI_NONE && !pWeaponVisual->LL_GetBoneVisible(bone_id))
 				pWeaponVisual->LL_SetBoneVisible(bone_id, TRUE, TRUE);
 		}
 		else
 		{
 			isGrenadeLauncherActive = false;
-			if (pWeaponVisual->LL_GetBoneVisible(bone_id))
+			if (bone_id != BI_NONE && pWeaponVisual->LL_GetBoneVisible(bone_id))
 				pWeaponVisual->LL_SetBoneVisible(bone_id, FALSE, TRUE);
 		}
 	}
