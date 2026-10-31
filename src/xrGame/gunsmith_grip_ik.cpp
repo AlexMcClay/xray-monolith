@@ -191,7 +191,7 @@ namespace gunsmith
 		int best = -1, best_prio = 0, type = 0;
 		for (u32 n = 1; n < tree.size(); ++n)
 		{
-			const SPartVisual& pv = part_visual(tree.node(u8(n)).section.c_str());
+			const SPartVisual& pv = part_visual(tree.node(u8(n)).section);
 			const int want = g_gs_grip_type >= 0 ? g_gs_grip_type : pv.grip_type;
 			const int t = pv.has_grip[want] ? want : (pv.has_grip[0] ? 0 : (pv.has_grip[1] ? 1 : -1));
 			if (t >= 0 && pv.grip_priority >= best_prio)
@@ -206,7 +206,7 @@ namespace gunsmith
 		Fmatrix part;
 		if (!wpn->gs_visuals().part_frame(CVisuals::eHud, item->m_model, u8(best), part))
 			return;
-		const SPartVisual& pv = part_visual(tree.node(u8(best)).section.c_str());
+		const SPartVisual& pv = part_visual(tree.node(u8(best)).section);
 		// Relative to the stock build's grip of the same type when the receiver has it: the stock handguard then
 		// leaves the animation's hand as it is, and another grip moves it by how Tarkov's two poses differ.
 		// Without it, the grip's pose itself, relative to the idle hand.

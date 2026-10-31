@@ -1348,7 +1348,7 @@ const gunsmith::SPartVisual* CWeapon::gs_sight_part(shared_str* section) const
 	const gunsmith::SNode& n = m_gs_tree.node(node);
 	if (section)
 		*section = n.section;
-	return &gunsmith::part_visual(n.section.c_str());
+	return &gunsmith::part_visual(n.section);
 }
 
 u8 CWeapon::gs_sight_node() const
@@ -1362,7 +1362,7 @@ void CWeapon::gs_sight_list(xr_vector<u8>& out) const
 	if (!m_gs_full_mode)
 		return;
 	for (u8 i = 1; i < m_gs_tree.size(); ++i)
-		if (gunsmith::is_cyclable_sight(gunsmith::part_visual(m_gs_tree.node(i).section.c_str())))
+		if (gunsmith::is_cyclable_sight(gunsmith::part_visual(m_gs_tree.node(i).section)))
 			out.push_back(i);
 }
 
@@ -1386,17 +1386,17 @@ bool CWeapon::gs_sight_next()
 	xr_vector<std::pair<u8, u8>> sights;
 	for (u8 n : nodes)
 	{
-		const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(n).section.c_str());
+		const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(n).section);
 		for (u8 s = 0; s < (pv.is_tactical() ? 1 : pv.sight_count()); ++s)
 			sights.push_back(std::make_pair(n, s));
 	}
 	if (sights.size() < 2)
 		return false;
 	const u8 cur = gs_sight_node();
-	const u8 cur_s = cur ? gunsmith::node_sight(gunsmith::part_visual(m_gs_tree.node(cur).section.c_str()), m_gs_tree.node(cur).mode) : 0;
+	const u8 cur_s = cur ? gunsmith::node_sight(gunsmith::part_visual(m_gs_tree.node(cur).section), m_gs_tree.node(cur).mode) : 0;
 	auto it = std::find(sights.begin(), sights.end(), std::make_pair(cur, cur_s));
 	const std::pair<u8, u8> next = (it == sights.end() || it + 1 == sights.end()) ? sights.front() : *(it + 1);
-	const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(next.first).section.c_str());
+	const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(next.first).section);
 	if (!pv.is_tactical())
 		m_gs_tree.set_mode(next.first, gunsmith::make_sight_mode(next.second, gunsmith::node_sight_mode(pv, m_gs_tree.node(next.first).mode)));
 	return gs_sight_select(next.first);
@@ -1408,14 +1408,14 @@ bool CWeapon::gs_sight_aim(gunsmith::SSightAim& out) const
 	if (!node)
 		return false;
 	const gunsmith::SNode& n = m_gs_tree.node(node);
-	out = gunsmith::sight_aim(gunsmith::part_visual(n.section.c_str()), n.mode);
+	out = gunsmith::sight_aim(gunsmith::part_visual(n.section), n.mode);
 	return true;
 }
 
 u8 CWeapon::gs_sight_mode(u8* count) const
 {
 	const u8 node = gs_sight_node();
-	const gunsmith::SPartVisual* pv = node ? &gunsmith::part_visual(m_gs_tree.node(node).section.c_str()) : nullptr;
+	const gunsmith::SPartVisual* pv = node ? &gunsmith::part_visual(m_gs_tree.node(node).section) : nullptr;
 	const bool modes = pv && !pv->is_tactical() && gunsmith::node_sight(*pv, m_gs_tree.node(node).mode) == 0;
 	if (count)
 		*count = modes ? pv->mode_count() : 1;
@@ -1526,7 +1526,7 @@ void CWeapon::gs_apply_shot_wear(float impair)
 	for (u32 i = 1; i < m_gs_tree.size(); ++i)
 	{
 		const gunsmith::SNode& n = m_gs_tree.node(u8(i));
-		const gunsmith::SPartData& p = gunsmith::part_data(n.section.c_str());
+		const gunsmith::SPartData& p = gunsmith::part_data(n.section);
 		if (!p.wears_on_shot || p.wear_per_shot <= 0.f)
 			continue;
 		float wear = p.wear_per_shot * impair * f_weapon_deterioration;
@@ -1574,8 +1574,7 @@ bool CWeapon::gs_debug_set_part(u8 parent, u8 slot, LPCSTR section)
 		Msg("! gunsmith: node %u does not exist", u32(parent));
 		return false;
 	}
-	gunsmith::SLOTS slots;
-	m_gs_tree.node_slots(parent, slots);
+	const gunsmith::SLOTS& slots = m_gs_tree.node_slots(parent);
 	if (slot >= slots.size())
 	{
 		Msg("! gunsmith: node %u has no slot %u (it has %u)", u32(parent), u32(slot), u32(slots.size()));
@@ -1673,8 +1672,7 @@ LPCSTR CWeapon::gs_check_place(const gunsmith::CTree& tree, LPCSTR section, u8 p
 		return "no_tree";
 	if (parent >= tree.size())
 		return "no_such_node";
-	gunsmith::SLOTS slots;
-	tree.node_slots(parent, slots);
+	const gunsmith::SLOTS& slots = tree.node_slots(parent);
 	if (slot >= slots.size())
 		return "no_such_slot";
 	if (!section || !*section || !pSettings->section_exist(section))
@@ -1710,8 +1708,7 @@ bool CWeapon::gs_attach_part(LPCSTR section, u8 parent, u8 slot, float condition
 		Msg("! [gunsmith] [%s] cannot attach [%s] to node %u slot %u: %s", cNameSect().c_str(), section ? section : "", u32(parent), u32(slot), reason);
 		return false;
 	}
-	gunsmith::SLOTS slots;
-	m_gs_tree.node_slots(parent, slots);
+	const gunsmith::SLOTS& slots = m_gs_tree.node_slots(parent);
 	if (slots[slot].legacy_addon != gunsmith::eLegacyNone)
 	{
 		Msg("! [gunsmith] [%s] slot %u is an addon slot (%s): attach the item itself", cNameSect().c_str(), u32(slot), gunsmith::legacy_addon_name(slots[slot].legacy_addon));
@@ -1872,8 +1869,7 @@ bool CWeapon::gs_attach_item(CInventoryItem* item, u8 parent, u8 slot)
 		Msg("! [gunsmith] [%s] cannot attach [%s] to node %u slot %u: %s", cNameSect().c_str(), section, u32(parent), u32(slot), reason);
 		return false;
 	}
-	gunsmith::SLOTS slots;
-	m_gs_tree.node_slots(parent, slots);
+	const gunsmith::SLOTS& slots = m_gs_tree.node_slots(parent);
 	if (slots[slot].legacy_addon != gunsmith::eLegacyNone)
 		return false;
 
@@ -2320,7 +2316,7 @@ void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
 bool CWeapon::gs_has_devices() const
 {
 	for (u8 i = 1; i < m_gs_tree.size(); ++i)
-		if (gunsmith::part_visual(m_gs_tree.node(i).section.c_str()).is_tactical())
+		if (gunsmith::part_visual(m_gs_tree.node(i).section).is_tactical())
 			return true;
 	return false;
 }
@@ -2339,7 +2335,7 @@ void CWeapon::gs_devices_next_mode()
 	bool changed = false;
 	for (u8 i = 1; i < m_gs_tree.size(); ++i)
 	{
-		const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(i).section.c_str());
+		const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(i).section);
 		if (pv.tac_modes.size() < 2)
 			continue;
 		m_gs_tree.set_mode(i, u8((m_gs_tree.node(i).mode + 1) % pv.tac_modes.size()));
@@ -2353,7 +2349,7 @@ bool CWeapon::gs_set_device_mode(u8 node, u8 mode)
 {
 	if (node == 0 || node >= m_gs_tree.size())
 		return false;
-	const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(node).section.c_str());
+	const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(node).section);
 	if (!pv.is_tactical() || mode >= pv.tac_modes.size())
 		return false;
 	m_gs_tree.set_mode(node, mode);
@@ -2367,15 +2363,17 @@ void CWeapon::gs_update_devices()
 {
 	if (!m_gs_full_mode)
 		return;
-	m_gs_devices.sync(m_gs_tree);
-	if (m_gs_devices.empty())
-		return;
+	// Devices only light on the player's gun in hand: other guns (NPCs', the bag's) skip the device list's
+	// rebuild check each frame and just keep whatever they built off (1 Nov 2026). It's rebuilt when in hand.
 	CActor* actor = smart_cast<CActor*>(H_Parent());
 	if (!actor || actor->inventory().ActiveItem() != this || !gs_devices_on())
 	{
 		m_gs_devices.off();
 		return;
 	}
+	m_gs_devices.sync(m_gs_tree);
+	if (m_gs_devices.empty())
+		return;
 	attachable_hud_item* hi = GetHUDmode() ? HudItemData() : nullptr;
 	if (hi && hi->m_model)
 	{
@@ -2807,17 +2805,24 @@ BOOL CWeapon::CheckForMisfire()
 
 	if (m_gs_tree.size() > 1)
 	{
+		// The script hook is looked up once, at the first part that can fail (not on every shot of a gun whose
+		// parts can't; 1 Nov 2026).
 		::luabind::functor<float> part_hook;
-		const bool has_hook = ai().script_engine().functor("xr_weapon_jam.GetPartMisfireProbability", part_hook);
+		bool has_hook = false, hook_looked_up = false;
 		CGameObject* owner = smart_cast<CGameObject*>(H_Parent());
 
 		for (u32 i = 1; i < m_gs_tree.size() && count < gunsmith::GS_MAX_NODES + 1; ++i)
 		{
 			const gunsmith::SNode& n = m_gs_tree.node(u8(i));
-			const gunsmith::SPartData& p = gunsmith::part_data(n.section.c_str());
+			const gunsmith::SPartData& p = gunsmith::part_data(n.section);
 			if (p.failure == gunsmith::eFailNone)
 				continue;
 			float probability = gunsmith::part_jam_probability(p, n.condition);
+			if (!hook_looked_up)
+			{
+				hook_looked_up = true;
+				has_hook = ai().script_engine().functor("xr_weapon_jam.GetPartMisfireProbability", part_hook);
+			}
 			if (has_hook)
 				probability = part_hook(lua_game_object(), owner ? owner->lua_game_object() : nullptr, int(i), p.kind.c_str(), probability);
 			clamp(probability, 0.f, 1.f);

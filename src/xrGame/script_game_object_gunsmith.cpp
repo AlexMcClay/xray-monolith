@@ -131,8 +131,7 @@ bool CScriptGameObject::gs_attach(CScriptGameObject* part, u8 parent, u8 slot)
 		return false;
 	}
 
-	gunsmith::SLOTS slots;
-	weapon->gs_tree().node_slots(parent, slots);
+	const gunsmith::SLOTS& slots = weapon->gs_tree().node_slots(parent);
 	if (slots[slot].legacy_addon != gunsmith::eLegacyNone)
 	{
 		// Old-style addon: the weapon's own attach code (flags, visuals, scope) does it.
@@ -259,7 +258,7 @@ bool CScriptGameObject::gs_set_parts_condition(float value)
 	t["zoom"] = aim.magnification > 1.f ? aim.magnification : 1.f;
 	const u8 node = weapon->gs_sight_node();
 	const gunsmith::SNode& n = weapon->gs_tree().node(node);
-	t["sight"] = int(gunsmith::node_sight(gunsmith::part_visual(n.section.c_str()), n.mode));
+	t["sight"] = int(gunsmith::node_sight(gunsmith::part_visual(n.section), n.mode));
 	return t;
 }
 
@@ -326,7 +325,7 @@ bool CScriptGameObject::gs_set_parts_condition(float value)
 	for (u8 i = 1; i < tree.size(); ++i)
 	{
 		const gunsmith::SNode& n = tree.node(i);
-		const gunsmith::SPartVisual& pv = gunsmith::part_visual(n.section.c_str());
+		const gunsmith::SPartVisual& pv = gunsmith::part_visual(n.section);
 		if (!pv.is_tactical())
 			continue;
 		::luabind::object d = ::luabind::newtable(L);

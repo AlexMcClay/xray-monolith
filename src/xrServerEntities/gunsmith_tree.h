@@ -57,7 +57,8 @@ namespace gunsmith
 		void set_mode(u8 index, u8 mode);
 
 		// Slots that node `index` exposes.
-		void node_slots(u8 index, SLOTS& out) const;
+		// A node's slots (the cached list of its section; empty for a node that doesn't exist)
+		const SLOTS& node_slots(u8 index) const;
 
 		// Save layout: gs_version u16, node_count u8, then per node
 		// section stringZ, parent u8, slot u8, condition u16 (0..65535 = 0..1), mode u8 (version 2+).

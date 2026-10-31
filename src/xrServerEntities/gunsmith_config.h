@@ -62,7 +62,9 @@ namespace gunsmith
 	// implicit slots for any attachable legacy addon not already covered (not on full-mode
 	// receivers: they take no old-style addons). A part gets
 	// its `slots`.
-	void slots_of(LPCSTR section, bool is_receiver, SLOTS& out);
+	// The cached slot list of a section. Configs don't change while the game runs, so the reference stays valid.
+	const SLOTS& slots_of(const shared_str& section, bool is_receiver);
+	const SLOTS& slots_of(LPCSTR section, bool is_receiver);
 
 	void tags_of(LPCSTR part, xr_vector<shared_str>& out);
 
@@ -172,6 +174,7 @@ namespace gunsmith
 		int ammo_mag_size; // `ammo_mag_size`: the gun's magazine size while this part is fitted, -1 if unset
 	};
 
+	const SPartData& part_data(const shared_str& section);
 	const SPartData& part_data(LPCSTR section);
 
 	// Jam chance of a part at this condition, from its curve.

@@ -118,25 +118,28 @@ namespace gunsmith
 		}
 	}
 
-	void slots_of(LPCSTR section, bool is_receiver, SLOTS& out)
+	const SLOTS& slots_of(const shared_str& section, bool is_receiver)
 	{
-		// Slot lists only depend on configs, which don't change while the game runs,
-		// and they are read on every shot from phase 2 on.
+		// Slot lists only depend on configs, which don't change while the game runs, and they are read on every
+		// shot and frame. Returned by reference: a map's entries stay put when others are added (they were
+		// copied on every call until 1 Nov 2026).
 		static xr_map<shared_str, SLOTS> cache[2];
-		out.clear();
-		if (!section || !*section)
-			return;
+		static const SLOTS none;
+		if (!section.size())
+			return none;
 
 		xr_map<shared_str, SLOTS>& c = cache[is_receiver ? 1 : 0];
-		const shared_str key(section);
-		auto it = c.find(key);
+		auto it = c.find(section);
 		if (it != c.end())
-		{
-			out = it->second;
-			return;
-		}
-		slots_of_uncached(section, is_receiver, out);
-		c.insert(mk_pair(key, out));
+			return it->second;
+		SLOTS out;
+		slots_of_uncached(section.c_str(), is_receiver, out);
+		return c.insert(mk_pair(section, out)).first->second;
+	}
+
+	const SLOTS& slots_of(LPCSTR section, bool is_receiver)
+	{
+		return slots_of(shared_str(section && *section ? section : nullptr), is_receiver);
 	}
 
 	void tags_of(LPCSTR part, xr_vector<shared_str>& out)
@@ -469,17 +472,23 @@ namespace gunsmith
 		}
 	}
 
-	const SPartData& part_data(LPCSTR section)
+	const SPartData& part_data(const shared_str& section)
 	{
+		// Keyed by the section string itself: callers hold a node's shared_str, so no lookup in the global
+		// string table per call (1 Nov 2026).
 		static xr_map<shared_str, SPartData> cache;
-		const shared_str key(section ? section : "");
-		auto it = cache.find(key);
+		auto it = cache.find(section);
 		if (it != cache.end())
 			return it->second;
 
 		SPartData d;
-		read_part_data(section, d);
-		return cache.insert(mk_pair(key, d)).first->second;
+		read_part_data(section.c_str(), d);
+		return cache.insert(mk_pair(section, d)).first->second;
+	}
+
+	const SPartData& part_data(LPCSTR section)
+	{
+		return part_data(shared_str(section ? section : ""));
 	}
 
 	float part_jam_probability(const SPartData& part, float condition)

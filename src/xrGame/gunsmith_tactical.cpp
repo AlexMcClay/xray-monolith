@@ -113,7 +113,7 @@ namespace gunsmith
 
 	void CTacticalDevices::build(SDevice& d, bool shadow)
 	{
-		const SPartVisual& pv = part_visual(d.section.c_str());
+		const SPartVisual& pv = part_visual(d.section);
 		bool has_light = false, has_laser = false;
 		for (u8 f : pv.tac_modes)
 		{
@@ -177,7 +177,7 @@ namespace gunsmith
 		for (u8 i = 1; i < tree.size(); ++i)
 		{
 			const SNode& n = tree.node(i);
-			if (!part_visual(n.section.c_str()).is_tactical())
+			if (!part_visual(n.section).is_tactical())
 				continue;
 			xr_sprintf(buf, "%u:%s", u32(i), n.section.c_str());
 			sig.push_back(buf);
@@ -190,7 +190,7 @@ namespace gunsmith
 		for (u8 i = 1; i < tree.size(); ++i)
 		{
 			const SNode& n = tree.node(i);
-			const SPartVisual& pv = part_visual(n.section.c_str());
+			const SPartVisual& pv = part_visual(n.section);
 			if (!pv.is_tactical())
 				continue;
 			SDevice d;
@@ -232,7 +232,7 @@ namespace gunsmith
 		const bool hud = ctx == CVisuals::eHud;
 		for (SDevice& d : m_devices)
 		{
-			const SPartVisual& pv = part_visual(d.section.c_str());
+			const SPartVisual& pv = part_visual(d.section);
 			const u8 flags = d.node < tree.size() ? pv.tac_flags(tree.node(d.node).mode) : 0;
 			Fmatrix frame;
 			if (!flags || !vis.part_frame(ctx, root, d.node, frame))

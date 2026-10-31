@@ -64,13 +64,14 @@ namespace gunsmith
 		}
 	}
 
-	const SPartVisual& part_visual(LPCSTR section)
+	const SPartVisual& part_visual(const shared_str& key)
 	{
+		// Keyed by the section string itself: callers hold a node's shared_str (1 Nov 2026).
 		static xr_map<shared_str, SPartVisual> cache;
-		const shared_str key(section ? section : "");
 		auto it = cache.find(key);
 		if (it != cache.end())
 			return it->second;
+		LPCSTR section = key.c_str();
 
 		SPartVisual v;
 		v.visual = read_str(section, "visual");
@@ -185,6 +186,11 @@ namespace gunsmith
 			v.extra_sights.push_back(es);
 		}
 		return cache.insert(mk_pair(key, v)).first->second;
+	}
+
+	const SPartVisual& part_visual(LPCSTR section)
+	{
+		return part_visual(shared_str(section ? section : ""));
 	}
 
 	SSightAim sight_aim(const SPartVisual& pv, u8 node_mode)
@@ -304,13 +310,13 @@ namespace gunsmith
 
 	u8 sight_node(const CTree& tree, u8 selected)
 	{
-		if (selected > 0 && selected < tree.size() && is_cyclable_sight(part_visual(tree.node(selected).section.c_str())))
+		if (selected > 0 && selected < tree.size() && is_cyclable_sight(part_visual(tree.node(selected).section)))
 			return selected;
 		u8 best = 0;
 		int best_priority = 0;
 		for (u8 i = 1; i < tree.size(); ++i)
 		{
-			const SPartVisual& pv = part_visual(tree.node(i).section.c_str());
+			const SPartVisual& pv = part_visual(tree.node(i).section);
 			if (pv.has_aim && (!best || pv.aim_priority >= best_priority))
 			{
 				best = i; // highest aim_priority; among equals the last in the tree
@@ -378,7 +384,6 @@ namespace gunsmith
 		for (int& v : child_of)
 			v = -1;
 
-		SLOTS slots;
 		for (u32 i = 1; i < tree.size() && i < GS_MAX_NODES; ++i)
 		{
 			const SNode& n = tree.node(u8(i));
@@ -387,14 +392,14 @@ namespace gunsmith
 				continue; // the parent has no model to mount on
 			IKinematics* parentK = parent_child < 0 ? root : c.children[parent_child].K;
 
-			tree.node_slots(n.parent, slots);
+			const SLOTS& slots = tree.node_slots(n.parent);
 			if (n.slot >= slots.size())
 				continue;
 			const SSlotInfo& slot = slots[n.slot];
 			if (!slot.mount_bone.size())
 				continue; // drawn the old way (a baked addon bone) or not at all
 
-			const SPartVisual& pv = part_visual(n.section.c_str());
+			const SPartVisual& pv = part_visual(n.section);
 			const shared_str& path = ctx == eHud ? pv.hud_visual : pv.visual;
 			if (!path.size())
 			{
@@ -567,7 +572,6 @@ namespace gunsmith
 		if (!root || c.root != root)
 			return;
 		update_local(c, root);
-		SLOTS slots;
 		for (u32 i = 0; i < tree.size() && i < GS_MAX_NODES; ++i)
 		{
 			// The node's model and its transform in the root's space.
@@ -591,7 +595,7 @@ namespace gunsmith
 			if (!K)
 				continue; // a part without a model: its slots have nowhere to show
 
-			tree.node_slots(u8(i), slots);
+			const SLOTS& slots = tree.node_slots(u8(i));
 			LPCSTR owner = i == 0 ? receiver : tree.node(u8(i)).section.c_str();
 			for (u32 s = 0; s < slots.size(); ++s)
 			{

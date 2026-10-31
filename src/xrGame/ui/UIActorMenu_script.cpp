@@ -243,16 +243,6 @@ void CUIActorMenu::HighlightSectionInSlot(LPCSTR section, u8 type, u16 slot_id)
 
 void CUIActorMenu::HighlightForEachInSlot(const ::luabind::functor<bool>& functor, u8 type, u16 slot_id)
 {
-	HighlightForEachInSlotImpl(functor, type, slot_id, false);
-}
-
-void CUIActorMenu::HighlightForEachInSlotDim(const ::luabind::functor<bool>& functor, u8 type, u16 slot_id)
-{
-	HighlightForEachInSlotImpl(functor, type, slot_id, true);
-}
-
-void CUIActorMenu::HighlightForEachInSlotImpl(const ::luabind::functor<bool>& functor, u8 type, u16 slot_id, bool dim)
-{
 	if (!functor)
 		return;
 
@@ -302,10 +292,7 @@ void CUIActorMenu::HighlightForEachInSlotImpl(const ::luabind::functor<bool>& fu
 		if (functor(item->object().cast_game_object()->lua_game_object()) == false)
 			continue;
 
-		if (dim)
-			ci->m_select_armament_dim = true;
-		else
-			ci->m_select_armament = true;
+		ci->m_select_armament = true;
 	}
 
 	m_highlight_clear = false;
@@ -336,7 +323,6 @@ void CUIActorMenu::script_register(lua_State* L)
 		.def("get_drag_item", &CUIActorMenu::GetCurrentItemAsGameObject)
 		.def("highlight_section_in_slot", &CUIActorMenu::HighlightSectionInSlot)
 		.def("highlight_for_each_in_slot", &CUIActorMenu::HighlightForEachInSlot)
-		.def("highlight_for_each_in_slot_dim", &CUIActorMenu::HighlightForEachInSlotDim)
 		.def("refresh_current_cell_item", &CUIActorMenu::RefreshCurrentItemCell)
 		.def("IsShown", &CUIActorMenu::IsShown)
 		.def("ShowDialog", &CUIActorMenu::ShowDialog)

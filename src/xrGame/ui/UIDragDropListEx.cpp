@@ -990,7 +990,6 @@ void CUICellContainer::Draw()
 			CUICell& ui_cell = GetCellAt(cpos);
 
 			u8 select_mode = 0;
-			bool dim = false;
 			if (!ui_cell.Empty())
 			{
 				if (ui_cell.m_item->m_cur_mark)
@@ -1005,11 +1004,6 @@ void CUICellContainer::Draw()
 				{
 					select_mode = 3;
 				}
-				else if (ui_cell.m_item->m_select_armament_dim)
-				{
-					select_mode = 3;
-					dim = true;
-				}
 				else if (ui_cell.m_item->m_select_equipped)
 				{
 					select_mode = 2;
@@ -1018,9 +1012,6 @@ void CUICellContainer::Draw()
 
 			Fvector2 tp;
 			GetTexUVLT(tp, tgt_cells.x1 + x, tgt_cells.y1 + y, select_mode);
-			// Gunsmith's dim highlight: the armament highlight at reduced opacity
-			const u32 back = m_pParentDragDropList->back_color;
-			const u32 cell_color = dim ? subst_alpha(back, color_get_A(back) * 2 / 5) : back;
 
 			//for (u32 k=0; k<6; ++k,++pv)
 			for (u32 k = 0; k < 6; ++k)
@@ -1033,7 +1024,7 @@ void CUICellContainer::Draw()
 				UIRender->PushPoint(iFloor(rect_offset.x + p.x * (f_len.x)) - 0.5f,
 				                    iFloor(rect_offset.y + p.y * (f_len.y)) - 0.5f,
 				                    0,
-				                    cell_color,
+				                    m_pParentDragDropList->back_color,
 				                    tp.x + uv.x, tp.y + uv.y);
 			} //for k
 		} //for y
@@ -1070,7 +1061,6 @@ void CUICellContainer::clear_select_armament()
 		if (cell.m_item)
 		{
 			cell.m_item->m_select_armament = false;
-			cell.m_item->m_select_armament_dim = false;
 		}
 	}
 }

@@ -19,7 +19,6 @@ namespace gunsmith
 	{
 		::luabind::object result = ::luabind::newtable(L);
 
-		SLOTS slots;
 		for (u32 i = 0; i < tree.size(); ++i)
 		{
 			const SNode& n = tree.node(u8(i));
@@ -33,13 +32,13 @@ namespace gunsmith
 			}
 			t["condition"] = n.condition;
 			t["mode"] = int(n.mode);
-			t["kind"] = i == 0 ? "receiver" : part_data(n.section.c_str()).kind.c_str();
+			t["kind"] = i == 0 ? "receiver" : part_data(n.section).kind.c_str();
 			const u8 legacy = tree.node_legacy_addon(u8(i));
 			if (legacy != eLegacyNone)
 				t["legacy_addon"] = legacy_addon_name(legacy);
 
 			::luabind::object slot_list = ::luabind::newtable(L);
-			tree.node_slots(u8(i), slots);
+			const SLOTS& slots = tree.node_slots(u8(i));
 			for (u32 s = 0; s < slots.size(); ++s)
 			{
 				const SSlotInfo& info = slots[s];

@@ -88,11 +88,12 @@ namespace gunsmith
 			m_nodes[index].mode = mode;
 	}
 
-	void CTree::node_slots(u8 index, SLOTS& out) const
+	const SLOTS& CTree::node_slots(u8 index) const
 	{
-		out.clear();
-		if (index < m_nodes.size())
-			slots_of(m_nodes[index].section.c_str(), index == 0 && !m_part_root, out);
+		static const SLOTS none;
+		if (index >= m_nodes.size())
+			return none;
+		return slots_of(m_nodes[index].section, index == 0 && !m_part_root);
 	}
 
 	void CTree::write(NET_Packet& packet) const
@@ -124,6 +125,8 @@ namespace gunsmith
 		}
 
 		const u8 count = packet.r_u8();
+		if (count > GS_MAX_NODES)
+			goto corrupt; // a tree holds at most GS_MAX_NODES; the rest of the code relies on it
 		for (u32 i = 0; i < count; ++i)
 		{
 			// The section string must end inside the packet, and the fixed fields must follow it.
@@ -159,10 +162,9 @@ namespace gunsmith
 
 	int CTree::place_in_free_slot(LPCSTR part, float condition)
 	{
-		SLOTS slots;
 		for (u32 i = 0; i < m_nodes.size(); ++i)
 		{
-			node_slots(u8(i), slots);
+			const SLOTS& slots = node_slots(u8(i));
 			for (u32 s = 0; s < slots.size(); ++s)
 			{
 				if (slots[s].implicit || find_in_slot(u8(i), u8(s)) >= 0 || is_slot_blocked(slots[s].section))
@@ -210,11 +212,10 @@ namespace gunsmith
 					_GetItem(body, 2, part_str, ':');
 					part = part_str;
 					const int parent = atoi(parent_str);
-					SLOTS slots;
-					if (parent >= 0 && parent < int(m_nodes.size()))
-						node_slots(u8(parent), slots);
-					else
+					const bool have_parent = parent >= 0 && parent < int(m_nodes.size());
+					if (!have_parent)
 						parent_missing = true;
+					const SLOTS& slots = node_slots(have_parent ? u8(parent) : u8(GS_NO_PARENT));
 					int slot = -1;
 					if (slot_str[0] >= '0' && slot_str[0] <= '9')
 						slot = atoi(slot_str);
@@ -250,7 +251,6 @@ namespace gunsmith
 			m_nodes[0].section = receiver;
 		}
 
-		SLOTS slots;
 		u32 i = 1;
 		while (i < m_nodes.size())
 		{
@@ -261,7 +261,7 @@ namespace gunsmith
 				reason = "part section no longer exists";
 			else
 			{
-				node_slots(n.parent, slots);
+				const SLOTS& slots = node_slots(n.parent);
 				const bool slot_ok = n.slot < slots.size() && part_fits_slot(n.section.c_str(), slots[n.slot], receiver, false);
 				if (!slot_ok)
 				{
@@ -310,8 +310,7 @@ namespace gunsmith
 	{
 		if (index == 0 || index >= m_nodes.size())
 			return eLegacyNone;
-		SLOTS slots;
-		node_slots(m_nodes[index].parent, slots);
+		const SLOTS& slots = node_slots(m_nodes[index].parent);
 		return m_nodes[index].slot < slots.size() ? slots[m_nodes[index].slot].legacy_addon : u8(eLegacyNone);
 	}
 
@@ -326,11 +325,9 @@ namespace gunsmith
 	u8 CTree::legacy_mask() const
 	{
 		u8 mask = 0;
-		SLOTS slots;
 		for (u32 i = 0; i < m_nodes.size(); ++i)
 		{
-			node_slots(u8(i), slots);
-			for (const SSlotInfo& s : slots)
+			for (const SSlotInfo& s : node_slots(u8(i)))
 				mask |= s.legacy_addon;
 		}
 		return mask;
@@ -363,10 +360,9 @@ namespace gunsmith
 		if (!part || !*part)
 			return true;
 
-		SLOTS slots;
 		for (u32 i = 0; i < m_nodes.size(); ++i)
 		{
-			node_slots(u8(i), slots);
+			const SLOTS& slots = node_slots(u8(i));
 			for (u32 s = 0; s < slots.size(); ++s)
 				if (slots[s].legacy_addon == legacy_addon && find_in_slot(u8(i), u8(s)) < 0)
 					return add_node(part, u8(i), u8(s), condition) >= 0;
@@ -405,7 +401,6 @@ namespace gunsmith
 	void CTree::dump(LPCSTR label) const
 	{
 		Msg("- [gunsmith] %s tree: %u node(s), legacy flags 0x%02x", label, u32(m_nodes.size()), u32(legacy_addon_flags()));
-		SLOTS slots;
 		for (u32 i = 0; i < m_nodes.size(); ++i)
 		{
 			const SNode& n = m_nodes[i];
@@ -414,7 +409,7 @@ namespace gunsmith
 			else
 				Msg("-   #%u [%s] parent=#%u slot=%u cond=%.4f", i, n.section.c_str(), u32(n.parent), u32(n.slot), n.condition);
 
-			node_slots(u8(i), slots);
+			const SLOTS& slots = node_slots(u8(i));
 			for (u32 s = 0; s < slots.size(); ++s)
 			{
 				const int occupant = find_in_slot(u8(i), u8(s));
@@ -435,7 +430,7 @@ namespace gunsmith
 	bool CTree::is_slot_blocked(const shared_str& slot_section) const
 	{
 		for (u32 i = 1; i < m_nodes.size(); ++i)
-			for (const shared_str& blocked : part_data(m_nodes[i].section.c_str()).blocks_slots)
+			for (const shared_str& blocked : part_data(m_nodes[i].section).blocks_slots)
 				if (blocked == slot_section)
 					return true;
 		return false;
@@ -443,10 +438,9 @@ namespace gunsmith
 
 	bool CTree::required_slots_filled() const
 	{
-		SLOTS slots;
 		for (u32 i = 0; i < m_nodes.size(); ++i)
 		{
-			node_slots(u8(i), slots);
+			const SLOTS& slots = node_slots(u8(i));
 			for (u32 s = 0; s < slots.size(); ++s)
 				if (slots[s].required && find_in_slot(u8(i), u8(s)) < 0)
 					return false;

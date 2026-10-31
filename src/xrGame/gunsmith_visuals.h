@@ -101,6 +101,7 @@ namespace gunsmith
 		u8 tac_flags(u8 mode) const { return tac_modes.empty() ? 0 : tac_modes[_min(u32(mode), u32(tac_modes.size() - 1))]; }
 	};
 
+	const SPartVisual& part_visual(const shared_str& section);
 	const SPartVisual& part_visual(LPCSTR section);
 
 	// A part's chosen sight and mode, from its node mode (see SPartVisual): the sight index and the mode,
