@@ -1082,6 +1082,15 @@ public:
 	};
 	virtual void SetHitImpulse(float val) { fHitImpulse = val; };
 	virtual void SetFireDistance(float val) { fireDistance = val; };
+
+	// Magazine size, bullet speed (m/s) and wear per shot (condition_shot_dec), the values the ammo_mag_size,
+	// bullet_speed and condition_shot_dec configs and upgrades set. As with the upgrade, a smaller magazine keeps
+	// the rounds already loaded until they are fired.
+	void SetAmmoMagSize(int val) { iMagazineSize = val; }
+	float GetBulletSpeedScript() { return GetBulletSpeed(); }
+	void SetBulletSpeedScript(float val) { SetBulletSpeed(val); }
+	float GetConditionShotDec() const { return conditionDecreasePerShot; }
+	void SetConditionShotDec(float val) { conditionDecreasePerShot = val; }
 	
 	IC u8 GetZoomType() const
 	{
