@@ -2,6 +2,7 @@
 #include "WeaponSSRS.h"
 
 extern BOOL g_launcher_dynamic_range_zoom;
+extern BOOL g_exact_fire_rate;
 #include "entity.h"
 #include "explosiveRocket.h"
 #include "level.h"
@@ -33,7 +34,6 @@ extern BOOL g_launcher_dynamic_range_zoom;
 #include "WeaponSSRS.h"
 
 #include "ai/stalker/ai_stalker.h"
-extern BOOL g_exact_fire_rate;
 
 #ifdef DEBUG
 #	include "phdebug.h"
@@ -523,7 +523,7 @@ void CWeaponSSRS::state_Fire(float dt)
 
 			m_bFireSingleShot = false;
 
-			// the time this shot is late by (at most a frame) comes off the next (g_exact_fire_rate)
+			// the time this shot is late by (at most a frame) comes off the next one's (g_exact_fire_rate)
 			const float late = g_exact_fire_rate ? _max(fShotTimeCounter, -dt) : 0.f;
 
 			//Alundaio: Use fModeShotTime instead of fOneShotTime if current fire mode is 2-shot burst
@@ -539,7 +539,7 @@ void CWeaponSSRS::state_Fire(float dt)
 			else
 				fShotTimeCounter = fOneShotTime;
 			//Alundaio: END
-			fShotTimeCounter += late;
+			fShotTimeCounter = _max(fShotTimeCounter + late, 0.f); // never into this frame: no burst after a hitch
 
 			if (E)
 			{
