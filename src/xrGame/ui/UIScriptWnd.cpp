@@ -38,6 +38,16 @@ void CUIDialogWndEx::SendMessage(CUIWindow* pWnd, s16 msg, void* pData)
 	//		(*it)->m_cpp_callback(pData);
 }
 
+bool CUIDialogWndEx::RunCallback(CUIWindow* pWnd, s16 msg)
+{
+	event_comparer ec(pWnd, msg);
+	CALLBACK_IT it = std::find_if(m_callbacks.begin(), m_callbacks.end(), ec);
+	if (it == m_callbacks.end())
+		return false;
+	((*it)->m_callback)();
+	return true;
+}
+
 bool CUIDialogWndEx::Load(LPCSTR xml_name)
 {
 	return true;
@@ -76,6 +86,10 @@ bool CUIDialogWndEx::OnKeyboardAction(int dik, EUIMessages keyboard_action)
 
 bool CUIDialogWndEx::OnMouseAction(float x, float y, EUIMessages mouse_action)
 {
+	// The wheel: the dialog's own callback first (AddCallback with the dialog's window name), so a script
+	// screen gets it wherever the cursor is, whatever its children do with it.
+	if (mouse_action == WINDOW_MOUSE_WHEEL_UP || mouse_action == WINDOW_MOUSE_WHEEL_DOWN)
+		RunCallback(this, s16(mouse_action));
 	return inherited::OnMouseAction(x, y, mouse_action);
 }
 

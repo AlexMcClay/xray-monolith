@@ -31,6 +31,8 @@ public:
 	virtual bool OnMouseAction(float x, float y, EUIMessages mouse_action);
 	virtual bool OnKeyboardAction(int dik, EUIMessages keyboard_action);
 	virtual bool Dispatch(int cmd, int param) { return true; }
+	// Runs the script callback for `msg` from `pWnd`, if one was added (AddCallback); nothing else is notified.
+	bool RunCallback(CUIWindow* pWnd, s16 msg);
 	/*
 	template<typename T>
 	IC	T*	GetControl(LPCSTR name);
