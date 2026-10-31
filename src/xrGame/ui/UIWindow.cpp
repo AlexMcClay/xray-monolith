@@ -468,8 +468,8 @@ void CUIWindow::OnMouseMove()
 
 void CUIWindow::OnMouseScroll(float iDirection)
 {
-	// Lets script windows react to the wheel (ui_events.WINDOW_MOUSE_WHEEL_UP / _DOWN callbacks).
-	// Only a script dialog's own callbacks run; nothing is broadcast to other windows.
+	// Lets script windows react to the wheel: the WINDOW_MOUSE_WHEEL_UP / _DOWN callback a script dialog added for
+	// this window runs. Nothing is sent to other windows.
 	if (CUIDialogWndEx* script_wnd = smart_cast<CUIDialogWndEx*>(GetMessageTarget()))
 		script_wnd->RunCallback(this, iDirection == WINDOW_MOUSE_WHEEL_UP ? WINDOW_MOUSE_WHEEL_UP : WINDOW_MOUSE_WHEEL_DOWN);
 }

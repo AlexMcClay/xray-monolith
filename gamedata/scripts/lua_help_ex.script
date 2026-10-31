@@ -352,6 +352,11 @@
         void AllowWorkInPause(bool state)
     }
 
+    Script dialogs (CUIScriptWnd): the mouse wheel reaches AddCallback callbacks
+        self:AddCallback(<window name>, ui_events.WINDOW_MOUSE_WHEEL_UP, fn, self) -- and WINDOW_MOUSE_WHEEL_DOWN
+        - With the dialog's own window name: runs wherever the cursor is, before its children handle the wheel.
+        - With a registered child's name: runs when the wheel turns over that child.
+
 	 class CUIPdaWnd : CUIDialogWnd {
         // Ncenka - allow to change PDA UI XML file
 		function SetPdaXml(string)
