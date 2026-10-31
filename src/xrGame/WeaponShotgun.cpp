@@ -10,8 +10,10 @@
 
 CWeaponShotgun::CWeaponShotgun()
 {
+	m_eSoundOpen = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
 	m_eSoundClose = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
 	m_eSoundAddCartridge = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
+	BeginReloadWasEmpty = false;
 }
 
 CWeaponShotgun::~CWeaponShotgun()
@@ -60,7 +62,7 @@ bool CWeaponShotgun::Action(u16 cmd, u32 flags)
 
 	if (m_bTriStateReload && GetState() == eReload &&
 		cmd == kWPN_FIRE && flags & CMD_START &&
-		m_sub_state == eSubstateReloadInProcess || m_sub_state == eSubstateReloadInProcessEmptyEnd) //остановить перезарядку
+		(m_sub_state == eSubstateReloadInProcess || m_sub_state == eSubstateReloadInProcessEmptyEnd)) //остановить перезарядку
 	{
 		AddCartridge(1);
 		m_sub_state = eSubstateReloadEnd;
