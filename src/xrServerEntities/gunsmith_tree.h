@@ -40,7 +40,14 @@ namespace gunsmith
 		const SNode& node(u8 index) const { return m_nodes[index]; }
 		const NODES& nodes() const { return m_nodes; }
 
-		void clear() { m_nodes.clear(); }
+		void clear() { m_nodes.clear(); touch_layout(); }
+
+		// Change counters (1 Nov 2026): a new number, never reused in the session, whenever the tree changes, so
+		// users can tell "changed?" with one compare instead of walking the tree. layout_revision: the parts, where
+		// they sit, the part-root flag. state_revision: that and the nodes' modes (the selected sight, sight and
+		// device modes). Conditions change neither. A copied tree keeps its numbers.
+		u32 layout_revision() const { return m_layout_rev; }
+		u32 state_revision() const { return m_state_rev; }
 
 		// Returns the new node's index, or -1 when the tree is full or the parent is invalid.
 		int add_node(LPCSTR section, u8 parent, u8 slot, float condition);
@@ -56,7 +63,6 @@ namespace gunsmith
 		void set_all_conditions(float condition);
 		void set_mode(u8 index, u8 mode);
 
-		// Slots that node `index` exposes.
 		// A node's slots (the cached list of its section; empty for a node that doesn't exist)
 		const SLOTS& node_slots(u8 index) const;
 
@@ -109,7 +115,14 @@ namespace gunsmith
 		// A tree whose node 0 is a part rather than a weapon: a detached part carrying
 		// the parts mounted on it. Node 0's slots then come from its `slots` key, and
 		// it gets no implicit addon slots. Not saved: owners set it after reading.
-		void set_part_root(bool part_root) { m_part_root = part_root; }
+		void set_part_root(bool part_root)
+		{
+			if (m_part_root != part_root)
+			{
+				m_part_root = part_root;
+				touch_layout();
+			}
+		}
 		bool is_part_root() const { return m_part_root; }
 
 		// Copies node `node` and everything mounted on it into `out`, re-rooted so
@@ -125,7 +138,12 @@ namespace gunsmith
 	private:
 		int place_in_free_slot(LPCSTR part, float condition);
 
+		void touch_layout();
+		void touch_state();
+
 		NODES m_nodes;
 		bool m_part_root = false;
+		u32 m_layout_rev = 0;
+		u32 m_state_rev = 0;
 	};
 }

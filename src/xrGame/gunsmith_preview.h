@@ -83,7 +83,7 @@ namespace gunsmith
 		struct SScene; // a section's default build, loaded once
 		struct SCell
 		{
-			shared_str key; // "o<id>:<build crc>" or "s<section>"
+			shared_str key; // "o<id>:<tree layout revision>" or "s<section>"
 			u16 id = u16(-1);
 			shared_str section;
 			u32 used = 0; // frame last asked for

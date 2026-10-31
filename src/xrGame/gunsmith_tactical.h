@@ -84,6 +84,8 @@ namespace gunsmith
 
 		xr_vector<SDevice> m_devices;
 		xr_vector<shared_str> m_sig; // "<node>:<section>" of each device, to spot tree changes
+		u32 m_rev = 0; // the tree's layout revision m_sig was made for (m_rev_valid)
+		bool m_rev_valid = false;
 		bool m_lit = false;
 
 		void build(SDevice& d, bool shadow);

@@ -37,6 +37,8 @@ class CScriptGameObject;
 ::luabind::object gs_get_stats_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_part_layout_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self);
+// The build's state revision (gunsmith_tree.h): a new number whenever its parts or modes change; 0 for other objects
+u32 gs_revision_script(CScriptGameObject* self);
 ::luabind::object gs_sight_magnification_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_mode_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_mode_next_script(lua_State* L, CScriptGameObject* self);

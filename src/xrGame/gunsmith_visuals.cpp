@@ -329,8 +329,22 @@ namespace gunsmith
 	void CVisuals::ensure(int ctx, IKinematics* root, const CTree& tree, LPCSTR receiver, LPCSTR hud_sect, bool enabled)
 	{
 		SContext& c = m_ctx[ctx];
-		m_sight_node = sight_node(tree, selected_sight(tree)); // a switch changes no layout: read it every time
-		m_sight_mode = m_sight_node && m_sight_node < tree.size() ? tree.node(m_sight_node).mode : 0;
+		// The sight aimed through: a switch changes no layout, so it follows the state revision (it was read on
+		// every call until 1 Nov 2026).
+		if (!m_sight_rev_valid || m_sight_rev != tree.state_revision())
+		{
+			m_sight_node = sight_node(tree, selected_sight(tree));
+			m_sight_mode = m_sight_node && m_sight_node < tree.size() ? tree.node(m_sight_node).mode : 0;
+			m_sight_rev = tree.state_revision();
+			m_sight_rev_valid = true;
+		}
+
+		// Same layout as when built: no signature to make and compare (this ran several times per frame).
+		if (c.built && c.root == root && c.receiver == receiver && c.enabled == enabled && c.layout_rev == tree.layout_revision())
+		{
+			show_modes(c, tree);
+			return;
+		}
 
 		xr_vector<SSig> sig;
 		if (enabled)
@@ -344,6 +358,8 @@ namespace gunsmith
 		}
 		if (c.built && c.root == root && c.receiver == receiver && c.sig == sig)
 		{
+			c.enabled = enabled;
+			c.layout_rev = tree.layout_revision();
 			show_modes(c, tree); // a mode switch changes no layout either
 			return;
 		}
@@ -353,6 +369,8 @@ namespace gunsmith
 		c.root = root;
 		c.receiver = receiver;
 		c.sig.swap(sig);
+		c.enabled = enabled;
+		c.layout_rev = tree.layout_revision();
 		if (!enabled || !root || tree.size() < 2)
 			return;
 

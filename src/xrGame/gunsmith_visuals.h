@@ -247,6 +247,8 @@ namespace gunsmith
 			xr_vector<SSig> sig;
 			xr_vector<SChild> children;
 			bool built = false;
+			bool enabled = false; // built with part models (sig empty when not)
+			u32 layout_rev = 0; // the tree's layout revision sig was made for
 			bool has_root_aim = false;
 			u16 root_aim_bone = 0;
 			Fvector root_aim;
@@ -258,6 +260,8 @@ namespace gunsmith
 		SContext m_ctx[2];
 		u8 m_sight_node = 0; // the node the gun aims through (sight_node), set by ensure()
 		u8 m_sight_mode = 0; // that node's mode (its sight and mode), set by ensure()
+		u32 m_sight_rev = 0; // the tree's state revision m_sight_node and m_sight_mode were read for
+		bool m_sight_rev_valid = false;
 
 		void update_local(SContext& c, IKinematics* root);
 		void show_modes(SContext& c, const CTree& tree);

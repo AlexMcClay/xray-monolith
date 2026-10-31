@@ -27,19 +27,6 @@ namespace gunsmith
 
 		CPreview* g_instance = nullptr;
 
-		u32 tree_crc(const CTree& tree)
-		{
-			u32 crc = 0;
-			for (u32 i = 0; i < tree.size(); ++i)
-			{
-				const SNode& n = tree.node(u8(i));
-				crc = crc32(n.section.c_str(), n.section.size(), crc);
-				const u8 link[2] = { n.parent, n.slot };
-				crc = crc32(link, sizeof(link), crc);
-			}
-			return crc;
-		}
-
 		// What an object draws: a full-mode gun with its parts, or a part item with the parts it
 		// carries (`part`: exported parts face -Z where guns face +Z).
 		struct SSource
@@ -79,7 +66,9 @@ namespace gunsmith
 		// A live object's cell key: the object and its build.
 		void object_key(u16 id, const CTree& tree, string128& key)
 		{
-			xr_sprintf(key, "o%u:%08x", u32(id), tree_crc(tree));
+			// the tree's layout revision: a new number whenever its parts change (was a checksum of every node,
+			// worked out for every cell every frame until 1 Nov 2026)
+			xr_sprintf(key, "o%u:%08x", u32(id), tree.layout_revision());
 		}
 
 		// The inventory cell's aspect, fitted into an icon cell.

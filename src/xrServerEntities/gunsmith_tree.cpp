@@ -5,12 +5,25 @@
 
 #include "stdafx.h"
 #include "gunsmith_tree.h"
+#include <atomic>
 
 namespace gunsmith
 {
 	namespace
 	{
 		const u8 LEGACY_ADDONS[] = { eLegacyScope, eLegacySilencer, eLegacyLauncher };
+
+		std::atomic<u32> g_revision{ 0 }; // the last revision handed out, for every tree
+	}
+
+	void CTree::touch_layout()
+	{
+		m_layout_rev = m_state_rev = ++g_revision;
+	}
+
+	void CTree::touch_state()
+	{
+		m_state_rev = ++g_revision;
 	}
 
 	int CTree::add_node(LPCSTR section, u8 parent, u8 slot, float condition)
@@ -26,6 +39,7 @@ namespace gunsmith
 		n.slot = m_nodes.empty() ? 0 : slot;
 		n.condition = clampr(condition, 0.f, 1.f);
 		m_nodes.push_back(n);
+		touch_layout();
 		return int(m_nodes.size() - 1);
 	}
 
@@ -60,6 +74,7 @@ namespace gunsmith
 			kept.push_back(n);
 		}
 		m_nodes.swap(kept);
+		touch_layout();
 	}
 
 	int CTree::find_in_slot(u8 parent, u8 slot) const
@@ -84,8 +99,11 @@ namespace gunsmith
 
 	void CTree::set_mode(u8 index, u8 mode)
 	{
-		if (index < m_nodes.size())
+		if (index < m_nodes.size() && m_nodes[index].mode != mode)
+		{
 			m_nodes[index].mode = mode;
+			touch_state();
+		}
 	}
 
 	const SLOTS& CTree::node_slots(u8 index) const
@@ -152,6 +170,7 @@ namespace gunsmith
 				goto corrupt;
 			m_nodes.push_back(n);
 		}
+		touch_layout();
 		return !m_nodes.empty();
 
 	corrupt:
@@ -249,6 +268,7 @@ namespace gunsmith
 			if (!quiet)
 				Msg("~ [gunsmith] part tree receiver [%s] renamed to [%s]", m_nodes[0].section.c_str(), receiver);
 			m_nodes[0].section = receiver;
+			touch_layout();
 		}
 
 		u32 i = 1;
@@ -274,6 +294,7 @@ namespace gunsmith
 							if (!quiet)
 								Msg("~ [gunsmith] [%s] part [%s] moved from slot %u to slot %u", receiver, n.section.c_str(), u32(n.slot), s);
 							n.slot = u8(s);
+							touch_layout();
 							reason = nullptr;
 							break;
 						}
@@ -473,6 +494,7 @@ namespace gunsmith
 			remap[i] = u8(out.m_nodes.size());
 			out.m_nodes.push_back(c);
 		}
+		out.touch_layout();
 	}
 
 	int CTree::graft(const CTree& sub, u8 parent, u8 slot, float root_condition)
@@ -495,6 +517,7 @@ namespace gunsmith
 				c.parent = u8(base + c.parent);
 			m_nodes.push_back(c);
 		}
+		touch_layout();
 		return int(base);
 	}
 }

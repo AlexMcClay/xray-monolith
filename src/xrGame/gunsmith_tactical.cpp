@@ -108,6 +108,7 @@ namespace gunsmith
 			free_device(d);
 		m_devices.clear();
 		m_sig.clear();
+		m_rev_valid = false;
 		m_lit = false;
 	}
 
@@ -172,6 +173,11 @@ namespace gunsmith
 
 	void CTacticalDevices::sync(const CTree& tree)
 	{
+		// Same layout as last time: nothing to compare (1 Nov 2026; this ran every frame).
+		if (m_rev_valid && m_rev == tree.layout_revision())
+			return;
+		m_rev = tree.layout_revision();
+		m_rev_valid = true;
 		xr_vector<shared_str> sig;
 		string256 buf;
 		for (u8 i = 1; i < tree.size(); ++i)
@@ -186,6 +192,8 @@ namespace gunsmith
 			return;
 		clear();
 		m_sig = sig;
+		m_rev = tree.layout_revision();
+		m_rev_valid = true;
 		bool shadow_given = false;
 		for (u8 i = 1; i < tree.size(); ++i)
 		{

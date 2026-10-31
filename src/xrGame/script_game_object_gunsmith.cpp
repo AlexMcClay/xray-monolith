@@ -219,6 +219,17 @@ bool CScriptGameObject::gs_set_parts_condition(float value)
 }
 
 // The section of the sight the weapon aims through (gs_mode = full), or nil.
+u32 gs_revision_script(CScriptGameObject* self)
+{
+	if (!self)
+		return 0;
+	if (const CWeapon* weapon = smart_cast<const CWeapon*>(&self->object()))
+		return weapon->gs_tree().state_revision();
+	if (const CInventoryItemObject* item = smart_cast<const CInventoryItemObject*>(&self->object()))
+		return item->gs_subtree().state_revision();
+	return 0;
+}
+
 ::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self)
 {
 	CWeapon* weapon = gs_weapon(self, "gs_sight_section");
