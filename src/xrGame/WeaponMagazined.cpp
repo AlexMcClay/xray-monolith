@@ -31,6 +31,10 @@ extern ENGINE_API bool g_dedicated_server;
 ENGINE_API extern float psHUD_FOV_def;
 
 BOOL g_auto_reload = FALSE;
+// g_exact_fire_rate: the time a shot fires late by (it waits for its frame) comes off the next shot's time, so
+// automatic fire keeps the weapon's rpm at any frame rate. Without it every shot waits for a whole frame:
+// 650 rpm fires at about 514 at 60 fps.
+BOOL g_exact_fire_rate = TRUE;
 
 CUIXml* pWpnScopeXml = NULL;
 
@@ -778,6 +782,9 @@ void CWeaponMagazined::state_Fire(float dt)
 		{
 			m_bFireSingleShot = false;
 
+			// the time this shot is late by (at most a frame) comes off the next one's (g_exact_fire_rate)
+			const float late = g_exact_fire_rate ? _max(fShotTimeCounter, -dt) : 0.f;
+
 			//Alundaio: Use fModeShotTime instead of fOneShotTime if current fire mode is 2-shot burst
 			//Alundaio: Cycle down RPM after two shots; used for Abakan/AN-94
 			// demonized: Add support for arbitrary shot burst at rpm_mode_2
@@ -788,6 +795,7 @@ void CWeaponMagazined::state_Fire(float dt)
 			else
 				fShotTimeCounter = fOneShotTime;
 			//Alundaio: END
+			fShotTimeCounter = _max(fShotTimeCounter + late, 0.f); // never into this frame: no burst after a hitch
 
 			++m_iShotNum;
 

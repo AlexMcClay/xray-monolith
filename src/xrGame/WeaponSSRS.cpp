@@ -2,6 +2,7 @@
 #include "WeaponSSRS.h"
 
 extern BOOL g_launcher_dynamic_range_zoom;
+extern BOOL g_exact_fire_rate;
 #include "entity.h"
 #include "explosiveRocket.h"
 #include "level.h"
@@ -522,6 +523,9 @@ void CWeaponSSRS::state_Fire(float dt)
 
 			m_bFireSingleShot = false;
 
+			// the time this shot is late by (at most a frame) comes off the next one's (g_exact_fire_rate)
+			const float late = g_exact_fire_rate ? _max(fShotTimeCounter, -dt) : 0.f;
+
 			//Alundaio: Use fModeShotTime instead of fOneShotTime if current fire mode is 2-shot burst
 			//Alundaio: Cycle down RPM after two shots; used for Abakan/AN-94
 			// demonized: Add support for arbitrary shot burst at rpm_mode_2
@@ -535,6 +539,7 @@ void CWeaponSSRS::state_Fire(float dt)
 			else
 				fShotTimeCounter = fOneShotTime;
 			//Alundaio: END
+			fShotTimeCounter = _max(fShotTimeCounter + late, 0.f); // never into this frame: no burst after a hitch
 
 			if (E)
 			{
