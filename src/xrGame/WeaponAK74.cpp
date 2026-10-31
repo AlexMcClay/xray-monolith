@@ -157,6 +157,11 @@ void CWeaponAK74::script_register	(lua_State *L)
 			.def("SetHitPowerCritical", &CWeapon::SetHitPowerCritical)
 			.def("SetHitImpulse", &CWeapon::SetHitImpulse)
 			.def("SetFireDistance", &CWeapon::SetFireDistance)
+			.def("SetAmmoMagSize", &CWeapon::SetAmmoMagSize)
+			.def("GetBulletSpeed", &CWeapon::GetBulletSpeedScript)
+			.def("SetBulletSpeed", &CWeapon::SetBulletSpeedScript)
+			.def("GetConditionShotDec", &CWeapon::GetConditionShotDec)
+			.def("SetConditionShotDec", &CWeapon::SetConditionShotDec)
 
 			// momopate
 			.def("GetZoomRotateTime", &CWeapon::GetZoomRotateTime)

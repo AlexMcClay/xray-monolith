@@ -1305,6 +1305,11 @@
         function SetHitPowerCritical(float)
         function SetHitImpulse(float)
         function SetFireDistance(float)
+        function SetAmmoMagSize(int) // as the ammo_mag_size upgrade: rounds already loaded over the new size stay until fired; GetAmmoMagSize() reads it
+        function GetBulletSpeed() // m/s, bullet_speed
+        function SetBulletSpeed(float)
+        function GetConditionShotDec() // condition lost per shot, condition_shot_dec
+        function SetConditionShotDec(float)
 
         // World model on stalkers adjustments
         function Set_mOffset(Fvector position, Fvector orientation)
