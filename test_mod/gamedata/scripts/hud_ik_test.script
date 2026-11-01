@@ -1,0 +1,62 @@
+-- Hand IK test (engine branch hud-ik-target): player_hud:set_ik_target and friends.
+-- Install this folder as its own mod. Hold any gun, then:
+--   NUMPAD7  left hand pinned to the gun FORWARD_CM further along the gun's Z axis than it is now (matrix form)
+--   NUMPAD8  left hand pinned to the gun's bone BONE where it is now (bone form; no jump expected)
+--   NUMPAD9  right hand pinned UP_CM above where it is now (matrix form; the gun does not follow the hand)
+--   NUMPAD4  the left hand's weight: 1 <-> 0.5
+--   NUMPAD0  clear both hands (they blend back to the animation in 0.25 s)
+-- A set target stays until cleared, also across weapon changes; while it is set Gunsmith's grip IK leaves the
+-- left hand alone.
+
+local FORWARD_CM = 5
+local UP_CM = 3
+local BONE = "wpn_body"
+local half = false
+
+local function say(text)
+	printf("[hud_ik_test] %s", text)
+	actor_menu.set_msg(1, "hud_ik_test: " .. text, 3)
+end
+
+local function moved(m, dx, dy, dz)
+	local out = matrix():set(m)
+	local c = vector():set(m.c)
+	c.x = c.x + dx
+	c.y = c.y + dy
+	c.z = c.z + dz
+	out.c = c
+	return out
+end
+
+local function on_key_press(dik)
+	local hud = get_player_hud()
+	if not hud then
+		return
+	end
+	if dik == DIK_keys.DIK_NUMPAD7 then
+		local h = hud:get_ik_hand(1)
+		hud:set_ik_target(1, moved(h, 0, 0, FORWARD_CM / 100))
+		say(string.format("left hand: %d cm forward (hand at %.3f %.3f %.3f in the gun)", FORWARD_CM, h.c.x, h.c.y, h.c.z))
+	elseif dik == DIK_keys.DIK_NUMPAD8 then
+		local h = hud:get_ik_hand(1, 0, BONE)
+		hud:set_ik_target(1, h, 0, BONE)
+		say(string.format("left hand: pinned to bone %s (hand at %.3f %.3f %.3f in the bone)", BONE, h.c.x, h.c.y, h.c.z))
+	elseif dik == DIK_keys.DIK_NUMPAD9 then
+		local h = hud:get_ik_hand(0)
+		hud:set_ik_target(0, moved(h, 0, UP_CM / 100, 0))
+		say(string.format("right hand: %d cm up", UP_CM))
+	elseif dik == DIK_keys.DIK_NUMPAD4 then
+		half = not half
+		hud:set_ik_weight(1, half and 0.5 or 1)
+		say(string.format("left weight %.1f (now %.2f)", half and 0.5 or 1, hud:get_ik_weight(1)))
+	elseif dik == DIK_keys.DIK_NUMPAD0 then
+		hud:clear_ik_target(0)
+		hud:clear_ik_target(1)
+		half = false
+		say(string.format("cleared (weights now %.2f, %.2f)", hud:get_ik_weight(0), hud:get_ik_weight(1)))
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("on_key_press", on_key_press)
+end
