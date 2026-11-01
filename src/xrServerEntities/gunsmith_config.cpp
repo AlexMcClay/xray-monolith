@@ -129,8 +129,7 @@ namespace gunsmith
 	const SLOTS& slots_of(const shared_str& section, bool is_receiver)
 	{
 		// Slot lists only depend on configs, which don't change while the game runs, and they are read on every
-		// shot and frame. Returned by reference: a map's entries stay put when others are added (they were
-		// copied on every call until 1 Nov 2026).
+		// shot and frame. Returned by reference: a map's entries stay put when others are added.
 		static xr_map<shared_str, SLOTS> cache[2];
 		static const SLOTS none;
 		if (!section.size())
@@ -271,7 +270,7 @@ namespace gunsmith
 	}
 
 	//==========================================================================
-	// Phase 2: part stats
+	// Part stats
 	//==========================================================================
 
 	namespace
@@ -387,7 +386,7 @@ namespace gunsmith
 	const SPartData& part_data(const shared_str& section)
 	{
 		// Keyed by the section string itself: callers hold a node's shared_str, so no lookup in the global
-		// string table per call (1 Nov 2026).
+		// string table per call.
 		static xr_map<shared_str, SPartData> cache;
 		auto it = cache.find(section);
 		if (it != cache.end())

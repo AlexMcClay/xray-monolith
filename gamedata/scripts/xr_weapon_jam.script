@@ -28,9 +28,6 @@ function GetConditionMisfireProbability(weapon, npc, base_value)
 	return t.ret_value or 0
 end
 
--- Gunsmith: the per-part jam chance hook (weapon_get_part_misfire_probability) is gone since 2 Nov 2026: parts no
--- longer jam; a script decides a whole shot through the engine's weapon_on_shot callback (gunsmith_callbacks.script).
-
 -- Vanilla misfire code
 function npc_misfire(weapon, npc, base_value, t)
 	local itm = weapon	

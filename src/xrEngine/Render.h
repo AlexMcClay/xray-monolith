@@ -381,7 +381,7 @@ public:
 	virtual u32 active_phase() = 0; //Swartz: actor shadow
 	virtual void RenderToTarget(RRT target) = 0;
 
-	// Gunsmith previews (DX10/11; the others return false). Draws visuals[i] at xforms[i] with
+	// Model previews (DX10/11; the others return false). Draws visuals[i] at xforms[i] with
 	// `view` and `proj` into the rect (x, y, w, h) of the named $user$ texture, created or resized
 	// to tw x th on demand. The rect is cleared to transparent first; UI shows it by that name.
 	virtual bool PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const Fmatrix& view,

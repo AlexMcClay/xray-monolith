@@ -1,6 +1,6 @@
--- Vanilla readings test (engine branch vanilla-readings, Gunsmith Docs 04 "Vanilla readings").
+-- Vanilla readings test (see the Gunsmith testing doc, "Vanilla readings").
 -- With the gun in hand:
---   run_string gs_vanilla_readings_test.show()   every reading the branch changes or adds, into the log
+--   run_string gs_vanilla_readings_test.show()   every reading the engine changes or adds, into the log
 --   run_string gs_vanilla_readings_test.check()  sets each Set_<Addon>_* value, reads it back, restores it
 --   run_string gs_vanilla_readings_test.silencer_pdm(2)  Set_Silencer_PDM_Base(2), to see the spread change
 -- mod_system_gs_vanilla_readings_test.ltx gives wpn_sil_nato, the ACOG and the M203 the four keys the

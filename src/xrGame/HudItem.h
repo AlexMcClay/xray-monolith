@@ -241,8 +241,8 @@ public:
 	virtual void render_hud_mode()
 	{
 	};
-	// Gunsmith: draws child models on the HUD model (after the HUD model itself), and
-	// gives the fire point when a part on the muzzle chain provides one.
+	// Draws child models on the HUD model (after the HUD model itself), and gives the item's
+	// own fire point when it has one (a weapon's part on the muzzle chain).
 	virtual void render_hud_attachments(IKinematics* model, const Fmatrix& xform) {}
 	virtual bool hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos) { return false; }
 	virtual bool need_renderable() { return true; };
@@ -317,11 +317,11 @@ public:
 private:
 	SPickParam PP;
 
-	// Gunsmith: sounds timed to the HUD motion, like Tarkov's animation events (Gunsmith Docs 19). The HUD
-	// section's gs_snd_<anm> lists "fraction of the motion, file[|another file]" pairs; when that motion starts on
-	// the actor's HUD, the item's own state sounds (snd_reload, snd_draw, ...) stop and these play in 2D at their
-	// times, scaled to the motion's actual length (so a faster reload keeps them in step). A motion with the key
-	// replaces the pending sounds of the last; leaving the HUD drops them.
+	// Gunsmith: sounds timed to the HUD motion. The HUD section's gs_snd_<anm> lists "fraction of the motion,
+	// file[|another file]" pairs; when that motion starts on the actor's HUD, the item's own state sounds (snd_reload,
+	// snd_draw, ...) stop and these play in 2D at their times, scaled to the motion's actual length (so a faster
+	// reload keeps them in step). A motion with the key replaces the pending sounds of the last; leaving the HUD
+	// drops them.
 	struct SGsSndEvent
 	{
 		float at;

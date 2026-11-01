@@ -12,7 +12,7 @@ CWeaponAK74::~CWeaponAK74()
 
 using namespace luabind;
 
-// Gunsmith: the addon multipliers as an unmodded exe gives them to scripts (CWeapon::GetAddonKoefScript,
+// The addon multipliers as an unmodded exe gives them to scripts (CWeapon::GetAddonKoefScript,
 // Weapon_gunsmith_members.h). C++ keeps reading the Get_<Addon>_* methods: the stats already hold the addon.
 template <u8 addon, u8 koef>
 static float get_addon_koef(CWeapon* w) { return w->GetAddonKoefScript(addon, koef); }
@@ -230,7 +230,7 @@ void CWeaponAK74::script_register	(lua_State *L)
 			
 			.def("Cost", &CWeapon::Cost)
 			.def("Weight", &CWeapon::Weight)
-			// Gunsmith: without the fitted parts, as an unmodded exe's Cost and Weight
+			// without the fitted parts, as an unmodded exe's Cost and Weight
 			.def("GetVanillaCost", &CWeapon::GetVanillaCost)
 			.def("GetVanillaWeight", &CWeapon::GetVanillaWeight)
 

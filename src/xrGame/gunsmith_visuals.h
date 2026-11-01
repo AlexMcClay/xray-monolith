@@ -13,42 +13,10 @@ class IRenderVisual;
 
 namespace gunsmith
 {
-	// Visual keys of a part section, cached per section.
-	//   visual, hud_visual                 model paths without .ogf (world, first person)
-	//   mount_offset_pos, mount_offset_rot applied after the mount (metres; degrees H,P,B)
-	//   aim_bone, aim_point                the part is a sight: the point the eye lines up with when
-	//                                      aiming (model space, moving with that bone, default the root)
-	//   aim_priority                       when several sights are fitted, the highest wins (ties: the
-	//                                      last in the tree); e.g. optics 1 over iron sights 0
-	//   aim_dir                            the sight line: forward x,y,z, up x,y,z (model space; default the
-	//                                      part's bore, 0,0,-1 and 0,1,0). Aiming turns the gun so it lies
-	//                                      along the view (canted sights roll the gun)
-	//   fire_bone, fire_point              the part is on the muzzle chain: shots and flash start
-	//                                      there when it is the last such part in the tree
-	// A sight that magnifies (an optic; see Gunsmith Docs 13-optics-and-3dss.md):
-	//   magnification                      e.g. 4 for a PSO-1; the camera zoom while aiming through it
-	//   magnification_min                  variable zoom (scroll wheel) from this up to magnification
-	//   zoom_step_count                    wheel steps across that range (default 4)
-	//   scope_zoom_factor                  overrides the zoom derived from magnification (vanilla units)
-	//   scope_texture                      a 2D scope overlay (ui\scopes.xml); default none
-	//   aim_eye_point, aim_eye_offset      where the eye sits behind the scope (model space), and how far
-	//                                      in front of the camera that point is placed (metres, default 0)
-	// Sight modes and dual sights (Gunsmith Docs 13, "Sight modes"; the gs_sight_mode key switches modes):
-	//   gs_sight_modes                     modes of the part's first sight (default 1): the SpecterDR 4x/1x,
-	//                                      the HHS-1's magnifier in line/aside, the PS-320 6x/1x
-	//   gs_sight_mode_zooms                each mode's magnification (1 = none), e.g. "4, 1"
-	//   gs_sight_mode_bones                the bone each mode's meshes are on: only the current mode's is shown
-	//   gs_sights                          sights on the part (default 1): a second one is cycled with the
-	//                                      other sights (the NcStar's red dot over its scope, the SpecterDR's
-	//                                      backup irons)
-	//   gs_sight_<s>_aim_point, gs_sight_<s>_aim_dir, gs_sight_<s>_magnification   sight s (from 1)
-	// The part's node mode holds the choice: bits 0-3 the mode, bits 4-5 the sight (tactical devices use
-	// their node's mode for themselves: a part that is both keeps its first sight and mode).
-	// A tactical device (flashlight, laser; see gunsmith_tactical.h):
-	//   tactical_modes                     its modes, e.g. "light | light, laser | laser"
-	//   light_point, light_section         where the light comes out (model space; it shines along -Z)
-	//                                      and its light definition section
-	//   laser_point, laser_section         the same for the laser
+	// Visual keys of a part section (models, mount offset, sight, optic, sight modes, muzzle, tactical device),
+	// cached per section. Keys: see the Gunsmith config reference.
+	// The part's node mode holds the chosen sight and mode: bits 0-3 the mode, bits 4-5 the sight (tactical
+	// devices use their node's mode for themselves: a part that is both keeps its first sight and mode).
 	// All positions are in the model's own space (as exported) and follow the named bone's
 	// motion; how a bone is oriented at rest doesn't matter.
 	struct SPartVisual
@@ -87,11 +55,9 @@ namespace gunsmith
 		shared_str light_section, laser_section;
 		bool is_tactical() const { return !tac_modes.empty(); }
 
-		// The left hand on the part (grip IK, gunsmith_grip_ik.h), per Tarkov GripType 0 and 1:
-		//   grip_hand_<type>    = x, y, z, h, p, b   the left hand bone in the model's space
-		//   grip_fingers_<type> = h, p, b x 15       the fingers' rotations relative to their parents (degrees)
-		//   grip_priority                            which fitted part the hand goes to (foregrips 2, handguards 1)
-		//   grip_type                                the pose the part looks best with (default 0; gs_grip_type -1)
+		// The left hand on the part (grip IK, gunsmith_grip_ik.h), per Tarkov GripType 0 and 1: the left hand
+		// bone in the model's space and the fingers' rotations relative to their parents (grip_hand_<type>,
+		// grip_fingers_<type>, grip_priority, grip_type; see the Gunsmith config reference).
 		bool has_grip[2];
 		Fmatrix grip_hand[2];
 		Fvector grip_fingers[2][15]; // radians
@@ -124,7 +90,7 @@ namespace gunsmith
 	};
 	SSightAim sight_aim(const SPartVisual& pv, u8 node_mode);
 
-	// Sight switching (Gunsmith Docs 13). A gun cycles through its fitted cyclable sights (an aim point and
+	// Sight switching. A gun cycles through its fitted cyclable sights (an aim point and
 	// aim_priority >= 1: optics and red dots, not iron sights) with vanilla's wpn_func key. The chosen
 	// sight's node is saved in node 0's mode, bits 1-7 (bit 0 is the tactical devices' on/off; 0 = automatic).
 	inline bool is_cyclable_sight(const SPartVisual& pv) { return pv.has_aim && pv.aim_priority >= 1; }
@@ -133,12 +99,9 @@ namespace gunsmith
 	// aim_priority (ties: the last in the tree). 0 without a sight.
 	u8 sight_node(const CTree& tree, u8 selected);
 
-	// A virtual mount on a model that has no bone of that name, from keys on `section`:
-	//   gs_mount_<name>_pos, gs_mount_<name>_rot   in the model's space (metres; degrees H,P,B)
-	//   gs_mount_<name>_bone                        bone whose motion it follows (default the root
-	//                                               bone), e.g. the magazine bone an animation moves
-	//   gs_mount_<name>_scale                       uniform scale for the part and everything on it
-	//                                               (default 1), for HUD models not at true scale
+	// A virtual mount on a model that has no bone of that name, from gs_mount_<name>_pos/_rot/_bone/_scale on
+	// `section` (model space, metres, degrees H,P,B; follows the bone, default the root; scale for HUD models
+	// not at true scale). Keys: see the Gunsmith config reference.
 	// False when the section has neither pos nor rot.
 	bool read_virtual_mount(LPCSTR section, LPCSTR name, Fmatrix& out, shared_str* bone = nullptr);
 
@@ -148,7 +111,7 @@ namespace gunsmith
 
 	// The child models of one weapon. Two contexts: the world model and the HUD model.
 	// A context is rebuilt when the tree's layout (sections, parents, slots) or the root
-	// model changes; condition changes don't rebuild anything.
+	// model changes; mode changes only switch the shown mode bones.
 	class CVisuals
 	{
 	public:

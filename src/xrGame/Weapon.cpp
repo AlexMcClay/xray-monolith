@@ -3131,7 +3131,7 @@ float CWeapon::Weight() const
 {
 	float res = CInventoryItemObject::Weight();
 
-	// Attached parts, including old-style addons (their item inv_weight, as before).
+	// Attached parts, including old-style addons (their item inv_weight, as in vanilla).
 	res += m_gs_stats.weight_add;
 
 	res += GetMagazineWeight(m_magazine);
@@ -3339,7 +3339,7 @@ u32 CWeapon::Cost() const
 {
 	u32 res = CInventoryItem::Cost();
 
-	// Attached parts, including old-style addons (their item cost, as before).
+	// Attached parts, including old-style addons (their item cost, as in vanilla).
 	if (m_gs_stats.cost_add > 0.f)
 		res += u32(m_gs_stats.cost_add + 0.5f);
 

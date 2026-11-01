@@ -82,7 +82,7 @@ void CWeapon::FireTrace(const Fvector& P, const Fvector& D)
 	//повысить изношенность оружия с учетом влияния конкретного патрона
 	//	float Deterioration = GetWeaponDeterioration();
 	//	Msg("Deterioration = %f", Deterioration);
-	// Receiver wear, or a script's for this shot (gunsmith).
+	// The weapon's wear for this shot: a script's, else its own with the parts' modifiers (gunsmith).
 	gs_apply_shot_wear(l_cartridge.param_s.impair);
 
 

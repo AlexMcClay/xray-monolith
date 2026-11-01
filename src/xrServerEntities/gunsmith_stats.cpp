@@ -10,9 +10,9 @@ namespace gunsmith
 {
 	namespace
 	{
-		// Which old *_k multipliers each old addon type applied
+		// Which addon *_k multipliers vanilla applies per addon type
 		// (CWeaponMagazined::LoadSilencerKoeffs / LoadScopeKoeffs, LoadLauncherKoeffs).
-		// crosshair_inertion_k was loaded but never applied, so it stays unapplied.
+		// crosshair_inertion_k is loaded but never applied there, so it stays unapplied.
 		bool legacy_applies(u8 legacy_addon, u8 stat)
 		{
 			switch (stat)
@@ -106,7 +106,7 @@ namespace gunsmith
 			out.can_fire = tree.empty() || tree.required_slots_filled();
 		}
 
-		// A section's stock build (gs_default_build, new parts), computed once per section.
+		// A section's stock build (its gs_default_build, no old addon flags), computed once per section.
 		const SWeaponStats& stock_stats(const shared_str& section)
 		{
 			static xr_map<shared_str, SWeaponStats> cache;
@@ -132,7 +132,7 @@ namespace gunsmith
 		for (u32 s = 0; s < eStatCount; ++s)
 		{
 			if (s == eStatErgonomics)
-				continue; // ergonomics stays absolute (its effect is relative, ergo_k)
+				continue; // ergonomics stays absolute (the scripts relate it to stock_ergonomics)
 			out.add[s] -= st.add[s];
 			if (!fis_zero(st.mul[s]))
 				out.mul[s] /= st.mul[s];

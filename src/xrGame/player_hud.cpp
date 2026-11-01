@@ -386,7 +386,7 @@ void attachable_hud_item::setup_firedeps(firedeps& fd)
 		VERIFY(_valid(fd.vLastSP));
 	}
 
-	// Gunsmith: the last part on the muzzle chain moves the fire point.
+	// The item may give its own fire point (a weapon: its last part on the muzzle chain).
 	Fvector gs_fp;
 	if (m_parent_hud_item && m_parent_hud_item->hud_fire_point(m_model, m_item_transform, gs_fp))
 	{

@@ -67,7 +67,7 @@ namespace gunsmith
 
 	const SPartVisual& part_visual(const shared_str& key)
 	{
-		// Keyed by the section string itself: callers hold a node's shared_str (1 Nov 2026).
+		// Keyed by the section string itself: callers hold a node's shared_str.
 		static xr_map<shared_str, SPartVisual> cache;
 		auto it = cache.find(key);
 		if (it != cache.end())
@@ -331,8 +331,7 @@ namespace gunsmith
 	{
 		SCOPE_TIMER("gs.visuals.ensure");
 		SContext& c = m_ctx[ctx];
-		// The sight aimed through: a switch changes no layout, so it follows the state revision (it was read on
-		// every call until 1 Nov 2026).
+		// The sight aimed through: a switch changes no layout, so it follows the state revision.
 		if (!m_sight_rev_valid || m_sight_rev != tree.state_revision())
 		{
 			m_sight_node = sight_node(tree, selected_sight(tree));

@@ -19,10 +19,7 @@
 
 #ifdef GAME_OBJECT_EXTENDED_EXPORTS
 
-// Functions that return Lua values take the calling lua_State (luabind raw<1>
-// policy): luabind pushes a returned object onto the state it was created in, so a
-// table built on the main state comes back as nil to scripts running in their own
-// thread, such as run_string.
+// Functions that return Lua values take the calling lua_State (raw<1>): see gunsmith_script.h.
 
 namespace
 {
@@ -166,7 +163,7 @@ static bool gs_attach_script(CScriptGameObject* self, CScriptGameObject* part, u
 	                    weapon->gs_jam_node(), weapon->IsMisfire());
 }
 
-// The section of the sight the weapon aims through (gs_mode = full), or nil.
+// The build's state revision (gunsmith_tree.h); 0 for other objects.
 u32 gs_revision_script(CScriptGameObject* self)
 {
 	if (!self)
@@ -218,6 +215,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 	return weapon && weapon->IsMisfire() ? gunsmith::failure_name(weapon->gs_jam_type()) : "none";
 }
 
+// The section of the sight the weapon aims through (gs_mode = full), or nil.
 ::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self)
 {
 	CWeapon* weapon = gs_weapon(self, "gs_sight_section");
@@ -227,7 +225,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 	return ::luabind::object(L, section.c_str());
 }
 
-// Sight modes (Gunsmith Docs 13): the sight aimed through's mode, { mode, count, zoom, sight } (mode from 0; zoom
+// Sight modes: the sight aimed through's mode, { mode, count, zoom, sight } (mode from 0; zoom
 // its magnification, 1 = none; sight: which of the part's sights, from 0), or nil without a sight.
 ::luabind::object gs_sight_mode_script(lua_State* L, CScriptGameObject* self)
 {
@@ -247,7 +245,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 	return t;
 }
 
-// Sight switching (Gunsmith Docs 13): the cyclable sights fitted, { { node, section }, ... } in tree order.
+// Sight switching: the cyclable sights fitted, { { node, section }, ... } in tree order.
 ::luabind::object gs_sights_script(lua_State* L, CScriptGameObject* self)
 {
 	::luabind::object t = ::luabind::newtable(L);

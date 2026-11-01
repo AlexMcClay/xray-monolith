@@ -25,11 +25,11 @@
 		before Anomaly's weapon degradation setting; leave it nil for the engine's own wear), t.malfunction
 		("misfire", "extraction", "feed", "barrel", "hard_slide", or nil for none) and t.node (the culprit
 		part's node, 0 for the gun). Unhandled, the engine uses the weapon's own misfire curve and wear.
-		Since 2 Nov 2026; the Gunsmith Framework's Tarkov malfunctions are a handler (gunsmith_malfunctions).
+		The Gunsmith Framework's Tarkov malfunctions are a handler (gunsmith_malfunctions).
 
 	weapon_on_recalc_stats(weapon, t)
 		The engine recomputed a weapon's stats from its parts: at spawn and load, when a part goes on or
-		off, a condition is set, gunsmith.refresh_stats() runs, and for the builder's previews (t.preview
+		off, when gunsmith.refresh_stats() runs, and for the builder's previews (t.preview
 		true: a build the weapon doesn't have yet). Not per shot. Any weapon, the player's and NPCs'.
 		t holds the parts' totals, with the stock build's (gs_default_build): t.section, t.recoil and
 		t.stock_recoil (summed recoil percents), t.ergonomics and t.stock_ergonomics, t.shoulder and

@@ -5,11 +5,11 @@
 struct attachable_hud_item;
 
 extern int g_gs_grip_ik;     // gs_grip_ik 0/1: the left hand on the fitted handguard or foregrip
-extern int g_gs_grip_type;   // gs_grip_type 0/1: which of Tarkov's grip poses (GripType) the hand takes (0 Common, as Tarkov)
+extern int g_gs_grip_type;   // gs_grip_type -1/0/1: each part's grip_type, or that Tarkov GripType (0 Common, 1 Alternative) on every part
 
 namespace gunsmith
 {
-	// The left hand on the fitted grip (Gunsmith Docs 17, phase 3), like Tarkov's runtime IK: one source of targets
+	// The left hand on the fitted grip, like Tarkov's runtime IK: one source of targets
 	// for player_hud's left-arm IK (hud_hand_ik.h), which does the arm, twist and fingers.
 	//
 	// Tarkov's handguards and foregrips carry the left hand's pose (GripPose). The pipeline turns it into the pose

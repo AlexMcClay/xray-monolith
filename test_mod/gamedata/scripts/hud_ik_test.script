@@ -1,4 +1,4 @@
--- Hand IK test (engine branch hud-ik-target): player_hud:set_ik_target and friends.
+-- Hand IK test: player_hud:set_ik_target and friends.
 -- Install this folder as its own mod. Hold any gun, then:
 --   NUMPAD7  left hand pinned to the gun FORWARD_CM further along the gun's Z axis than it is now (matrix form)
 --   NUMPAD8  left hand pinned to the gun's bone BONE where it is now (bone form; no jump expected)

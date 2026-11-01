@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////
 //	Module 		: gunsmith_tactical.cpp
 //	Description : Gunsmith tactical devices - weapon-mounted flashlights and lasers,
-//	              any number per gun, each in its own mode (Gunsmith Docs 15)
+//	              any number per gun, each in its own mode
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
@@ -173,7 +173,7 @@ namespace gunsmith
 
 	void CTacticalDevices::sync(const CTree& tree)
 	{
-		// Same layout as last time: nothing to compare (1 Nov 2026; this ran every frame).
+		// Same layout as last time: nothing to compare.
 		if (m_rev_valid && m_rev == tree.layout_revision())
 			return;
 		m_rev = tree.layout_revision();

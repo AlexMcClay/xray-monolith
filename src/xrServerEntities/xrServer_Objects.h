@@ -163,9 +163,6 @@
 // 127	 CSE_ALifeObjectClimable		added material;
 // 128	 CSE_ALifeObjectClimable		added can_fire in smart covers;
 //------------------------------------------------------------------------------
-// Gunsmith saved 129 (CSE_ALifeItemWeapon + part tree) and 130 (CSE_ALifeItem II_ATTCH + sub-tree) from 29 Oct to
-// 1 Nov 2026; those still read. Since then the trees are named blocks after the state (CSE_Abstract::ext_*), and
-// the version is upstream's again.
 #define SPAWN_VERSION	u16(128)
 
 SERVER_ENTITY_DECLARE_BEGIN2(CSE_Shape, ISE_Shape, CShapeData)

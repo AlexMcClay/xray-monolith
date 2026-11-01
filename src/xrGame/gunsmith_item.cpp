@@ -43,7 +43,7 @@ void CInventoryItemObject::RenderAttachments()
 
 void CInventoryItemObject::gs_spawn_parts(CSE_Abstract* DC)
 {
-	// Gunsmith: the parts a part item carries come with its spawn data.
+	// The parts a part item carries come with its spawn data.
 	if (!m_gs_subtree)
 		m_gs_subtree = xr_new<gunsmith::CTree>();
 	m_gs_subtree->clear();

@@ -60,7 +60,6 @@ bool CWeaponShotgun::Action(u16 cmd, u32 flags)
 {
 	if (inherited::Action(cmd, flags)) return true;
 
-	// Gunsmith: the sub-states in brackets (the || bound loosest, so eSubstateReloadInProcessEmptyEnd alone passed)
 	if (m_bTriStateReload && GetState() == eReload &&
 		cmd == kWPN_FIRE && flags & CMD_START &&
 		(m_sub_state == eSubstateReloadInProcess || m_sub_state == eSubstateReloadInProcessEmptyEnd)) //остановить перезарядку

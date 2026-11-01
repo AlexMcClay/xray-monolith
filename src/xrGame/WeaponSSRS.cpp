@@ -529,7 +529,7 @@ void CWeaponSSRS::state_Fire(float dt)
 			//Alundaio: Use fModeShotTime instead of fOneShotTime if current fire mode is 2-shot burst
 			//Alundaio: Cycle down RPM after two shots; used for Abakan/AN-94
 			// demonized: Add support for arbitrary shot burst at rpm_mode_2
-			// gs_shot_time: parts that change the rate of fire (as CWeaponMagazined; this class missed it until 1 Nov 2026)
+			// gs_shot_time: parts that change the rate of fire (as in CWeaponMagazined)
 			if (GetCurrentFireMode() >= 2 || cycleDownCheck())
 			{
 				fShotTimeCounter = gs_shot_time(fModeShotTime);

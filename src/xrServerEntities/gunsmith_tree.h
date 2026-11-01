@@ -20,8 +20,8 @@ namespace gunsmith
 		shared_str section;
 		u8 parent; // index of the parent node, GS_NO_PARENT for the receiver
 		u8 slot; // index into the parent's slot list
-		// A tactical device's selected mode (index into its tactical_modes). On node 0, the
-		// receiver, it is the weapon's devices-on flag (0 off, 1 on). See gunsmith_tactical.h.
+		// A tactical device's selected mode (index into its tactical_modes), or a sight part's chosen sight and
+		// mode (gunsmith_visuals.h). On node 0 of a weapon tree, the weapon's own state (see devices_on).
 		u8 mode;
 
 		SNode() : parent(GS_NO_PARENT), slot(0), mode(0) {}
@@ -41,7 +41,7 @@ namespace gunsmith
 
 		void clear() { m_nodes.clear(); touch_layout(); }
 
-		// Change counters (1 Nov 2026): a new number, never reused in the session, whenever the tree changes, so
+		// Change counters: a new number, never reused in the session, whenever the tree changes, so
 		// users can tell "changed?" with one compare instead of walking the tree. layout_revision: the parts, where
 		// they sit, the part-root flag. state_revision: that and the nodes' modes (the selected sight, sight and
 		// device modes). A copied tree keeps its numbers.
@@ -62,7 +62,7 @@ namespace gunsmith
 		// A weapon tree's own state, saved in node 0's mode: bit 0 its tactical devices are on, bits 1-7 the node the
 		// player selected to aim through (0: automatic). Not for a part-root tree, whose node 0 is a part with a mode
 		// of its own. The selection follows its node when nodes are removed and renumbered (remove_subtree), and
-		// goes back to automatic when that node is removed (it pointed at whatever took the number until 1 Nov 2026).
+		// goes back to automatic when that node is removed.
 		bool devices_on() const { return !m_part_root && !m_nodes.empty() && (m_nodes[0].mode & 1) != 0; }
 		void set_devices_on(bool on);
 		u8 selected_sight() const { return m_part_root || m_nodes.empty() ? 0 : u8(m_nodes[0].mode >> 1); }

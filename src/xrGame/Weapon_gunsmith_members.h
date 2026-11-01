@@ -3,8 +3,8 @@
 //	Description : CWeapon's Gunsmith members: the part tree, stats, part models, devices and aiming
 ////////////////////////////////////////////////////////////////////////////
 //
-// Included INSIDE class CWeapon (Weapon.h), nowhere else, so Weapon.h stays a few lines from upstream's
-// (1 Nov 2026). The bodies are in Weapon_gunsmith.cpp. Starts public; ends protected, as Weapon.h continues.
+// Included INSIDE class CWeapon (Weapon.h), nowhere else, so Weapon.h stays a few lines from upstream's.
+// The bodies are in Weapon_gunsmith.cpp. Starts public; ends protected, as Weapon.h continues.
 // No include guard: it is part of the class body.
 
 public:
@@ -24,14 +24,14 @@ public:
 	// Gameplay checks (shot sound, tracers, AI hearing) use this; IsSilencerAttached() stays the addon flag.
 	bool IsSuppressorFitted() const { return IsSilencerAttached() || m_gs_stats.suppressor_part; }
 
-	// Vanilla readings for scripts (Gunsmith Docs 24, "Vanilla readings"). Weight() and Cost() count every fitted
-	// part; these are what an unmodded exe's would give: the parts left out, the old-style addons counted.
+	// Vanilla readings for scripts. Weight() and Cost() count every fitted part; these are what an unmodded
+	// exe's would give: the parts left out, the old-style addons counted.
 	float GetVanillaWeight() const;
 	u32 GetVanillaCost() const;
 	// The script values Get_/Set_<Silencer|Scope|Launcher>_<PDM_Base|PDM_Vel|PDM_Accel|CrosshairInertion>
 	// (WeaponAK74.cpp). The stats already fold an attached addon's *_k keys in, so cur_*_koef keeps only a script's
 	// factor on top (1 after InitAddons). Scripts read and set the vanilla value, the addon's multiplier times that
-	// factor, so a set value takes effect as it would without Gunsmith, and InitAddons resets it as before.
+	// factor, so a set value takes effect as it would without Gunsmith, and InitAddons resets it.
 	enum EAddonKind { eAddonKindSilencer, eAddonKindScope, eAddonKindLauncher };
 	enum EAddonKoef { eAddonKoefPdmBase, eAddonKoefPdmVel, eAddonKoefPdmAccel, eAddonKoefCrosshairInertion };
 	float GetAddonKoefScript(u8 addon, u8 koef) const;
@@ -90,7 +90,7 @@ public:
 	// What aiming uses for that part's chosen sight and mode (gunsmith::sight_aim): false without a sight.
 	bool gs_sight_aim(gunsmith::SSightAim& out) const;
 
-	// Sight modes (Gunsmith Docs 13): the sight aimed through's current mode (count: how many it has).
+	// Sight modes: the sight aimed through's current mode (count: how many it has).
 	// Saved in the part's node mode.
 	u8 gs_sight_mode(u8* count = nullptr) const;
 
@@ -150,7 +150,7 @@ protected:
 	float m_gs_aim_still = 0.f; // seconds the camera has been still (aim refinement waits for it)
 	shared_str m_gs_aim_sight;
 	// The aim rotation (H, P, B) that lays the sight's line along the view: the sight's pitch and yaw
-	// off the camera axis and, from 1 degree, its roll (a canted sight). Predicted with m_gs_aim_corr.
+	// off the camera axis and, from aim_roll_min degrees, its roll (a canted sight). Predicted with m_gs_aim_corr.
 	Fvector m_gs_aim_rot = { 0.f, 0.f, 0.f };
 	// The camera the HUD was placed with last frame (m_item_transform is last frame's).
 	Fmatrix m_gs_prev_cam;

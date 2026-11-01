@@ -15,7 +15,6 @@ CWeaponAutomaticShotgun::CWeaponAutomaticShotgun()
 	m_eSoundOpen = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
 	m_eSoundClose = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
 	m_eSoundAddCartridge = ESoundTypes(SOUND_TYPE_WEAPON_SHOOTING);
-	// Gunsmith: these were left uninitialised
 	BeginReloadWasEmpty = false;
 	ClickInterruptFlag = false;
 	MotionMarked = false;
@@ -67,9 +66,7 @@ bool CWeaponAutomaticShotgun::Action(u16 cmd, u32 flags)
 	}
 	if (inherited::Action(cmd, flags)) return true;
 
-	// Gunsmith: on a full-mode gun, fire stops the reload as Tarkov's does: the shell in the hand still goes in, then
-	// the close plays. (Below, a shell was added at the press and the clip played out to idle with no close: user,
-	// 31 Oct 2026, "reloading feels very buggy and unresponsive")
+	// Gunsmith: on a full-mode gun, fire stops the reload: the shell in the hand still goes in, then the close plays.
 	if (gs_full_mode() && m_bTriStateReload && GetState() == eReload && ClickInterruptFlag && !m_bGsClearJam &&
 		m_sub_state != eSubstateReloadEnd)
 	{
@@ -77,7 +74,6 @@ bool CWeaponAutomaticShotgun::Action(u16 cmd, u32 flags)
 		return true;
 	}
 
-	// Gunsmith: the sub-states in brackets (the || bound loosest, so eSubstateReloadInProcessEmptyEnd alone passed)
 	if (m_bTriStateReload && GetState() == eReload &&
         ClickInterruptFlag && // ver
 		(m_sub_state == eSubstateReloadInProcess || m_sub_state == eSubstateReloadInProcessEmptyEnd)) //постановить перезагрузку
@@ -169,8 +165,8 @@ void CWeaponAutomaticShotgun::Reload()
 void CWeaponAutomaticShotgun::TriStateReload()
 {
 	// Gunsmith: a misfire is cleared by working the action once (anm_reload_misfire), as the magazine guns do
-	// (CWeaponMagazined::PlayAnimReload), whether the tube is full or not: a jammed full tube had no way out
-	// (31 Oct 2026). Without the animation, the reload as before (it clears the misfire as it adds a shell).
+	// (CWeaponMagazined::PlayAnimReload), whether the tube is full or not. Without the animation, the reload
+	// clears the misfire as it adds a shell.
 	if (IsMisfire() && iAmmoElapsed && HudAnimationExist("anm_reload_misfire"))
 	{
 		CWeapon::Reload();
@@ -272,7 +268,7 @@ void CWeaponAutomaticShotgun::switch2_EndReload()
 {
 	SetPending(FALSE);
 	if (gs_snd_covers("anm_close"))
-		; // Gunsmith: Tarkov's sounds for the close (JSRS's MP-133 close was a shell in and a pump: user, 31 Oct 2026)
+		; // Gunsmith: the HUD section times its own close sounds (gs_snd_<anm>)
 	else if (BeginReloadWasEmpty && m_sounds.FindSoundItem("sndCloseEmpty", false))
 		PlaySound("sndCloseEmpty", get_LastFP());
 	else

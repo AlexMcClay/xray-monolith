@@ -482,7 +482,7 @@ BOOL CSE_Abstract::Spawn_Read(NET_Packet& tNetPacket)
 	R_ASSERT3((b1 || b2), "cannot read object, which is not successfully saved :(", name_replace());
 
 	// Named blocks off the end first; the class state is then read with the packet ending where it ends, so
-	// STATE_Read (and its r_eof checks) see exactly the bytes they always did.
+	// STATE_Read (and its r_eof checks) see exactly the bytes STATE_Write wrote.
 	const u32 end = tNetPacket.r_tell() - sizeof(u16) + size;
 	const u32 state_end = ext_read(tNetPacket, end);
 	const u32 count = tNetPacket.B.count;
@@ -492,11 +492,11 @@ BOOL CSE_Abstract::Spawn_Read(NET_Packet& tNetPacket)
 	if (state_end != end)
 	{
 		// Past the blocks: the client's spawn packet carries the update data after them (M_SPAWN_UPDATE), and
-		// UPDATE_Read must start there (1 Nov 2026: it read the blocks as ammo type and state, a crash at a new game).
+		// UPDATE_Read must start there, not in the blocks.
 		tNetPacket.B.count = count;
 		tNetPacket.r_seek(end);
 	}
-	// Gunsmith's saves of 29 Oct to 1 Nov 2026 were SPAWN_VERSION 129 and 130; once read, the object is in
+	// Gunsmith saves of SPAWN_VERSION 129 and 130 (see gunsmith_server.cpp): once read, the object is in
 	// memory as a current one, so a later STATE_Read of a packet its own STATE_Write made (script tools)
 	// takes the current layout.
 	if (m_wVersion > SPAWN_VERSION)

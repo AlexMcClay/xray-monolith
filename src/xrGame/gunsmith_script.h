@@ -11,14 +11,10 @@
 namespace gunsmith
 {
 	// Node numbers are 0-based everywhere (node 0 is the receiver), as in gunsmith_debug.dump_tree.
-	// The returned array is 1-based, so element n + 1 is node n:
-	//   { index, section, parent, slot, kind, legacy_addon, slots = {
-	//       { index, section, accepts = {tag, ...}, required, field_swappable, implicit,
-	//         legacy_addon, occupant, blocked }, ... } }
-	// parent and slot are absent on the receiver; legacy_addon and occupant are absent when unset.
+	// The returned array is 1-based, so element n + 1 is node n. Table format: lua_help_ex.script, game_object gs_get_tree.
 	// Build tables on the calling script's lua_State (luabind raw<1> policy): luabind
 	// pushes a returned object onto the state it was created in, so a table made on
-	// the main state comes back as nil to scripts running in their own thread.
+	// the main state comes back as nil to scripts running in their own thread, such as run_string.
 	::luabind::object tree_to_lua(lua_State* L, const CTree& tree);
 
 	// Builds a tree from an array of { section, parent, slot }.

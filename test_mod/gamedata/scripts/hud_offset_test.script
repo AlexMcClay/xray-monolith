@@ -1,6 +1,6 @@
 -- hud_offset_test.script: console checks for the per-object HUD offsets (game_object:set_hud_offset,
--- engine branch feature/hud-offset). With a gun in hand: run_string hud_offset_test.<name>()
--- (lowercase; the console lowercases what you type). See Gunsmith Docs 04, "HUD offset primitive".
+-- the HUD offset primitive). With a gun in hand: run_string hud_offset_test.<name>()
+-- (lowercase; the console lowercases what you type). See the Gunsmith testing doc, "HUD offset primitive".
 --   dump()          every slot of the item in hand: SET marks an override; values are the override or the HUD section's
 --   hip()           slot 5 (base_hud_offset): 4 cm right, 3 cm down, rolled; shows at the hip, in sprint and reload
 --   hands()         slot 0 (hands_position/orientation, Weapon Cover Tilt's slot): moves the hands and the gun at once

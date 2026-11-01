@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////
 //	Module 		: gunsmith_tactical.h
 //	Description : Gunsmith tactical devices - weapon-mounted flashlights and lasers,
-//	              any number per gun, each in its own mode (Gunsmith Docs 15)
+//	              any number per gun, each in its own mode
 ////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -17,13 +17,8 @@ namespace gunsmith
 {
 	class CVisuals;
 
-	// A light definition section, with CTorch's key names where they overlap:
-	//   type (2 spot), range, color, spot_angle (degrees), spot_texture, glow_texture,
-	//   glow_radius, volumetric, volumetric_quality / _intensity / _distance
-	// Lasers ([gs_tac_laser_*]) also read:
-	//   range (how far the laser reaches, metres), dot_range (the dot's light), dot_glow_texture,
-	//   dot_glow_radius, beam_visual (world model; its first-person copy is <path's folder>\hud\<name>),
-	//   beam_hud_length (the beam's length in first person, metres)
+	// A light definition section, with CTorch's key names where they overlap; lasers read a few more.
+	// Keys: see the Gunsmith tactical devices doc. A beam_visual's first-person copy is <path's folder>\hud\<name>.
 	struct SLightDesc
 	{
 		u32 type = 2;
@@ -43,8 +38,8 @@ namespace gunsmith
 		void load(LPCSTR section);
 	};
 
-	// The tactical devices fitted to one weapon. The weapon's tree holds the state: node 0's mode is
-	// the devices-on flag, each device node's mode is its selected mode.
+	// The tactical devices fitted to one weapon. The weapon's tree holds the state: bit 0 of node 0's mode
+	// is the devices-on flag, each device node's mode is its selected mode.
 	class CTacticalDevices
 	{
 	public:

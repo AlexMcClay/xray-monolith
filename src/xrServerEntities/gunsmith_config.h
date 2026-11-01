@@ -17,16 +17,7 @@ namespace gunsmith
 		eLegacySilencer = 0x04,
 	};
 
-	// One slot of a receiver or part.
-	//
-	// Slot section keys:
-	//   accepts         = tag, tag, ...   parts fit when their `tags` intersect this list
-	//   required        = bool            (default false) gun cannot fire with it empty (enforced from phase 2)
-	//   mount_bone      = bone            bone on the owning node's model the part mounts to, or a
-	//                                      virtual mount (gs_mount_<name>_pos/_rot on the owner's section)
-	//   field_swappable = bool            (default false) editable outside a workbench (framework UI)
-	//   legacy_addon    = scope | silencer | launcher
-	//                                      this slot stands for one of the old addon flags
+	// One slot of a receiver or part. Keys: see the Gunsmith config reference.
 	//
 	// Implicit slots are synthesized for receivers whose old addon status is
 	// "attachable" but which declare no slot for that addon. They have no LTX
@@ -46,23 +37,13 @@ namespace gunsmith
 
 	typedef xr_vector<SSlotInfo> SLOTS;
 
-	// Receiver keys on the weapon section:
-	//   gs_mode          = legacy | full  (default legacy; full-mode guns take no old-style addons)
-	//   gs_slots         = slot, slot, ... root slots
-	//   gs_default_build = entry, ...     entry is a part section (placed in the first free
-	//                                     slot it fits) or parent:slot:part_section, where slot is
-	//                                     an index or a slot's mount_bone (e.g. mod_scope); a leading
-	//                                     '?' makes an entry optional (skipped quietly if missing)
-	// Part keys (on any item section):
-	//   part_kind, tags, slots, blocks_slots (plus visual and stat keys used by later phases)
-
+	// Receiver keys (gs_mode, gs_slots, gs_default_build) and part keys: see the Gunsmith config reference.
+	// Full-mode receivers (gs_mode = full) take no old-style addons.
 	bool is_full_mode(LPCSTR receiver);
 
-	// Slots a node exposes, in index order. A receiver gets its `gs_slots`, then
-	// implicit slots for any attachable legacy addon not already covered (not on full-mode
-	// receivers: they take no old-style addons). A part gets
-	// its `slots`.
-	// The cached slot list of a section. Configs don't change while the game runs, so the reference stays valid.
+	// Slots a node exposes, in index order. A receiver gets its `gs_slots`, then implicit slots for any
+	// attachable legacy addon not already covered (not on full-mode receivers). A part gets its `slots`.
+	// Cached per section: configs don't change while the game runs, so the reference stays valid.
 	const SLOTS& slots_of(const shared_str& section, bool is_receiver);
 	const SLOTS& slots_of(LPCSTR section, bool is_receiver);
 
@@ -89,7 +70,7 @@ namespace gunsmith
 	LPCSTR legacy_addon_name(u8 legacy_addon);
 
 	//==========================================================================
-	// Phase 2: part stats
+	// Part stats
 	//==========================================================================
 
 	// Stats a part can change. Each has `<name>_add` (default 0) and `<name>_mul`
@@ -120,7 +101,6 @@ namespace gunsmith
 
 	// A weapon malfunction's type: the receiver's own misfire curve gives eFailMisfire; a script deciding the shot
 	// (the weapon_on_shot callback, CWeapon::gs_script_shot) any of them. Every type is cleared by racking the bolt.
-	// Parts had their own types and jam curves until 2 Nov 2026 (Gunsmith Docs 25).
 	enum EFailure
 	{
 		eFailNone = 0,
@@ -138,10 +118,10 @@ namespace gunsmith
 	// Everything the engine reads from a part section, cached per section.
 	//
 	// Parts have no condition: only the weapon's condition wears, and a script may decide its wear and
-	// malfunctions per shot (weapon_on_shot; Gunsmith Docs 25).
-	// Weight and cost: old-style addons count their item `inv_weight` and `cost`,
-	// as before. Other parts count `weight` and `part_cost` (default 0), so
-	// internal parts that are also items don't add their item price to the gun.
+	// malfunctions per shot (weapon_on_shot).
+	// Weight and cost: old-style addons count their item `inv_weight` and `cost`. Other parts count
+	// `weight` and `part_cost` (default 0), so internal parts that are also items don't add their item
+	// price to the gun.
 	struct SPartData
 	{
 		shared_str kind; // part_kind, or inferred from the item class, or "generic"
@@ -150,14 +130,14 @@ namespace gunsmith
 		float add[eStatCount];
 		float mul[eStatCount];
 		bool has_mul[eStatCount];
-		float legacy_k[eStatCount]; // old *_k keys, clamped 0.01..2 as the old code did
+		float legacy_k[eStatCount]; // addon *_k keys, clamped 0.01..2 as vanilla does
 
 		float weight, cost; // gunsmith keys
 		float legacy_weight, legacy_cost; // item inv_weight / cost
 
 		xr_vector<shared_str> blocks_slots;
 
-		// Handling, as Tarkov (Gunsmith Docs 02):
+		// Handling (Tarkov-style):
 		float recoil; // `recoil`: Tarkov's recoil percent (negative = less); a gun sums its parts' values
 		bool shoulder_contact; // `shoulder_contact = true`: a stock the shooter's shoulder rests on
 
@@ -170,8 +150,8 @@ namespace gunsmith
 	const SPartData& part_data(LPCSTR section);
 
 	// Engine-wide tuning, [gunsmith_settings] in system configs (all optional). Some can also be changed while
-	// playing (set_setting; the Framework's MCM page does). The handling formulas' settings (recoil_strength,
-	// no_stock_recoil, ergo_strength, ergo_aim_k, ergo_sway_k) are the Framework's since 1 Nov 2026.
+	// playing (set_setting; the Framework's MCM page does). The handling formulas and their settings are the
+	// Framework's.
 	struct SSettings
 	{
 		float ergo_base; // receiver ergonomics when the weapon has no `ergonomics` key (50)
@@ -179,7 +159,7 @@ namespace gunsmith
 		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
 		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
 		float optic_base_fov;
-		// Aiming through a part's sight (Gunsmith Docs 13, "Aim direction"): the sight's roll is corrected from
+		// Aiming through a part's sight: the sight's roll is corrected from
 		// aim_roll_min degrees (1), and its line turned onto the view only when it is less than aim_turn_max
 		// degrees off (20; more is bad data). The correction is refined while the camera turns slower than
 		// aim_still_turn rad/s (0.1) and moves slower than aim_still_move m/s (0.3) for aim_still_time s (0.25),

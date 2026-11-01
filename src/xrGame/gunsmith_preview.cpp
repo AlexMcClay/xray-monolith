@@ -65,8 +65,7 @@ namespace gunsmith
 		// A live object's cell key: the object and its build.
 		void object_key(u16 id, const CTree& tree, string128& key)
 		{
-			// the tree's layout revision: a new number whenever its parts change (was a checksum of every node,
-			// worked out for every cell every frame until 1 Nov 2026)
+			// the tree's layout revision: a new number whenever its parts change
 			xr_sprintf(key, "o%u:%08x", u32(id), tree.layout_revision());
 		}
 
@@ -457,8 +456,8 @@ namespace gunsmith
 		const Fmatrix& vp = m_view_vp;
 		for (const CVisuals::SSlotPoint& p : m_view_points)
 		{
-			// Fmatrix::transform(Fvector4&, Fvector) returns x, y, z already divided by w (w kept). Dividing
-			// again (until 30 Oct 2026) scaled every dot by 1/distance: right only near the default camera.
+			// Fmatrix::transform(Fvector4&, Fvector) returns x, y, z already divided by w (w kept): don't divide
+			// again, or every dot is scaled by 1/distance.
 			Fvector4 h;
 			vp.transform(h, p.pos);
 			SViewSlot s;
@@ -518,7 +517,7 @@ namespace gunsmith
 		if (!m_failed && Device.dwFrame - m_view_tick <= 1 && m_view_id != u16(-1))
 		{
 			// Only when what it shows changed (gun, build, camera, size), when the builder was just opened, and every
-			// 30 frames anyway, so a render target the driver dropped comes back (1 Nov 2026; drawn every frame before).
+			// 30 frames anyway, so a render target the driver dropped comes back.
 			SViewKey key;
 			key.id = m_view_id;
 			SSource src;

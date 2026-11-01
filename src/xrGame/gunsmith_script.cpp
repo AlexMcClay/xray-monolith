@@ -21,7 +21,7 @@ namespace gunsmith
 	{
 		::luabind::object result = ::luabind::newtable(L);
 
-		// Every slot section a fitted part blocks, worked out once (is_slot_blocked per slot walked every part)
+		// Every slot section a fitted part blocks, worked out once (is_slot_blocked walks every part per slot)
 		xr_vector<shared_str> blocked;
 		for (u32 i = 1; i < tree.size(); ++i)
 			for (const shared_str& b : part_data(tree.node(u8(i)).section).blocks_slots)
@@ -305,7 +305,7 @@ bool gs_is_full_mode(LPCSTR section)
 	return result;
 }
 
-// Gunsmith: part tree access on a weapon's server object, for guns that are
+// Part tree access on a weapon's server object, for guns that are
 // offline (NPC loadouts, traders, stashes). Same table format as game_object:gs_get_tree.
 // Takes the calling lua_State (raw<1>): see gunsmith_script.h.
 ::luabind::object cse_gs_get_tree_script(lua_State* L, CSE_ALifeItemWeapon* weapon)

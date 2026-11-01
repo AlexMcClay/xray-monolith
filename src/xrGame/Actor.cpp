@@ -2223,7 +2223,7 @@ bool CActor::AllowActorShadow()
 	if (flashlight && flashlight->torch_active())
 		return false;
 
-	// Gunsmith: a light on the gun would be blocked by the actor's own body, as the left-hand one
+	// A light on the gun would be blocked by the actor's own body, as the left-hand one
 	CWeapon* weapon = smart_cast<CWeapon*>(inventory().ActiveItem());
 	if (weapon && weapon->gs_devices_lit())
 		return false;

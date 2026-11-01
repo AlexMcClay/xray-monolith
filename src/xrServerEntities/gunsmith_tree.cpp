@@ -133,7 +133,7 @@ namespace gunsmith
 			packet.w_stringZ(n.section);
 			packet.w_u8(n.parent);
 			packet.w_u8(n.slot);
-			packet.w_float_q16(1.f, 0.f, 1.f); // unused (was the part's condition)
+			packet.w_float_q16(1.f, 0.f, 1.f); // unused, kept for the save layout
 			packet.w_u8(n.mode);
 		}
 	}
@@ -168,7 +168,7 @@ namespace gunsmith
 				goto corrupt;
 			packet.r_u8(n.parent);
 			packet.r_u8(n.slot);
-			packet.r_u16(); // unused (was the part's condition)
+			packet.r_u16(); // unused, kept for the save layout
 			if (version >= 2)
 			{
 				if (packet.r_elapsed() < sizeof(u8))

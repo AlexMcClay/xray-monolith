@@ -10,8 +10,7 @@
 namespace gunsmith
 {
 	// An old-style addon the weapon has attached but the tree has no slot for
-	// (for example a scope made attachable by an upgrade). It still counts, so
-	// stats stay exactly as they were before the tree existed.
+	// (for example a scope made attachable by an upgrade). It still counts, as in vanilla.
 	struct SExtraPart
 	{
 		shared_str section;
@@ -28,8 +27,7 @@ namespace gunsmith
 	// On top, a script layer (script_add, script_mul) that scripts set whenever the stats are recomputed
 	// (CWeapon::gs_script_stats, the weapon_on_recalc_stats callback). The parts' recoil percents and
 	// ergonomics are only summed here, with the stock build's; the Gunsmith Framework turns them into
-	// multipliers with Tarkov's formulas and the handling settings (gunsmith_handling.script; 1 Nov 2026,
-	// before that in this file).
+	// multipliers with Tarkov's formulas and the handling settings (gunsmith_handling.script).
 	struct SWeaponStats
 	{
 		float add[eStatCount];

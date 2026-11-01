@@ -11,7 +11,7 @@
 
 void CSE_ALifeItem::gs_write_subtree()
 {
-	// Gunsmith: a part item carries the parts mounted on it (plain part items only), in the "gs_subtree" block
+	// A part item carries the parts mounted on it (plain part items only), in the "gs_subtree" block
 	// after the state (CSE_Abstract::ext_*), not in it.
 	if (m_tClassID == CLSID_IITEM_ATTACH && m_gs_subtree.size() > 1)
 	{
@@ -26,8 +26,8 @@ void CSE_ALifeItem::gs_write_subtree()
 
 void CSE_ALifeItem::gs_read_subtree(NET_Packet& tNetPacket)
 {
-	// Gunsmith sub-tree: in the state itself in saves of SPAWN_VERSION 130 (29 Oct to 1 Nov 2026), in the
-	// "gs_subtree" block since. Packets with neither (vanilla saves, script-built state packets) leave the item
+	// The sub-tree is in the state itself in saves of SPAWN_VERSION 130, else in the "gs_subtree" block.
+	// Packets with neither (vanilla saves, script-built state packets) leave the item
 	// with what it had.
 	if (m_tClassID != CLSID_IITEM_ATTACH)
 		return;
@@ -88,8 +88,8 @@ void CSE_ALifeItemWeapon::gs_write_tree()
 
 void CSE_ALifeItemWeapon::gs_read_tree(NET_Packet& tNetPacket)
 {
-	// Gunsmith part tree: in the state itself in saves of SPAWN_VERSION 129 and 130 (29 Oct to 1 Nov 2026), in
-	// the "gs_tree" block since. Packets with neither (vanilla saves, script-built state packets) leave the
+	// The part tree is in the state itself in saves of SPAWN_VERSION 129 and 130, else in the "gs_tree" block.
+	// Packets with neither (vanilla saves, script-built state packets) leave the
 	// weapon's tree as it is: it is built from the addon flags on the next write or spawn when empty.
 	if (m_wVersion > 128 && !tNetPacket.r_eof())
 	{

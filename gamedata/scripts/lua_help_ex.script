@@ -242,7 +242,7 @@
     }
 
     class cse_abstract {
-        string get_script_data() // text a script keeps on this server object, saved with it; "" without (1 Nov 2026)
+        string get_script_data() // text a script keeps on this server object, saved with it; "" without
         bool set_script_data(string text) // stores it (up to 8 KB; "" removes it); false when too long. Saved as a named block after the object's state, so it needs no layout or SPAWN_VERSION change and survives saves, loads and online/offline switches
     }
 
@@ -1327,8 +1327,8 @@
         function GetConditionShotDec() // condition lost per shot, condition_shot_dec
         function SetConditionShotDec(float)
 
-        // Gunsmith: readings that differ from an unmodded exe's on a gun with parts, and how to read the unmodded value
-        // (Gunsmith Docs 24, "Vanilla readings"). A gun without Gunsmith parts reads as before.
+        // Gunsmith: readings that differ from an unmodded exe's on a gun with parts, and how to read the unmodded value.
+        // A gun without Gunsmith parts reads as unmodded.
         //   Weight(), game_object:weight()      include every fitted part      -> GetVanillaWeight()
         //   Cost(), game_object:cost()          include every fitted part      -> GetVanillaCost()
         //   game_object:weapon_is_silencer()    also true for a suppressor part -> IsSilencerAttached() for the

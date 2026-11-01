@@ -105,10 +105,10 @@ public:
 	xr_vector<u8> client_data;
 	virtual void load(NET_Packet& tNetPacket);
 
-	// Named data blocks saved after the object's own state (1 Nov 2026), so engine features and scripts can keep
+	// Named data blocks saved after the object's own state, so engine features and scripts can keep
 	// data on any object without changing its class's save layout or SPAWN_VERSION. Spawn_Write appends them
 	// behind STATE_Write's bytes, with their length and a marker at the very end; Spawn_Read takes them off the
-	// end before STATE_Read, which sees exactly the bytes it always did. A packet without them reads as before.
+	// end before STATE_Read, which sees exactly the bytes STATE_Write wrote. A packet without them reads as usual.
 	struct SExtBlock
 	{
 		shared_str name;

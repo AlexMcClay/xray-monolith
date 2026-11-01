@@ -1,8 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////
 //	Module 		: Weapon_gunsmith.cpp
 //	Description : CWeapon's Gunsmith code: the part tree, stats, sights, parts, devices and aiming through a
-//	              fitted sight. Moved out of Weapon.cpp unchanged (1 Nov 2026), so Weapon.cpp stays close to
-//	              upstream (Gunsmith Docs 24).
+//	              fitted sight. Kept out of Weapon.cpp so that file stays close to upstream.
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
@@ -95,7 +94,7 @@ void CWeapon::gs_set_legacy_addon(u8 legacy_addon, LPCSTR part)
 void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out) const
 {
 	// Attached old-style addons the tree has no slot for (e.g. made attachable by
-	// an upgrade) still count, as they did before the tree.
+	// an upgrade) still count, as in vanilla.
 	xr_vector<gunsmith::SExtraPart> extra;
 	const u8 mask = tree.legacy_mask();
 	auto add_extra = [&](u8 addon, ALife::EWeaponAddonStatus status, const shared_str& section)
@@ -723,7 +722,7 @@ int g_gs_debug = 0;
 namespace
 {
 	// The camera-space rotation that lays a sight line (forward f, up u, unit, camera space: x right, y up,
-	// z forward) along the view: forward onto +z, then, from 1 degree (Tarkov's SCOPE_ROTATION_THRESHOLD),
+	// z forward) along the view: forward onto +z, then, from aim_roll_min degrees (Tarkov's SCOPE_ROTATION_THRESHOLD),
 	// up onto +y (a canted sight rolls the gun upright). turn and roll are the angles applied (radians).
 	void gs_sight_line_rotation(const Fvector& f, const Fvector& u, Fmatrix& out, float& turn, float& roll)
 	{
@@ -815,15 +814,15 @@ bool CWeapon::gs_set_device_mode(u8 node, u8 mode)
 	return true;
 }
 
-// Devices light only on the actor's active weapon (NPCs' stay off for now), drawn on the HUD model in
+// Devices light only on the actor's active weapon (NPCs' stay off), drawn on the HUD model in
 // first person and on the world model otherwise.
 void CWeapon::gs_update_devices()
 {
 	SCOPE_TIMER("gs.devices.update");
 	if (!m_gs_full_mode)
 		return;
-	// Devices only light on the player's gun in hand: other guns (NPCs', the bag's) skip the device list's
-	// rebuild check each frame and just keep whatever they built off (1 Nov 2026). It's rebuilt when in hand.
+	// Other guns (NPCs', the bag's) skip the device list's rebuild check each frame and keep whatever
+	// they built, off. It is rebuilt when in hand.
 	CActor* actor = smart_cast<CActor*>(H_Parent());
 	if (!actor || actor->inventory().ActiveItem() != this || !gs_devices_on())
 	{
@@ -873,7 +872,7 @@ void CWeapon::DeleteHudItemData()
 
 void CWeapon::gs_world_fire_point(const Fmatrix& parent)
 {
-	// Gunsmith: the last part on the muzzle chain moves the fire point.
+	// The last part on the muzzle chain moves the fire point.
 	IKinematics* K = m_gs_full_mode && Visual() ? Visual()->dcast_PKinematics() : nullptr;
 	if (K)
 	{
@@ -953,17 +952,16 @@ void CWeapon::gs_after_spawn()
 {
 	gs_match_scope_part();
 	gs_rebuild_stats(false); // InitAddons below picks the suppressed or plain effects
-	// A new gun is spawned with its section's rounds (ammo_elapsed), which can be more than its magazine part holds
-	// (the EFT mod's M870 has 8, the stock Gunsmith tube 5): the tube stayed "full", and no reload until three were
-	// fired (user, 31 Oct 2026). What doesn't fit is dropped
+	// A new gun is spawned with its section's rounds (ammo_elapsed), which can be more than its magazine part
+	// holds (a shotgun tube part shorter than the section's). What doesn't fit is dropped, or the magazine
+	// would count as full past its size.
 	if (m_gs_applied_mag_size >= 0 && iAmmoElapsed > iMagazineSize)
 		iAmmoElapsed = iMagazineSize;
 }
 
 // A script may decide the shot (the weapon_on_shot callback; the Gunsmith Framework does Tarkov's malfunctions
 // there): its wear and whether, how and by which part it malfunctions. Otherwise CheckForMisfire uses the
-// receiver's own misfire curve (vanilla's misfire_* keys). Parts had their own jam curves until 2 Nov 2026
-// (Gunsmith Docs 25).
+// receiver's own misfire curve (vanilla's misfire_* keys).
 BOOL CWeapon::gs_misfire(u8 failure, u8 node)
 {
 	if (failure == gunsmith::eFailNone)
@@ -979,7 +977,7 @@ BOOL CWeapon::gs_misfire(u8 failure, u8 node)
 
 bool CWeapon::gs_fire_blocked()
 {
-	// Gunsmith: a required part is missing (e.g. no bolt), the gun can't fire.
+	// A required part is missing (e.g. no bolt), the gun can't fire.
 	if (!IsMisfire() && !m_gs_stats.can_fire)
 	{
 		if (!m_gs_cant_fire_logged)
@@ -1021,24 +1019,22 @@ void CWeaponMagazinedWGrenade::gs_apply_mag_size(int size, bool live)
 		inherited::gs_apply_mag_size(size, live);
 }
 
-	// Gunsmith: aim through the fitted sight part. Its aim point is kept on the camera's axis
-	// (where the screen centre and a collimator's dot are): a correction to the aim offset.
-	// When a sight is first aimed through, the correction is computed for the pose the HUD
-	// is moving to (the aim offset and rotation), from where the sight sits in the hands now,
-	// so it is right on the first aim; then it is refined while aiming steadily. An optic with
-	// aim_eye_point also gets its eye relief (z).
-// Called from UpdateHudAdditional with its camera, its aim offset index and the aim offset it is about to apply
-// (position, rotation, aim rotation); corrects the position and aim rotation (moved here 1 Nov 2026).
+// Aiming through the fitted sight part. Called from UpdateHudAdditional with its camera, its aim offset index
+// and the aim offset it is about to apply (position, rotation, aim rotation); corrects the position and aim
+// rotation so the sight's aim point stays on the camera's axis (where the screen centre and a collimator's dot
+// are). When a sight is first aimed through, the correction is computed for the pose the HUD is moving to, from
+// where the sight sits in the hands now, so it is right on the first aim; then it is refined while aiming
+// steadily. An optic with aim_eye_point also gets its eye relief (z).
 void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 idx,
 	Fvector& curr_offs, const Fvector& curr_rot, Fvector& curr_aim_rot)
 {
-	// Gunsmith: the camera m_item_transform was built with (it is updated after this call).
+	// The camera m_item_transform was built with (it is updated after this call).
 	const Fmatrix gs_prev_cam = m_gs_prev_cam;
 	const bool gs_prev_cam_ok = m_gs_prev_cam_ok;
 	m_gs_prev_cam = trans;
 	m_gs_prev_cam_ok = true;
 
-	// Gunsmith: aim through the fitted sight part
+	// Only aiming (offset index 1) a full-mode gun without modular attachments.
 	if (!(idx == 1 && !m_modular_attachments && m_gs_full_mode))
 		return;
 
@@ -1079,8 +1075,8 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 			off_inv.invert(offset_xform(m_hud_aim_rot, m_hud_offset[1], m_hud_offset[0]));
 			hands.mul_43(prev_inv, hi->m_item_transform);
 			hands.mulA_43(off_inv);
-			// The sight line at the aim offset: turned onto the view (pitch, yaw; roll from 1 degree)
-			// by an aim rotation, applied first in camera space (Gunsmith Docs 13, "Aim direction").
+			// The sight line at the aim offset: turned onto the view (pitch, yaw; roll from aim_roll_min)
+			// by an aim rotation, applied first in camera space.
 			Fmatrix aimed;
 			aimed.mul_43(offset_xform(curr_aim_rot, curr_rot, curr_offs), hands);
 			Fvector fwd, up;
@@ -1136,8 +1132,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 
 		// Refine once fully aimed and settled, not while firing, and only once the camera has
 		// been still for a moment: while turning or moving, the HUD's inertia and bob push the
-		// sight off axis on purpose, and learning that offset left the sight off afterwards
-		// (until 30 Oct 2026 it refined then, at 1.5/s, and took about a second to recover).
+		// sight off axis on purpose, and learning that offset would leave the sight off afterwards.
 		Fvector s;
 		hi->m_item_transform.transform_tiny(s, sight);
 		cam_inv.transform_tiny(s); // camera space: x right, y up, z forward
@@ -1174,7 +1169,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 	}
 }
 
-// Vanilla readings for scripts (Weapon_gunsmith_members.h, Gunsmith Docs 24).
+// Vanilla readings for scripts (Weapon_gunsmith_members.h).
 
 float CWeapon::GetVanillaWeight() const
 {
@@ -1219,7 +1214,7 @@ namespace
 		}
 	}
 
-	// `loaded`: the addon's *_k keys (Load*Koeffs, clamped to 0.01..2), what vanilla's Apply*Koeffs copied in.
+	// `loaded`: the addon's *_k keys (Load*Koeffs, clamped to 0.01..2), what vanilla's Apply*Koeffs copies in.
 	template <class K>
 	float addon_koef_get(const K& loaded, const K& cur, bool attached, u8 koef)
 	{
