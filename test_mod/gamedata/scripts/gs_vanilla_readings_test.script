@@ -1,0 +1,90 @@
+-- Vanilla readings test (engine branch vanilla-readings, Gunsmith Docs 04 "Vanilla readings").
+-- With the gun in hand:
+--   run_string gs_vanilla_readings_test.show()   every reading the branch changes or adds, into the log
+--   run_string gs_vanilla_readings_test.check()  sets each Set_<Addon>_* value, reads it back, restores it
+--   run_string gs_vanilla_readings_test.silencer_pdm(2)  Set_Silencer_PDM_Base(2), to see the spread change
+-- mod_system_gs_vanilla_readings_test.ltx gives wpn_sil_nato, the ACOG and the M203 the four keys the
+-- Get_<Addon>_* methods read (vanilla's addons have none of them), so the addon values show up.
+
+local function say(fmt, ...)
+	printf("[vanilla readings] " .. fmt, ...)
+end
+
+local function gun()
+	local obj = db.actor and db.actor:active_item()
+	local w = obj and IsWeapon(obj) and obj:cast_Weapon()
+	return obj, w
+end
+
+local addons = { "Silencer", "Scope", "Launcher" }
+local values = { "PDM_Base", "PDM_Vel", "PDM_Accel", "CrosshairInertion" }
+
+function show()
+	local obj, w = gun()
+	if not w then
+		say("no weapon in hand")
+		return
+	end
+	if not w.GetVanillaWeight then
+		say("this exe has no GetVanillaWeight: not the vanilla-readings build")
+		return
+	end
+	local st = obj.gs_get_stats and obj:gs_get_stats()
+	say("%s", obj:section())
+	say("  weapon_is_silencer %s, IsSilencerAttached %s, suppressed %s", tostring(obj:weapon_is_silencer()),
+		tostring(w:IsSilencerAttached()), st and tostring(st.suppressed) or "-")
+	say("  weight %.3f, GetVanillaWeight %.3f, difference %.3f; gs parts_weight %s", obj:weight(), w:GetVanillaWeight(),
+		obj:weight() - w:GetVanillaWeight(), st and string.format("%.3f", st.parts_weight) or "-")
+	say("  cost %d, GetVanillaCost %d, difference %d; gs parts_cost %s", obj:cost(), w:GetVanillaCost(),
+		obj:cost() - w:GetVanillaCost(), st and string.format("%.0f", st.parts_cost) or "-")
+	for _, a in ipairs(addons) do
+		local t = {}
+		for _, v in ipairs(values) do
+			t[#t + 1] = string.format("%s %.3f", v, w["Get_" .. a .. "_" .. v](w))
+		end
+		say("  %s: %s", a, table.concat(t, ", "))
+	end
+	if st and st.stats then
+		local s = st.stats
+		say("  in effect: pdm_base %.4f, pdm_vel %.4f, pdm_accel %.4f, crosshair_inertion %.4f",
+			s.pdm_base and s.pdm_base.value or -1, s.pdm_vel and s.pdm_vel.value or -1,
+			s.pdm_accel and s.pdm_accel.value or -1, s.crosshair_inertion and s.crosshair_inertion.value or -1)
+	end
+end
+
+-- As gunsmith_debug.check_setters: each value set to a test value, read back, set back to what it was.
+function check()
+	local obj, w = gun()
+	if not w then
+		say("no weapon in hand")
+		return
+	end
+	local ok = true
+	for _, a in ipairs(addons) do
+		for _, v in ipairs(values) do
+			local get, set = w["Get_" .. a .. "_" .. v], w["Set_" .. a .. "_" .. v]
+			local before = get(w)
+			local test = before * 0.5 + 0.25
+			set(w, test)
+			local got = get(w)
+			set(w, before)
+			local after = get(w)
+			local pass = math.abs(got - test) < 1e-4 and math.abs(after - before) < 1e-4
+			ok = ok and pass
+			say("%s_%s: %.4f, set %.4f, read %.4f, restored %.4f: %s", a, v, before, test, got, after, pass and "ok" or "FAILED")
+		end
+	end
+	say("%s: %s", obj:section(), ok and "all ok" or "FAILED")
+end
+
+-- The console lowercases what it runs, so the capitalised setter is called from here.
+function silencer_pdm(v)
+	local obj, w = gun()
+	if not w then
+		say("no weapon in hand")
+		return
+	end
+	local before = w:Get_Silencer_PDM_Base()
+	w:Set_Silencer_PDM_Base(tonumber(v) or 1)
+	say("Silencer_PDM_Base %.4f -> %.4f", before, w:Get_Silencer_PDM_Base())
+end

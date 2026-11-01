@@ -1324,6 +1324,22 @@
         function GetConditionShotDec() // condition lost per shot, condition_shot_dec
         function SetConditionShotDec(float)
 
+        // Gunsmith: readings that differ from an unmodded exe's on a gun with parts, and how to read the unmodded value
+        // (Gunsmith Docs 24, "Vanilla readings"). A gun without Gunsmith parts reads as before.
+        //   Weight(), game_object:weight()      include every fitted part      -> GetVanillaWeight()
+        //   Cost(), game_object:cost()          include every fitted part      -> GetVanillaCost()
+        //   game_object:weapon_is_silencer()    also true for a suppressor part, worn or not -> IsSilencerAttached() for the
+        //                                       silencer addon only; game_object:gs_get_stats().suppressed for "suppressing now"
+        //   GetAmmoMagSize()                    the fitted magazine part's size, as an upgrade would set it; fitting another
+        //                                       magazine part replaces a SetAmmoMagSize value
+        //   Get_/Set_<Silencer|Scope|Launcher>_<PDM_Base|PDM_Vel|PDM_Accel|CrosshairInertion>: as unmodded, the attached addon's
+        //                                       *_k key (1 without that addon); a set value replaces it until the addons change
+        //   The gun's own values (GetFireDispersion, RPM, GetHitPower, GetBulletSpeed, Get_PDM_*, GetZoomRotateTime, cam recoil)
+        //   leave the parts out, as they always left the addons out; game_object:gs_get_stats().stats[name].value is the
+        //   value in effect. Set* on them still works, and the parts multiply on top.
+        function GetVanillaWeight() // Weight() without the parts: the item, its old-style addons and the rounds loaded
+        function GetVanillaCost() // Cost() without the parts: the item, its old-style addons and the rounds loaded
+
         // World model on stalkers adjustments
         function Set_mOffset(Fvector position, Fvector orientation)
         function Set_mStrapOffset(Fvector position, Fvector orientation)

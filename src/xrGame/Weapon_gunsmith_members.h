@@ -33,6 +33,19 @@ public:
 	// Gameplay checks (shot sound, AI hearing) use this; IsSilencerAttached() stays the addon flag.
 	bool IsSuppressorFitted() const { return IsSilencerAttached() || m_gs_stats.suppressor_part; }
 
+	// Vanilla readings for scripts (Gunsmith Docs 24, "Vanilla readings"). Weight() and Cost() count every fitted
+	// part; these are what an unmodded exe's would give: the parts left out, the old-style addons counted.
+	float GetVanillaWeight() const;
+	u32 GetVanillaCost() const;
+	// The script values Get_/Set_<Silencer|Scope|Launcher>_<PDM_Base|PDM_Vel|PDM_Accel|CrosshairInertion>
+	// (WeaponAK74.cpp). The stats already fold an attached addon's *_k keys in, so cur_*_koef keeps only a script's
+	// factor on top (1 after InitAddons). Scripts read and set the vanilla value, the addon's multiplier times that
+	// factor, so a set value takes effect as it would without Gunsmith, and InitAddons resets it as before.
+	enum EAddonKind { eAddonKindSilencer, eAddonKindScope, eAddonKindLauncher };
+	enum EAddonKoef { eAddonKoefPdmBase, eAddonKoefPdmVel, eAddonKoefPdmAccel, eAddonKoefCrosshairInertion };
+	float GetAddonKoefScript(u8 addon, u8 koef) const;
+	void SetAddonKoefScript(u8 addon, u8 koef, float value);
+
 	float gs_pdm_base() const;
 	float gs_pdm_vel() const;
 	float gs_pdm_accel() const;
