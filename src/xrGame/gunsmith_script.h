@@ -33,7 +33,6 @@ namespace gunsmith
 class CScriptGameObject;
 ::luabind::object gs_get_tree_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_get_stats_script(lua_State* L, CScriptGameObject* self);
-::luabind::object gs_part_layout_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self);
 // The build's state revision (gunsmith_tree.h): a new number whenever its parts or modes change; 0 for other objects
 u32 gs_revision_script(CScriptGameObject* self);
@@ -43,22 +42,14 @@ u32 gs_revision_script(CScriptGameObject* self);
 int gs_fit_verdict_script(CScriptGameObject* self, LPCSTR section);
 // The jam type of a jammed gun ("barrel", "feed", "extraction"...), "none" when it isn't jammed or isn't a gun.
 LPCSTR gs_jam_type_script(CScriptGameObject* self);
-::luabind::object gs_sight_magnification_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_mode_script(lua_State* L, CScriptGameObject* self);
-::luabind::object gs_sight_mode_next_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sights_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_node_script(lua_State* L, CScriptGameObject* self);
-::luabind::object gs_sight_next_script(lua_State* L, CScriptGameObject* self);
-::luabind::object gs_sight_select_script(lua_State* L, CScriptGameObject* self, u8 node);
 ::luabind::object gs_sight_set_script(lua_State* L, CScriptGameObject* self, u8 node, u8 sight, u8 mode);
 ::luabind::object gs_tactical_set_on_script(lua_State* L, CScriptGameObject* self, bool on);
 ::luabind::object gs_tactical_state_script(lua_State* L, CScriptGameObject* self);
-::luabind::object gs_tactical_toggle_script(lua_State* L, CScriptGameObject* self);
-::luabind::object gs_tactical_next_mode_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_tactical_set_mode_script(lua_State* L, CScriptGameObject* self, u8 node, u8 mode);
-::luabind::object gs_preview_stats_script(lua_State* L, CScriptGameObject* self, ::luabind::object changes);
 ::luabind::object gs_preview_attach_script(lua_State* L, CScriptGameObject* self, CScriptGameObject* item, u8 parent, u8 slot);
-::luabind::object gs_detach_script(lua_State* L, CScriptGameObject* self, u8 node);
 ::luabind::object gs_detach_spawn_script(lua_State* L, CScriptGameObject* self, u8 node, bool spawn);
 
 // gunsmith.model_bones(path): the bone names of a model (path without .ogf), or nil when
@@ -68,7 +59,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self);
 
 // Previews (gunsmith_preview.h): inventory icons and the workbench view.
 //   gunsmith.icon_rect(id) / icon_rect_section(section)  {x1, y1, x2, y2} in icon_texture(), or nil
-//   gunsmith.preview_object(id) / preview_section(section) / preview_clear()
+//   gunsmith.preview_object(id) / preview_clear()
 //   gunsmith.preview_camera(yaw, pitch, zoom, pan_x, pan_y, aspect), preview_tick() every frame shown
 //   gunsmith.preview_slots()  { {node, slot, u, v, visible}, ... } with the current camera
 //   gunsmith.preview_bounds() {x1, y1, x2, y2} of the build on screen (0..1), or nil
@@ -81,7 +72,6 @@ LPCSTR gs_icon_texture();
 LPCSTR gs_preview_texture();
 bool gs_preview_available();
 void gs_preview_object(u16 id);
-void gs_preview_section(LPCSTR section);
 void gs_preview_clear();
 void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pan_y, float aspect);
 ::luabind::object gs_preview_slots_script(lua_State* L);
@@ -90,7 +80,6 @@ void gs_preview_resolution(u32 w, u32 h);
 void gs_preview_tick();
 bool gs_is_full_mode(LPCSTR section);
 bool gs_set_setting(LPCSTR name, float value);
-float gs_get_setting(LPCSTR name);
 // Every weapon in play recomputes its stats, so weapon_on_recalc_stats runs for each (after a handling setting
 // changes: the Framework's MCM page).
 void gs_refresh_stats_script();

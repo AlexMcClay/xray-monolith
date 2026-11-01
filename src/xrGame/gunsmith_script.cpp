@@ -227,7 +227,6 @@ LPCSTR gs_icon_texture() { return "$user$gs_icons"; }
 LPCSTR gs_preview_texture() { return "$user$gs_view"; }
 bool gs_preview_available() { return gunsmith::CPreview::instance().available(); }
 void gs_preview_object(u16 id) { gunsmith::CPreview::instance().view_object(id); }
-void gs_preview_section(LPCSTR section) { gunsmith::CPreview::instance().view_section(section); }
 void gs_preview_clear() { gunsmith::CPreview::instance().view_clear(); }
 void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pan_y, float aspect)
 {
@@ -269,7 +268,6 @@ bool gs_carries_parts(u16 id)
 }
 
 bool gs_set_setting(LPCSTR name, float value) { return gunsmith::set_setting(name, value); }
-float gs_get_setting(LPCSTR name) { return gunsmith::get_setting(name); }
 
 void gs_refresh_stats_script()
 {

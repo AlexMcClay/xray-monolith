@@ -489,11 +489,6 @@ void CWeapon::SwitchZoomType()
 			return;
 	}
 
-	// Without a script: Gunsmith guns with two or more optics or red dots move to the next fitted sight
-	// (Gunsmith Docs 13). Vanilla's alternative aim (zoom type 1) is for vanilla guns.
-	if (m_gs_full_mode && gs_sight_next())
-		return;
-
 	if (!useSeparateUBGLKeybind)
     {
 		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))

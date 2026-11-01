@@ -1294,9 +1294,7 @@ public:
 	// Gunsmith part tree (script_game_object_gunsmith.cpp). Node and slot numbers are 0-based.
 	// Methods returning tables are free functions in gunsmith_script.h.
 	bool gs_can_attach(LPCSTR section, u8 parent, u8 slot);
-	LPCSTR gs_can_attach_reason(LPCSTR section, u8 parent, u8 slot);
 	bool gs_attach(CScriptGameObject* part, u8 parent, u8 slot);
-	bool gs_attach_section(LPCSTR section, u8 parent, u8 slot);
 #endif
 	//-Alundaio
 

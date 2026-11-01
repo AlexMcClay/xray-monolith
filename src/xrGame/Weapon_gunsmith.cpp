@@ -230,28 +230,6 @@ bool CWeapon::gs_sight_select(u8 node)
 	return true;
 }
 
-bool CWeapon::gs_sight_next()
-{
-	// every sight of every cyclable part, in tree order (a dual optic's second sight after its first)
-	xr_vector<u8> nodes;
-	gs_sight_list(nodes);
-	xr_vector<std::pair<u8, u8>> sights;
-	for (u8 n : nodes)
-	{
-		const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(n).section);
-		for (u8 s = 0; s < (pv.is_tactical() ? 1 : pv.sight_count()); ++s)
-			sights.push_back(std::make_pair(n, s));
-	}
-	if (sights.size() < 2)
-		return false;
-	const u8 cur = gs_sight_node();
-	const u8 cur_s = cur ? gunsmith::node_sight(gunsmith::part_visual(m_gs_tree.node(cur).section), m_gs_tree.node(cur).mode) : 0;
-	auto it = std::find(sights.begin(), sights.end(), std::make_pair(cur, cur_s));
-	const std::pair<u8, u8> next = (it == sights.end() || it + 1 == sights.end()) ? sights.front() : *(it + 1);
-	const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(next.first).section);
-	return gs_sight_set(next.first, next.second, gunsmith::node_sight_mode(pv, m_gs_tree.node(next.first).mode));
-}
-
 bool CWeapon::gs_sight_set(u8 node, u8 sight, u8 mode)
 {
 	if (node == 0 || node >= m_gs_tree.size())
@@ -286,15 +264,6 @@ u8 CWeapon::gs_sight_mode(u8* count) const
 	if (count)
 		*count = modes ? pv->mode_count() : 1;
 	return modes ? gunsmith::node_sight_mode(*pv, m_gs_tree.node(node).mode) : 0;
-}
-
-bool CWeapon::gs_sight_mode_next()
-{
-	u8 count;
-	const u8 mode = gs_sight_mode(&count);
-	if (count < 2)
-		return false;
-	return gs_sight_set(gs_sight_node(), 0, u8((mode + 1) % count)); // the aim correction re-predicts (its key has the mode)
 }
 
 const gunsmith::SPartVisual* CWeapon::gs_optic() const
@@ -875,16 +844,6 @@ void CWeapon::RenderAttachments()
 	m_gs_devices.render_beams(gunsmith::CVisuals::eWorld);
 }
 
-void CWeapon::gs_world_layout(xr_vector<std::pair<u8, Fmatrix>>& out)
-{
-	out.clear();
-	IKinematics* K = m_gs_full_mode && Visual() ? Visual()->dcast_PKinematics() : nullptr;
-	if (!K)
-		return;
-	m_gs_visuals.ensure(gunsmith::CVisuals::eWorld, K, m_gs_tree, cNameSect().c_str(), nullptr, true);
-	m_gs_visuals.layout(gunsmith::CVisuals::eWorld, K, out);
-}
-
 void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
 {
 	SCOPE_TIMER("gs.parts.hud_render");
@@ -903,11 +862,6 @@ bool CWeapon::gs_has_devices() const
 	return false;
 }
 
-bool CWeapon::gs_devices_toggle()
-{
-	return gs_devices_set_on(!gs_devices_on()) && gs_devices_on();
-}
-
 bool CWeapon::gs_devices_set_on(bool on)
 {
 	if (m_gs_tree.empty() || !gs_has_devices())
@@ -915,21 +869,6 @@ bool CWeapon::gs_devices_set_on(bool on)
 	m_gs_tree.set_devices_on(on);
 	gs_sync_to_server();
 	return true;
-}
-
-void CWeapon::gs_devices_next_mode()
-{
-	bool changed = false;
-	for (u8 i = 1; i < m_gs_tree.size(); ++i)
-	{
-		const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(i).section);
-		if (pv.tac_modes.size() < 2)
-			continue;
-		m_gs_tree.set_mode(i, u8((m_gs_tree.node(i).mode + 1) % pv.tac_modes.size()));
-		changed = true;
-	}
-	if (changed)
-		gs_sync_to_server();
 }
 
 bool CWeapon::gs_set_device_mode(u8 node, u8 mode)

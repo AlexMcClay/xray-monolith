@@ -81,8 +81,6 @@ public:
 	// slot has a mount_bone is drawn as its own model on its parent, in the world and on the HUD.
 	bool gs_full_mode() const { return m_gs_full_mode; }
 	gunsmith::CVisuals& gs_visuals() { return m_gs_visuals; }
-	// The world model's part models: tree node and transform in the receiver model's space.
-	void gs_world_layout(xr_vector<std::pair<u8, Fmatrix>>& out);
 	virtual void RenderAttachments();
 	virtual void render_hud_attachments(IKinematics* model, const Fmatrix& xform);
 	virtual bool hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos);
@@ -96,37 +94,27 @@ public:
 	// What aiming uses for that part's chosen sight and mode (gunsmith::sight_aim): false without a sight.
 	bool gs_sight_aim(gunsmith::SSightAim& out) const;
 
-	// Sight modes (Gunsmith Docs 13): the sight aimed through's next mode (false when it has only one),
-	// and its current mode (count: how many it has). Saved in the part's node mode.
-	bool gs_sight_mode_next();
+	// Sight modes (Gunsmith Docs 13): the sight aimed through's current mode (count: how many it has).
+	// Saved in the part's node mode.
 	u8 gs_sight_mode(u8* count = nullptr) const;
 
 	// Sight switching: the fitted cyclable sights (optics and red dots, in tree order), the node aimed
-	// through (0 = none), the next one (false with fewer than two), a given one (false if not cyclable).
+	// through (0 = none), a given one (false if not cyclable).
 	// The choice is saved in node 0's mode (bits 1-7); it follows its part when other parts come and go.
 	void gs_sight_list(xr_vector<u8>& out) const;
 	u8 gs_sight_node() const;
-	bool gs_sight_next();
 	bool gs_sight_select(u8 node);
 	// Aim through a fitted sight with a given sight of it (a dual optic's 0 or 1) and mode (0-based); false if it
-	// isn't a cyclable sight or either is out of range. The primitive scripts build sight switching on;
-	// gs_sight_next and gs_sight_mode_next are the default policy (V and H without a script).
+	// isn't a cyclable sight or either is out of range. The primitive scripts build sight switching on.
 	bool gs_sight_set(u8 node, u8 sight, u8 mode);
-	// Back to automatic (the best sight). Removing parts doesn't need it: CTree::remove_subtree renumbers the
-	// choice with the nodes, and drops it only when the chosen sight itself comes off.
-	void gs_sight_forget() { m_gs_tree.set_selected_sight(0); }
 
 	// Tactical devices (gunsmith_tactical.h): flashlights and lasers fitted as parts, any number,
 	// switched together. The state lives in the tree (saved with it): bit 0 of node 0's mode is the on
 	// flag (bits 1-7: the selected sight), each device node's mode its selected mode.
 	bool gs_devices_on() const { return m_gs_tree.devices_on(); }
 	bool gs_has_devices() const;
-	// Toggles every device; returns the new state.
-	bool gs_devices_toggle();
 	// Every device on or off; false without devices.
 	bool gs_devices_set_on(bool on);
-	// Every device to its next mode (each within its own modes).
-	void gs_devices_next_mode();
 	bool gs_set_device_mode(u8 node, u8 mode);
 	// A device light (not just a laser) is shining in first person or on the world model.
 	bool gs_devices_lit() const { return m_gs_devices.lit(); }

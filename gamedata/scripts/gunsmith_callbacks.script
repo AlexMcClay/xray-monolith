@@ -4,8 +4,8 @@
 	callbacks that any script can register with RegisterScriptCallback.
 
 	on_gs_part_attached(weapon, node, section)
-		A part went into the weapon's tree: through game_object:gs_attach,
-		gs_attach_section, or the inventory (scopes, silencers, launchers).
+		A part went into the weapon's tree: through game_object:gs_attach
+		or the inventory (scopes, silencers, launchers).
 		node is its 0-based node number.
 
 	on_gs_part_detached(weapon, section, item_id)
@@ -41,8 +41,8 @@
 	weapon_on_alt_aim_key(weapon, t)
 		The player pressed the alternative-aim key (wpn_func, V by default) with this weapon. Set
 		t.handled = true to take the key: the engine then does nothing more. Unhandled, the engine does
-		its own: a Gunsmith gun to its next sight, else vanilla's alternative aim or launcher. The
-		Gunsmith Framework's sight switching is a handler (gunsmith_sights).
+		vanilla's alternative aim or launcher. The Gunsmith Framework's sight switching is a handler
+		(gunsmith_sights).
 --]]
 
 AddScriptCallback("on_gs_part_attached")

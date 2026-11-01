@@ -194,10 +194,6 @@ namespace gunsmith
 		// receiver model's space. Null without a sight.
 		const SPartVisual* sight_eye(IKinematics* root, Fvector& eye, bool& has_eye);
 
-		// Each child's tree node and transform in the root model's space, with the root's bones
-		// recalculated first (the model may not have been drawn), e.g. for inventory icons.
-		void layout(int ctx, IKinematics* root, xr_vector<std::pair<u8, Fmatrix>>& out);
-
 		// Appends each child's model and transform in the root model's space, children's bones
 		// recalculated, for drawing the build elsewhere (gunsmith_preview). The caller calculates
 		// the root's bones.

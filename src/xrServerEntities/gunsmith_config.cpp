@@ -444,10 +444,4 @@ namespace gunsmith
 		*p = _max(0.f, value);
 		return true;
 	}
-
-	float get_setting(LPCSTR name)
-	{
-		const float* p = setting_ptr(name);
-		return p ? *p : 0.f;
-	}
 }

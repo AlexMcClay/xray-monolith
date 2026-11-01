@@ -2951,7 +2951,6 @@ void CLevel::script_register(lua_State* L)
 		def("preview_size", &gs_preview_size_script, raw<1>()),
 		def("preview_available", &gs_preview_available),
 		def("preview_object", &gs_preview_object),
-		def("preview_section", &gs_preview_section),
 		def("preview_clear", &gs_preview_clear),
 		def("preview_camera", &gs_preview_camera),
 		def("preview_tick", &gs_preview_tick),
@@ -2960,7 +2959,6 @@ void CLevel::script_register(lua_State* L)
 		def("preview_resolution", &gs_preview_resolution),
 		def("is_full_mode", &gs_is_full_mode),
 		def("set_setting", &gs_set_setting),
-		def("get_setting", &gs_get_setting),
 		def("refresh_stats", &gs_refresh_stats_script),
 		def("carries_parts", &gs_carries_parts)
 	];

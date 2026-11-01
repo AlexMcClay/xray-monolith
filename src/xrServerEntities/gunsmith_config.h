@@ -189,5 +189,4 @@ namespace gunsmith
 	const SSettings& settings();
 	// Settings by name (recoil_recovery). False for an unknown name. Takes effect at once.
 	bool set_setting(LPCSTR name, float value);
-	float get_setting(LPCSTR name);
 }

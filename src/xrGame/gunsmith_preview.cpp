@@ -217,19 +217,11 @@ namespace gunsmith
 	void CPreview::view_object(u16 id)
 	{
 		m_view_id = id;
-		m_view_section = nullptr;
-	}
-
-	void CPreview::view_section(LPCSTR section)
-	{
-		m_view_id = u16(-1);
-		m_view_section = section;
 	}
 
 	void CPreview::view_clear()
 	{
 		m_view_id = u16(-1);
-		m_view_section = nullptr;
 		m_view_points.clear();
 	}
 
@@ -400,7 +392,7 @@ namespace gunsmith
 	{
 		SCOPE_TIMER("gs.preview.view");
 		DRAW_LIST list;
-		if (!draw_list(m_view_id, m_view_section.c_str(), list))
+		if (!draw_list(m_view_id, nullptr, list))
 			return;
 
 		bounds(list, m_view_box);
@@ -429,13 +421,8 @@ namespace gunsmith
 		m_view_points.clear();
 		IKinematics* K = list.front().first->dcast_PKinematics();
 		SSource src;
-		if (m_view_id != u16(-1))
-		{
-			if (object_source(m_view_id, src))
-				src.visuals->slot_points(CVisuals::eWorld, K, *src.tree, src.owner.c_str(), nullptr, m_view_points);
-		}
-		else if (SScene* s = scene(m_view_section.c_str()))
-			s->visuals.slot_points(CVisuals::eWorld, K, s->tree, m_view_section.c_str(), nullptr, m_view_points);
+		if (object_source(m_view_id, src))
+			src.visuals->slot_points(CVisuals::eWorld, K, *src.tree, src.owner.c_str(), nullptr, m_view_points);
 	}
 
 	// Orbits the build's centre; yaw 0 / pitch 0 looks at its right side like the icons.
@@ -530,15 +517,14 @@ namespace gunsmith
 			++drawn;
 		}
 		// The view is drawn while the workbench keeps ticking it.
-		if (!m_failed && Device.dwFrame - m_view_tick <= 1 && (m_view_id != u16(-1) || m_view_section.size()))
+		if (!m_failed && Device.dwFrame - m_view_tick <= 1 && m_view_id != u16(-1))
 		{
 			// Only when what it shows changed (gun, build, camera, size), when the builder was just opened, and every
 			// 30 frames anyway, so a render target the driver dropped comes back (1 Nov 2026; drawn every frame before).
 			SViewKey key;
 			key.id = m_view_id;
-			key.section = m_view_section;
 			SSource src;
-			if (m_view_id != u16(-1) && object_source(m_view_id, src))
+			if (object_source(m_view_id, src))
 				key.revision = src.tree->state_revision();
 			key.yaw = m_yaw;
 			key.pitch = m_pitch;

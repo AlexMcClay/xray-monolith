@@ -51,7 +51,6 @@ namespace gunsmith
 
 		// Workbench view: what it shows, its camera, and view_tick() every frame it is shown.
 		void view_object(u16 id);
-		void view_section(LPCSTR section);
 		void view_clear();
 		// `aspect` is the shown view's width / height on screen; the texture is stretched to it.
 		void view_camera(float yaw_deg, float pitch_deg, float zoom, float pan_x, float pan_y, float aspect);
@@ -104,7 +103,6 @@ namespace gunsmith
 		bool m_failed = false;
 
 		u16 m_view_id = u16(-1);
-		shared_str m_view_section;
 		u32 m_view_tick = 0;
 		float m_yaw = 0.f, m_pitch = 10.f, m_zoom = 1.f, m_pan_x = 0.f, m_pan_y = 0.f, m_aspect = 2.f;
 		Fbox m_view_box; // of the last view drawn
@@ -116,13 +114,12 @@ namespace gunsmith
 		struct SViewKey
 		{
 			u16 id = u16(-1);
-			shared_str section;
 			u32 revision = 0;
 			float yaw = 0.f, pitch = 0.f, zoom = 0.f, pan_x = 0.f, pan_y = 0.f, aspect = 0.f;
 			u32 w = 0, h = 0;
 			bool operator==(const SViewKey& o) const
 			{
-				return id == o.id && section == o.section && revision == o.revision && yaw == o.yaw && pitch == o.pitch &&
+				return id == o.id && revision == o.revision && yaw == o.yaw && pitch == o.pitch &&
 					zoom == o.zoom && pan_x == o.pan_x && pan_y == o.pan_y && aspect == o.aspect && w == o.w && h == o.h;
 			}
 		};
