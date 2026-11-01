@@ -107,10 +107,55 @@ void player_hud_motion_container::load(IKinematicsAnimated* model, const shared_
 	}
 }
 
+Fvector* attachable_hud_item::script_offset(u8 part, u8 slot) const
+{
+	// Slots 8 and 9 (the attached scope's aim) live on the weapon, as in hud_adjust
+	const attachable_hud_item* owner = this;
+	if ((slot == 8 || slot == 9) && m_attach_place_idx == SCOPE_ATTACH_IDX)
+		owner = m_parent->attached_item(0);
+	return (owner && owner->m_parent_hud_item) ? owner->m_parent_hud_item->HudOffset(part, slot) : nullptr;
+}
+
+Fvector& attachable_hud_item::hud_offset(u8 part, u8 slot)
+{
+	if (slot != 0)
+	{
+		if (Fvector* o = script_offset(part, slot))
+			return *o;
+	}
+	return m_measures.m_hands_offset[part][slot];
+}
+
+Fvector attachable_hud_item::offset_value(u8 part, u8 slot)
+{
+	if (Fvector* o = script_offset(part, slot))
+		return *o;
+
+	switch (slot)
+	{
+	case 0: return m_measures.m_hands_attach[part];
+	case 8:
+	case 9:
+		{
+			// The attached scope's own section, when this weapon carries one
+			attachable_hud_item* si = m_parent->attached_item(SCOPE_ATTACH_IDX);
+			if (si && m_parent->attached_item(0) == this)
+				return si->m_measures.m_hands_offset[part][slot == 8 ? 1 : 3];
+			return m_measures.m_hands_offset[part][slot == 8 ? 1 : 3];
+		}
+	case 10: return part ? m_measures.m_fire_direction : m_measures.m_fire_point_offset;
+	case 11: return part ? m_measures.m_shell_point_offset : m_measures.m_fire_point2_offset;
+	case 12: return m_measures.m_item_attach[part];
+	default: return m_measures.m_hands_offset[part][slot];
+	}
+}
+
 Fvector& attachable_hud_item::hands_attach_pos()
 {
 	if (g_player_hud->m_adjust_mode)
 		return g_player_hud->m_adjust_offset[0][0];
+	if (Fvector* o = script_offset(0, 0))
+		return *o;
 	return m_measures.m_hands_attach[0];
 }
 
@@ -118,19 +163,21 @@ Fvector& attachable_hud_item::hands_attach_rot()
 {
 	if (g_player_hud->m_adjust_mode)
 		return g_player_hud->m_adjust_offset[1][0];
+	if (Fvector* o = script_offset(1, 0))
+		return *o;
 	return m_measures.m_hands_attach[1];
 }
 
 Fvector& attachable_hud_item::hands_offset_pos()
 {
 	u8 idx = m_parent_hud_item->GetCurrentHudOffsetIdx();
-	return m_measures.m_hands_offset[0][idx];
+	return hud_offset(0, idx);
 }
 
 Fvector& attachable_hud_item::hands_offset_rot()
 {
 	u8 idx = m_parent_hud_item->GetCurrentHudOffsetIdx();
-	return m_measures.m_hands_offset[1][idx];
+	return hud_offset(1, idx);
 }
 
 Fvector& attachable_hud_item::aim_offset_pos()
@@ -140,7 +187,10 @@ Fvector& attachable_hud_item::aim_offset_pos()
 			return g_player_hud->m_adjust_offset[0][8];
 		return g_player_hud->m_adjust_offset[0][1];
 	}
-	return m_measures.m_hands_offset[0][1];
+	if (m_attach_place_idx == SCOPE_ATTACH_IDX)
+		if (Fvector* o = script_offset(0, 8))
+			return *o;
+	return hud_offset(0, 1);
 }
 
 Fvector& attachable_hud_item::aim_offset_rot()
@@ -150,7 +200,10 @@ Fvector& attachable_hud_item::aim_offset_rot()
 			return g_player_hud->m_adjust_offset[1][8];
 		return g_player_hud->m_adjust_offset[1][1];
 	}
-	return m_measures.m_hands_offset[1][1];
+	if (m_attach_place_idx == SCOPE_ATTACH_IDX)
+		if (Fvector* o = script_offset(1, 8))
+			return *o;
+	return hud_offset(1, 1);
 }
 
 Fvector& attachable_hud_item::alt_aim_offset_pos()
@@ -160,7 +213,10 @@ Fvector& attachable_hud_item::alt_aim_offset_pos()
 			return g_player_hud->m_adjust_offset[0][9];
 		return g_player_hud->m_adjust_offset[0][3];
 	}
-	return m_measures.m_hands_offset[0][3];
+	if (m_attach_place_idx == SCOPE_ATTACH_IDX)
+		if (Fvector* o = script_offset(0, 9))
+			return *o;
+	return hud_offset(0, 3);
 }
 
 Fvector& attachable_hud_item::alt_aim_offset_rot()
@@ -170,35 +226,38 @@ Fvector& attachable_hud_item::alt_aim_offset_rot()
 			return g_player_hud->m_adjust_offset[1][9];
 		return g_player_hud->m_adjust_offset[1][3];
 	}
-	return m_measures.m_hands_offset[1][3];
+	if (m_attach_place_idx == SCOPE_ATTACH_IDX)
+		if (Fvector* o = script_offset(1, 9))
+			return *o;
+	return hud_offset(1, 3);
 }
 
 Fvector& attachable_hud_item::attach_base_offset_pos()
 {
 	if (g_player_hud->m_adjust_mode)
 		return g_player_hud->m_adjust_offset[0][6];
-	return m_measures.m_hands_offset[0][6];
+	return hud_offset(0, 6);
 }
 
 Fvector& attachable_hud_item::attach_base_offset_rot()
 {
 	if (g_player_hud->m_adjust_mode)
 		return g_player_hud->m_adjust_offset[1][6];
-	return m_measures.m_hands_offset[1][6];
+	return hud_offset(1, 6);
 }
 
 Fvector& attachable_hud_item::attach_mount_offset_pos()
 {
 	if (g_player_hud->m_adjust_mode)
 		return g_player_hud->m_adjust_offset[0][7];
-	return m_measures.m_hands_offset[0][7];
+	return hud_offset(0, 7);
 }
 
 Fvector& attachable_hud_item::attach_mount_offset_rot()
 {
 	if (g_player_hud->m_adjust_mode)
 		return g_player_hud->m_adjust_offset[1][7];
-	return m_measures.m_hands_offset[1][7];
+	return hud_offset(1, 7);
 }
 
 float attachable_hud_item::attach_scale()
@@ -233,10 +292,10 @@ void attachable_hud_item::update(bool bForce)
 	if (!!m_measures.m_prop_flags.test(hud_item_measures::e_16x9_mode_now) != is_16x9)
 		m_measures.load(m_sect_name, m_model);
 
-	Fvector ypr = m_parent->m_adjust_mode ? m_parent->m_adjust_obj[1] : m_measures.m_item_attach[1];
+	Fvector ypr = m_parent->m_adjust_mode ? m_parent->m_adjust_obj[1] : offset_value(1, 12);
 	ypr.mul(PI / 180.f);
 	m_attach_offset.setHPB(ypr.x, ypr.y, ypr.z);
-	m_attach_offset.translate_over(m_parent->m_adjust_mode ? m_parent->m_adjust_obj[0] : m_measures.m_item_attach[0]);
+	m_attach_offset.translate_over(m_parent->m_adjust_mode ? m_parent->m_adjust_obj[0] : offset_value(0, 12));
 
 	if (m_attach_place_idx == SCOPE_ATTACH_IDX) {
 		m_item_transform.set(m_parent->attached_item(0)->m_item_transform);
@@ -274,14 +333,21 @@ void attachable_hud_item::update(bool bForce)
 void attachable_hud_item::setup_firedeps(firedeps& fd)
 {
 	update(false);
+	// hud_adjust's editor values, else the script overrides (slots 10 and 11), else the section's
+	auto fire_slot = [this](u8 part, u8 slot, const Fvector& def) -> const Fvector& {
+		if (m_parent->m_adjust_mode)
+			return m_parent->m_adjust_firepoint_shell[part][slot - 10];
+		const Fvector* o = script_offset(part, slot);
+		return o ? *o : def;
+	};
 	// fire point&direction
 	if (m_measures.m_prop_flags.test(hud_item_measures::e_fire_point))
 	{
 		Fmatrix& fire_mat = m_model->LL_GetTransform(m_measures.m_fire_bone);
-		fire_mat.transform_tiny(fd.vLastFP, m_parent->m_adjust_mode ? m_parent->m_adjust_firepoint_shell[0][0] : m_measures.m_fire_point_offset);
+		fire_mat.transform_tiny(fd.vLastFP, fire_slot(0, 10, m_measures.m_fire_point_offset));
 		m_item_transform.transform_tiny(fd.vLastFP);
 
-		fd.vLastFD.set(m_parent->m_adjust_mode ? m_parent->m_adjust_firepoint_shell[1][0] : m_measures.m_fire_direction);
+		fd.vLastFD.set(fire_slot(1, 10, m_measures.m_fire_direction));
 		m_item_transform.transform_dir(fd.vLastFD);
 		VERIFY(_valid(fd.vLastFD));
 
@@ -296,9 +362,9 @@ void attachable_hud_item::setup_firedeps(firedeps& fd)
 		// demonized: transforms for fire bone/point silencer, they should be identical to above if they dont exist
 		{
 			Fmatrix& fire_mat = m_model->LL_GetTransform(m_measures.m_fire_bone_silencer);
-			fire_mat.transform_tiny(fd.vLastFPSilencer, m_parent->m_adjust_mode ? m_parent->m_adjust_firepoint_shell[0][0] : m_measures.m_fire_point_silencer);
+			fire_mat.transform_tiny(fd.vLastFPSilencer, fire_slot(0, 10, m_measures.m_fire_point_silencer));
 			m_item_transform.transform_tiny(fd.vLastFPSilencer);
-			fd.vLastFD.set(m_parent->m_adjust_mode ? m_parent->m_adjust_firepoint_shell[1][0] : m_measures.m_fire_direction);
+			fd.vLastFD.set(fire_slot(1, 10, m_measures.m_fire_direction));
 			VERIFY(_valid(fd.vLastFPSilencer));
 		}
 	}
@@ -306,16 +372,16 @@ void attachable_hud_item::setup_firedeps(firedeps& fd)
 	if (m_measures.m_prop_flags.test(hud_item_measures::e_fire_point2))
 	{
 		Fmatrix& fire_mat = m_model->LL_GetTransform(m_measures.m_fire_bone2);
-		fire_mat.transform_tiny(fd.vLastFP2, m_parent->m_adjust_mode ? m_parent->m_adjust_firepoint_shell[0][1] : m_measures.m_fire_point2_offset);
+		fire_mat.transform_tiny(fd.vLastFP2, fire_slot(0, 11, m_measures.m_fire_point2_offset));
 		m_item_transform.transform_tiny(fd.vLastFP2);
-		fd.vLastFD.set(m_parent->m_adjust_mode ? m_parent->m_adjust_firepoint_shell[1][0] : m_measures.m_fire_direction);
+		fd.vLastFD.set(fire_slot(1, 10, m_measures.m_fire_direction));
 		VERIFY(_valid(fd.vLastFP2));
 	}
 
 	if (m_measures.m_prop_flags.test(hud_item_measures::e_shell_point))
 	{
 		Fmatrix& fire_mat = m_model->LL_GetTransform(m_measures.m_shell_bone);
-		fire_mat.transform_tiny(fd.vLastSP, m_parent->m_adjust_mode ? m_parent->m_adjust_firepoint_shell[1][1] : m_measures.m_shell_point_offset);
+		fire_mat.transform_tiny(fd.vLastSP, fire_slot(1, 11, m_measures.m_shell_point_offset));
 		m_item_transform.transform_tiny(fd.vLastSP);
 		VERIFY(_valid(fd.vLastSP));
 	}

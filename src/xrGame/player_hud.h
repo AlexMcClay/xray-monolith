@@ -352,6 +352,13 @@ struct attachable_hud_item
 	Fvector& attach_mount_offset_rot();
 	float attach_scale();
 
+	// An offset slot (1-7, as hud_adjust.set_vector) with its script override (CHudItem::SetHudOffset)
+	Fvector& hud_offset(u8 part, u8 slot);
+	// The script override of a slot on this item's object, or null; 8 and 9 are read from the weapon
+	Fvector* script_offset(u8 part, u8 slot) const;
+	// A slot's current value: the override, else the HUD section's (hud_adjust's editor values not included)
+	Fvector offset_value(u8 part, u8 slot);
+
 	//props
 	u32 m_upd_firedeps_frame;
 	void tune(Ivector values);
