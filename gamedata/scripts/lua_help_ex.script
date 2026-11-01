@@ -1120,6 +1120,19 @@
         void set_hud_fire_point2(Fvector value)
         void set_hud_fire_point_silencer(Fvector value)
 
+        // HUD offset overrides kept on the HUD item object (weapons, devices, PDA); not saved, survive HUD reloads
+        // index as hud_adjust.set_vector: 0 hands_position/orientation, 1 aim, 2 GL, 3 alt aim, 4 lowered,
+        // 5 base_hud_offset, 6 attach_base, 7 attach_mount, 8/9 attached scope's aim/alt aim (set on the weapon),
+        // 10 fire_point/fire_direction, 11 fire_point2/shell_point, 12 item_position/orientation
+        // Values replace the HUD section's, in its units (aim/lowered/base rotations in radians, hands and item orientation in degrees)
+        // While hud_adjust.enabled(true), the hud_adjust values win
+        void set_hud_offset(int index, Fvector position, Fvector rotation)
+        void reset_hud_offset(int index)
+        void reset_hud_offset() // all
+        bool has_hud_offset(int index)
+        Fvector hud_offset_pos(int index) // the override, else the HUD section's value
+        Fvector hud_offset_rot(int index)
+
         u16 hud_fire_bone_id()
         u16 hud_fire_bone2_id()
         u16 hud_fire_bone_silencer_id()

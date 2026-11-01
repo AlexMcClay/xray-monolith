@@ -146,6 +146,25 @@ public:
 
 	virtual u8 GetCurrentHudOffsetIdx() { return 0; }
 
+	// Script overrides of the HUD section's offsets, kept on this object (not saved).
+	// Slots as in hud_adjust.set_vector, in the units of the HUD section's keys:
+	// 0 hands_position/orientation, 1 aim, 2 GL, 3 alt aim, 4 lowered, 5 base_hud_offset,
+	// 6 attach base, 7 attach mount, 8/9 the attached scope's aim/alt aim (set on the weapon),
+	// 10 fire_point/fire_direction, 11 fire_point2/shell_point, 12 item_position/orientation.
+	enum { HUD_OFFSET_SLOTS = 13 };
+	void SetHudOffset(u8 slot, const Fvector& pos, const Fvector& rot);
+	void ResetHudOffset(u8 slot);
+	void ResetHudOffsets();
+	Fvector* HudOffset(u8 part, u8 slot) const; // part 0 position, 1 rotation; null when not set
+private:
+	struct hud_offsets
+	{
+		u16 m_set; // a bit per slot
+		Fvector m_value[2][HUD_OFFSET_SLOTS]; // pos,rot
+	};
+	hud_offsets* m_hud_offsets; // created by the first SetHudOffset
+public:
+
 	BOOL GetHUDmode();
 	void PlayBlendAnm(LPCSTR name, float speed = 1.f, float power = 1.f, bool stop_old = true);
 	IC bool IsPending() const { return !!m_huditem_flags.test(fl_pending); }

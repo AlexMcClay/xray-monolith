@@ -2619,12 +2619,12 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 		{
 			if (idx == 0)
 			{
-				curr_offs = hi->m_measures.m_hands_offset[0][5]; //pos,normal2
-				curr_rot = hi->m_measures.m_hands_offset[1][5]; //pos,normal2
+				curr_offs = hi->hud_offset(0, 5); //pos,normal2
+				curr_rot = hi->hud_offset(1, 5); //pos,normal2
 			}
 			else {
-				curr_offs = hi->m_measures.m_hands_offset[0][idx]; //pos,aim
-				curr_rot = hi->m_measures.m_hands_offset[1][idx]; //rot,aim
+				curr_offs = hi->hud_offset(0, idx); //pos,aim
+				curr_rot = hi->hud_offset(1, idx); //rot,aim
 			}
 		}
 		

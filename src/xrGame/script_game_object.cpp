@@ -414,6 +414,63 @@ static void validate_and_set_hud_fire_bone(attachable_hud_item* item, u16 bone_i
     item->m_measures.m_prop_flags.set(flag, TRUE);
 }
 
+// Per-object HUD offset overrides (CHudItem::SetHudOffset); slots as in hud_adjust.set_vector
+static CHudItem* get_script_hud_offset_item(CScriptGameObject* object, LPCSTR member, int index)
+{
+	CHudItem* item = smart_cast<CHudItem*>(&object->object());
+	if (!item)
+	{
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError,
+			"CGameObject : cannot access class member %s!", member);
+		return nullptr;
+	}
+	if (index < 0 || index >= CHudItem::HUD_OFFSET_SLOTS)
+	{
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError,
+			"CGameObject : %s: index %d is not 0-%d", member, index, CHudItem::HUD_OFFSET_SLOTS - 1);
+		return nullptr;
+	}
+	return item;
+}
+
+void CScriptGameObject::set_hud_offset(int index, Fvector pos, Fvector rot)
+{
+	if (CHudItem* item = get_script_hud_offset_item(this, "set_hud_offset", index))
+		item->SetHudOffset(u8(index), pos, rot);
+}
+
+void CScriptGameObject::reset_hud_offset(int index)
+{
+	if (CHudItem* item = get_script_hud_offset_item(this, "reset_hud_offset", index))
+		item->ResetHudOffset(u8(index));
+}
+
+void CScriptGameObject::reset_hud_offsets()
+{
+	if (CHudItem* item = get_script_hud_offset_item(this, "reset_hud_offset", 0))
+		item->ResetHudOffsets();
+}
+
+bool CScriptGameObject::has_hud_offset(int index)
+{
+	CHudItem* item = get_script_hud_offset_item(this, "has_hud_offset", index);
+	return item && item->HudOffset(0, u8(index));
+}
+
+Fvector CScriptGameObject::hud_offset_pos(int index)
+{
+	CHudItem* item = get_script_hud_offset_item(this, "hud_offset_pos", index);
+	attachable_hud_item* hi = item ? item->HudItemData() : nullptr;
+	return hi ? hi->offset_value(0, u8(index)) : Fvector().set(0.f, 0.f, 0.f);
+}
+
+Fvector CScriptGameObject::hud_offset_rot(int index)
+{
+	CHudItem* item = get_script_hud_offset_item(this, "hud_offset_rot", index);
+	attachable_hud_item* hi = item ? item->HudItemData() : nullptr;
+	return hi ? hi->offset_value(1, u8(index)) : Fvector().set(0.f, 0.f, 0.f);
+}
+
 Fvector CScriptGameObject::hud_fire_point()
 {
 	attachable_hud_item* item = get_script_hud_item(this, "hud_fire_point");

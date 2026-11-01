@@ -51,6 +51,8 @@ CHudItem::CHudItem()
 	script_ui_funct = nullptr;
 	script_ui_bone = nullptr;
 	script_ui_matrix.identity();
+
+	m_hud_offsets = nullptr;
 }
 
 DLL_Pure* CHudItem::_construct()
@@ -67,6 +69,46 @@ DLL_Pure* CHudItem::_construct()
 CHudItem::~CHudItem()
 {
 	DeleteHudItemData();
+	xr_delete(m_hud_offsets);
+}
+
+void CHudItem::SetHudOffset(u8 slot, const Fvector& pos, const Fvector& rot)
+{
+	if (slot >= HUD_OFFSET_SLOTS)
+		return;
+
+	if (!m_hud_offsets)
+	{
+		m_hud_offsets = xr_new<hud_offsets>();
+		m_hud_offsets->m_set = 0;
+	}
+
+	m_hud_offsets->m_value[0][slot].set(pos);
+	m_hud_offsets->m_value[1][slot].set(rot);
+	m_hud_offsets->m_set |= u16(1 << slot);
+}
+
+void CHudItem::ResetHudOffset(u8 slot)
+{
+	if (!m_hud_offsets || slot >= HUD_OFFSET_SLOTS)
+		return;
+
+	m_hud_offsets->m_set &= u16(~(1 << slot));
+	if (!m_hud_offsets->m_set)
+		xr_delete(m_hud_offsets);
+}
+
+void CHudItem::ResetHudOffsets()
+{
+	xr_delete(m_hud_offsets);
+}
+
+Fvector* CHudItem::HudOffset(u8 part, u8 slot) const
+{
+	if (!m_hud_offsets || slot >= HUD_OFFSET_SLOTS || !(m_hud_offsets->m_set & (1 << slot)))
+		return nullptr;
+
+	return &m_hud_offsets->m_value[part][slot];
 }
 
 void CHudItem::DeleteHudItemData()

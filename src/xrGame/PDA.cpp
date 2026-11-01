@@ -584,12 +584,12 @@ void CPda::UpdateHudAdditional(Fmatrix& trans)
 	{
 		if (!m_bZoomed)
 		{
-			curr_offs = hi->m_measures.m_hands_offset[0][5]; //pos,normal2
-			curr_rot = hi->m_measures.m_hands_offset[1][5]; //pos,normal2
+			curr_offs = hi->hud_offset(0, 5); //pos,normal2
+			curr_rot = hi->hud_offset(1, 5); //pos,normal2
 		}
 		else {
-			curr_offs = hi->m_measures.m_hands_offset[0][1]; //pos,aim
-			curr_rot = hi->m_measures.m_hands_offset[1][1]; //rot,aim
+			curr_offs = hi->hud_offset(0, 1); //pos,aim
+			curr_rot = hi->hud_offset(1, 1); //rot,aim
 		}
 	}
 	

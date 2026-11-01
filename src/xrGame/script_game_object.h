@@ -1123,6 +1123,12 @@ public:
 	void set_hud_fire_point(Fvector value);
 	void set_hud_fire_point2(Fvector value);
 	void set_hud_fire_point_silencer(Fvector value);
+	void set_hud_offset(int index, Fvector pos, Fvector rot);
+	void reset_hud_offset(int index);
+	void reset_hud_offsets();
+	bool has_hud_offset(int index);
+	Fvector hud_offset_pos(int index);
+	Fvector hud_offset_rot(int index);
 	u16 hud_fire_bone();
 	u16 hud_fire_bone2();
 	u16 hud_fire_bone_silencer();
