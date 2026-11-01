@@ -274,9 +274,23 @@ bool CWeapon::gs_sight_next()
 	auto it = std::find(sights.begin(), sights.end(), std::make_pair(cur, cur_s));
 	const std::pair<u8, u8> next = (it == sights.end() || it + 1 == sights.end()) ? sights.front() : *(it + 1);
 	const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(next.first).section);
+	return gs_sight_set(next.first, next.second, gunsmith::node_sight_mode(pv, m_gs_tree.node(next.first).mode));
+}
+
+bool CWeapon::gs_sight_set(u8 node, u8 sight, u8 mode)
+{
+	if (node == 0 || node >= m_gs_tree.size())
+		return false;
+	const gunsmith::SPartVisual& pv = gunsmith::part_visual(m_gs_tree.node(node).section);
+	if (!gunsmith::is_cyclable_sight(pv))
+		return false;
 	if (!pv.is_tactical())
-		m_gs_tree.set_mode(next.first, gunsmith::make_sight_mode(next.second, gunsmith::node_sight_mode(pv, m_gs_tree.node(next.first).mode)));
-	return gs_sight_select(next.first);
+	{
+		if (sight >= pv.sight_count() || mode >= pv.mode_count())
+			return false;
+		m_gs_tree.set_mode(node, gunsmith::make_sight_mode(sight, mode));
+	}
+	return gs_sight_select(node); // the zoom, overlay and lens follow there
 }
 
 bool CWeapon::gs_sight_aim(gunsmith::SSightAim& out) const
@@ -305,11 +319,7 @@ bool CWeapon::gs_sight_mode_next()
 	const u8 mode = gs_sight_mode(&count);
 	if (count < 2)
 		return false;
-	const u8 node = gs_sight_node();
-	m_gs_tree.set_mode(node, gunsmith::make_sight_mode(0, u8((mode + 1) % count)));
-	gs_update_optic(); // zoom and lens follow; the aim correction re-predicts on its own (its key has the mode)
-	gs_sync_to_server();
-	return true;
+	return gs_sight_set(gs_sight_node(), 0, u8((mode + 1) % count)); // the aim correction re-predicts (its key has the mode)
 }
 
 const gunsmith::SPartVisual* CWeapon::gs_optic() const
@@ -951,7 +961,7 @@ namespace
 		roll = atan2f(u1.x, u1.y); // the sight's up, off the camera's up
 		Fmatrix r2;
 		r2.identity();
-		if (_abs(roll) >= deg2rad(1.f))
+		if (_abs(roll) >= deg2rad(gunsmith::settings().aim_roll_min))
 		{
 			r2.rotation(z, roll);
 			Fvector t;
@@ -1007,11 +1017,16 @@ bool CWeapon::gs_has_devices() const
 
 bool CWeapon::gs_devices_toggle()
 {
+	return gs_devices_set_on(!gs_devices_on()) && gs_devices_on();
+}
+
+bool CWeapon::gs_devices_set_on(bool on)
+{
 	if (m_gs_tree.empty() || !gs_has_devices())
 		return false;
-	m_gs_tree.set_devices_on(!m_gs_tree.devices_on());
+	m_gs_tree.set_devices_on(on);
 	gs_sync_to_server();
-	return gs_devices_on();
+	return true;
 }
 
 void CWeapon::gs_devices_next_mode()
@@ -1152,7 +1167,8 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const
 				Fmatrix line, base, turned;
 				float turn, roll;
 				gs_sight_line_rotation(f, u, line, turn, roll);
-				if (turn < deg2rad(20.f)) // larger: bad data, not a sight line worth turning the gun to
+				const float turn_max = deg2rad(gunsmith::settings().aim_turn_max);
+				if (turn < turn_max) // larger: bad data, not a sight line worth turning the gun to
 				{
 					base.setHPB(curr_aim_rot.x, curr_aim_rot.y, curr_aim_rot.z);
 					turned.mul_43(line, base);
@@ -1160,7 +1176,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const
 				}
 				if (g_gs_aim_debug)
 					Msg("- gs_aim: sight [%s] line %.2f deg off the view, roll %.2f deg%s", key.c_str(),
-						rad2deg(turn), rad2deg(roll), turn < deg2rad(20.f) ? "" : " (too far: not turned)");
+						rad2deg(turn), rad2deg(roll), turn < turn_max ? "" : " (too far: not turned)");
 			}
 			// Where the sight lands with that rotation and no position correction (camera space).
 			aimed.mul_43(offset_xform(m_gs_aim_rot, curr_rot, curr_offs), hands);
@@ -1207,10 +1223,10 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const
 		{
 			const float turn = acosf(_min(1.f, gs_prev_cam.k.dotproduct(trans.k))) / dt; // rad/s
 			const float move = gs_prev_cam.c.distance_to(trans.c) / dt; // m/s
-			still = turn < 0.1f && move < 0.3f;
+			still = turn < gunsmith::settings().aim_still_turn && move < gunsmith::settings().aim_still_move;
 		}
 		m_gs_aim_still = still ? m_gs_aim_still + Device.fTimeDelta : 0.f;
-		if (aimed && idle && settled && m_gs_aim_still > 0.25f)
+		if (aimed && idle && settled && m_gs_aim_still > gunsmith::settings().aim_still_time)
 		{
 			const float k = _min(1.f, Device.fTimeDelta * g_gs_aim_speed);
 			Fvector d = {-s.x * k, -s.y * k, 0.f}, dl;

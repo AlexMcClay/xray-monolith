@@ -337,12 +337,26 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 	int i = 1;
 	for (u8 node : sights)
 	{
+		const gunsmith::SNode& n = weapon->gs_tree().node(node);
+		const gunsmith::SPartVisual& pv = gunsmith::part_visual(n.section);
 		::luabind::object s = ::luabind::newtable(L);
 		s["node"] = int(node);
-		s["section"] = weapon->gs_tree().node(node).section.c_str();
+		s["section"] = n.section.c_str();
+		s["tactical"] = pv.is_tactical(); // a device with a sight: no sights or modes of its own here
+		s["sights"] = int(pv.is_tactical() ? 1 : pv.sight_count()); // a dual optic has 2
+		s["modes"] = int(pv.is_tactical() ? 1 : pv.mode_count());
+		s["sight"] = int(gunsmith::node_sight(pv, n.mode));
+		s["mode"] = int(gunsmith::node_sight_mode(pv, n.mode));
 		t[i++] = s;
 	}
 	return t;
+}
+
+// Aim through a fitted sight with that sight of it and mode (0-based); false if it isn't one or out of range.
+::luabind::object gs_sight_set_script(lua_State* L, CScriptGameObject* self, u8 node, u8 sight, u8 mode)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_sight_set");
+	return ::luabind::object(L, weapon ? weapon->gs_sight_set(node, sight, mode) : false);
 }
 
 // The node of the sight the weapon aims through, or nil.
@@ -408,6 +422,13 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 {
 	CWeapon* weapon = gs_weapon(self, "gs_tactical_toggle");
 	return ::luabind::object(L, weapon ? weapon->gs_devices_toggle() : false);
+}
+
+// Every tactical device on or off; false without devices.
+::luabind::object gs_tactical_set_on_script(lua_State* L, CScriptGameObject* self, bool on)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_tactical_set_on");
+	return ::luabind::object(L, weapon ? weapon->gs_devices_set_on(on) : false);
 }
 
 // Every tactical device to its next mode.

@@ -577,6 +577,8 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		.def("gs_sight_node", &gs_sight_node_script, raw<1>())
 		.def("gs_sight_next", &gs_sight_next_script, raw<1>())
 		.def("gs_sight_select", &gs_sight_select_script, raw<1>())
+		.def("gs_sight_set", &gs_sight_set_script, raw<1>())
+		.def("gs_tactical_set_on", &gs_tactical_set_on_script, raw<1>())
 		.def("gs_tactical_state", &gs_tactical_state_script, raw<1>())
 		.def("gs_tactical_toggle", &gs_tactical_toggle_script, raw<1>())
 		.def("gs_tactical_next_mode", &gs_tactical_next_mode_script, raw<1>())

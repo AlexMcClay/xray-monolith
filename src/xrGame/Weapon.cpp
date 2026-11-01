@@ -479,7 +479,17 @@ void CWeapon::SetUIScope(LPCSTR scope_texture)
 BOOL useSeparateUBGLKeybind = TRUE;
 void CWeapon::SwitchZoomType()
 {
-	// Gunsmith guns with two or more optics or red dots: the key moves to the next fitted sight
+	// A script may take the key first: _G.CWeapon_OnAltAimKey(weapon) returning true (gunsmith_callbacks.script
+	// forwards it to the weapon_on_alt_aim_key callback; the Gunsmith Framework switches sights there).
+	::luabind::functor<::luabind::object> alt_key;
+	if (ai().script_engine().functor("_G.CWeapon_OnAltAimKey", alt_key))
+	{
+		::luabind::object handled = alt_key(lua_game_object());
+		if (handled.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(handled))
+			return;
+	}
+
+	// Without a script: Gunsmith guns with two or more optics or red dots move to the next fitted sight
 	// (Gunsmith Docs 13). Vanilla's alternative aim (zoom type 1) is for vanilla guns.
 	if (m_gs_full_mode && gs_sight_next())
 		return;

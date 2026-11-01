@@ -52,6 +52,8 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self);
 ::luabind::object gs_sight_node_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_next_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_sight_select_script(lua_State* L, CScriptGameObject* self, u8 node);
+::luabind::object gs_sight_set_script(lua_State* L, CScriptGameObject* self, u8 node, u8 sight, u8 mode);
+::luabind::object gs_tactical_set_on_script(lua_State* L, CScriptGameObject* self, bool on);
 ::luabind::object gs_tactical_state_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_tactical_toggle_script(lua_State* L, CScriptGameObject* self);
 ::luabind::object gs_tactical_next_mode_script(lua_State* L, CScriptGameObject* self);

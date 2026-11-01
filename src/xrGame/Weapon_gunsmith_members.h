@@ -108,6 +108,10 @@ public:
 	u8 gs_sight_node() const;
 	bool gs_sight_next();
 	bool gs_sight_select(u8 node);
+	// Aim through a fitted sight with a given sight of it (a dual optic's 0 or 1) and mode (0-based); false if it
+	// isn't a cyclable sight or either is out of range. The primitive scripts build sight switching on;
+	// gs_sight_next and gs_sight_mode_next are the default policy (V and H without a script).
+	bool gs_sight_set(u8 node, u8 sight, u8 mode);
 	// Back to automatic (the best sight). Removing parts doesn't need it: CTree::remove_subtree renumbers the
 	// choice with the nodes, and drops it only when the chosen sight itself comes off.
 	void gs_sight_forget() { m_gs_tree.set_selected_sight(0); }
@@ -119,6 +123,8 @@ public:
 	bool gs_has_devices() const;
 	// Toggles every device; returns the new state.
 	bool gs_devices_toggle();
+	// Every device on or off; false without devices.
+	bool gs_devices_set_on(bool on);
 	// Every device to its next mode (each within its own modes).
 	void gs_devices_next_mode();
 	bool gs_set_device_mode(u8 node, u8 mode);
