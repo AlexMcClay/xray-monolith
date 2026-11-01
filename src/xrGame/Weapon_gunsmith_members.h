@@ -24,18 +24,10 @@ public:
 	// Gameplay checks (shot sound, tracers, AI hearing) use this; IsSilencerAttached() stays the addon flag.
 	bool IsSuppressorFitted() const { return IsSilencerAttached() || m_gs_stats.suppressor_part; }
 
-	// Vanilla readings for scripts. Weight() and Cost() count every fitted part; these are what an unmodded
-	// exe's would give: the parts left out, the old-style addons counted.
-	float GetVanillaWeight() const;
-	u32 GetVanillaCost() const;
-	// The script values Get_/Set_<Silencer|Scope|Launcher>_<PDM_Base|PDM_Vel|PDM_Accel|CrosshairInertion>
-	// (WeaponAK74.cpp). The stats already fold an attached addon's *_k keys in, so cur_*_koef keeps only a script's
-	// factor on top (1 after InitAddons). Scripts read and set the vanilla value, the addon's multiplier times that
-	// factor, so a set value takes effect as it would without Gunsmith, and InitAddons resets it.
-	enum EAddonKind { eAddonKindSilencer, eAddonKindScope, eAddonKindLauncher };
-	enum EAddonKoef { eAddonKoefPdmBase, eAddonKoefPdmVel, eAddonKoefPdmAccel, eAddonKoefCrosshairInertion };
-	float GetAddonKoefScript(u8 addon, u8 koef) const;
-	void SetAddonKoefScript(u8 addon, u8 koef, float value);
+	// Vanilla readings for scripts. Weight() and Cost() count the fitted parts; these leave them out, as an
+	// unmodded exe's would (old-style addons counted).
+	float GetVanillaWeight() const { return Weight() - m_gs_stats.weight_add; }
+	u32 GetVanillaCost() const { return Cost() - (m_gs_stats.cost_add > 0.f ? u32(m_gs_stats.cost_add + 0.5f) : 0); }
 
 	float gs_pdm_base() const;
 	float gs_pdm_vel() const;
@@ -63,8 +55,11 @@ public:
 	// Puts an inventory item into a free non-addon slot, with any parts it carries.
 	// Fires on_gs_part_attached. The caller destroys the item.
 	bool gs_attach_item(CInventoryItem* item, u8 parent, u8 slot);
-	// Stats a tree would give this weapon (the live tree, or a preview copy), without the scripts' layer.
-	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out) const;
+	// Stats a tree would give this weapon (the live tree, or a preview copy), without the scripts' layer;
+	// with_addons: old-style addons counted (gunsmith_stats.h).
+	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out, bool with_addons) const;
+	// The live stats with old-style addons counted, for display (gs_get_stats).
+	void gs_display_stats(gunsmith::SWeaponStats& out) const;
 	// The scripts' layer of `stats` (script_add, script_mul): the weapon_on_recalc_stats callback, through
 	// _G.CWeapon_OnRecalcStats (gunsmith_callbacks.script), given the parts' totals; `preview` for a build that
 	// isn't the weapon's (the builder). Runs on every full recompute and preview, not per shot.

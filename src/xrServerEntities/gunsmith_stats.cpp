@@ -35,13 +35,16 @@ namespace gunsmith
 			}
 		}
 
-		void take_part(LPCSTR section, u8 legacy_addon, SWeaponStats& out)
+		// with_addons false: an old-style addon's multipliers, weight and cost are left to vanilla's code
+		void take_part(LPCSTR section, u8 legacy_addon, bool with_addons, SWeaponStats& out)
 		{
 			const SPartData& p = part_data(section);
 
 			for (u32 s = 0; s < eStatCount; ++s)
 			{
 				out.add[s] += p.add[s];
+				if (!with_addons && legacy_applies(legacy_addon, u8(s)))
+					continue;
 				if (p.has_mul[s])
 					out.mul[s] *= p.mul[s];
 				else if (legacy_applies(legacy_addon, u8(s)))
@@ -50,8 +53,11 @@ namespace gunsmith
 
 			if (legacy_addon != eLegacyNone)
 			{
-				out.weight_add += p.legacy_weight;
-				out.cost_add += p.legacy_cost;
+				if (with_addons)
+				{
+					out.weight_add += p.legacy_weight;
+					out.cost_add += p.legacy_cost;
+				}
 			}
 			else
 			{
@@ -88,14 +94,14 @@ namespace gunsmith
 	namespace
 	{
 		// The parts' modifiers as they are, before relating them to the stock build.
-		void compute_raw(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out)
+		void compute_raw(const CTree& tree, const xr_vector<SExtraPart>& extra, bool with_addons, SWeaponStats& out)
 		{
 			out.reset();
 
 			for (u32 i = 1; i < tree.size(); ++i)
-				take_part(tree.node(u8(i)).section.c_str(), tree.node_legacy_addon(u8(i)), out);
+				take_part(tree.node(u8(i)).section.c_str(), tree.node_legacy_addon(u8(i)), with_addons, out);
 			for (const SExtraPart& e : extra)
-				take_part(e.section.c_str(), e.legacy_addon, out);
+				take_part(e.section.c_str(), e.legacy_addon, with_addons, out);
 
 			const SSettings& cfg = settings();
 			const float base = tree.empty() ? cfg.ergo_base
@@ -116,14 +122,14 @@ namespace gunsmith
 			SWeaponStats s;
 			CTree t;
 			t.build_default(section.c_str(), 0);
-			compute_raw(t, xr_vector<SExtraPart>(), s);
+			compute_raw(t, xr_vector<SExtraPart>(), true, s);
 			return cache.insert(mk_pair(section, s)).first->second;
 		}
 	}
 
-	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out)
+	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out, bool with_addons)
 	{
-		compute_raw(tree, extra, out);
+		compute_raw(tree, extra, with_addons, out);
 		if (tree.empty())
 			return;
 

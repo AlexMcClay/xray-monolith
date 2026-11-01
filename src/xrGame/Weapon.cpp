@@ -3131,7 +3131,18 @@ float CWeapon::Weight() const
 {
 	float res = CInventoryItemObject::Weight();
 
-	// Attached parts, including old-style addons (their item inv_weight, as in vanilla).
+	if (IsGrenadeLauncherAttached() && GetGrenadeLauncherName().size())
+	{
+		res += pSettings->r_float(GetGrenadeLauncherName(), "inv_weight");
+	}
+	if (IsScopeAttached() && m_scopes.size())
+	{
+		res += pSettings->r_float(GetScopeName(), "inv_weight");
+	}
+	if (IsSilencerAttached() && GetSilencerName().size())
+	{
+		res += pSettings->r_float(GetSilencerName(), "inv_weight");
+	}
 	res += m_gs_stats.weight_add;
 
 	res += GetMagazineWeight(m_magazine);
@@ -3338,8 +3349,18 @@ void CWeapon::ZoomDec()
 u32 CWeapon::Cost() const
 {
 	u32 res = CInventoryItem::Cost();
-
-	// Attached parts, including old-style addons (their item cost, as in vanilla).
+	if (IsGrenadeLauncherAttached() && GetGrenadeLauncherName().size())
+	{
+		res += pSettings->r_u32(GetGrenadeLauncherName(), "cost");
+	}
+	if (IsScopeAttached() && m_scopes.size())
+	{
+		res += pSettings->r_u32(GetScopeName(), "cost");
+	}
+	if (IsSilencerAttached() && GetSilencerName().size())
+	{
+		res += pSettings->r_u32(GetSilencerName(), "cost");
+	}
 	if (m_gs_stats.cost_add > 0.f)
 		res += u32(m_gs_stats.cost_add + 0.5f);
 

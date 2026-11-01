@@ -24,6 +24,10 @@ namespace gunsmith
 	// They are also relative to the gun's stock build (its gs_default_build): a stock gun handles
 	// exactly as its section says (vanilla's numbers), and parts change it from there.
 	//
+	// Old-style addons (silencer, scope and launcher flags) keep vanilla's own code on the live weapon: their *_k
+	// multipliers (Apply*Koeffs), weight and cost. The live stats leave those out; displays and the builder's
+	// previews count them (compute's `with_addons`), so they show what the weapon gives.
+	//
 	// On top, a script layer (script_add, script_mul) that scripts set whenever the stats are recomputed
 	// (CWeapon::gs_script_stats, the weapon_on_recalc_stats callback). The parts' recoil percents and
 	// ergonomics are only summed here, with the stock build's; the Gunsmith Framework turns them into
@@ -57,5 +61,5 @@ namespace gunsmith
 		float horz_k() const { return mul[eStatCamHorz] * script_mul[eStatCamHorz]; } // horizontal: multiplier only
 	};
 
-	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out);
+	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out, bool with_addons);
 }

@@ -33,8 +33,10 @@ namespace
 		return weapon;
 	}
 
+	// `live`: the weapon's own stats for display (gs_display_stats), against which a preview's weight and cost go
 	::luabind::object stats_to_lua(lua_State* L, const CWeapon* weapon, const gunsmith::SWeaponStats& stats,
-	                               bool has_silencer, u8 jam_type, u8 jam_node, bool jammed)
+	                               const gunsmith::SWeaponStats& live, bool has_silencer, u8 jam_type, u8 jam_node,
+	                               bool jammed)
 	{
 		::luabind::object t = ::luabind::newtable(L);
 
@@ -46,8 +48,8 @@ namespace
 		t["shoulder"] = stats.shoulder;
 		t["no_stock"] = stats.stock_shoulder && !stats.shoulder;
 		// The weapon's weight and price with these parts instead of its current ones.
-		t["weight"] = weapon->Weight() - weapon->gs_stats().weight_add + stats.weight_add;
-		t["cost"] = float(weapon->Cost()) - weapon->gs_stats().cost_add + stats.cost_add;
+		t["weight"] = weapon->Weight() - live.weight_add + stats.weight_add;
+		t["cost"] = float(weapon->Cost()) - live.cost_add + stats.cost_add;
 		t["parts_weight"] = stats.weight_add;
 		t["parts_cost"] = stats.cost_add;
 		t["can_fire"] = stats.can_fire;
@@ -159,7 +161,9 @@ static bool gs_attach_script(CScriptGameObject* self, CScriptGameObject* part, u
 	CWeapon* weapon = gs_weapon(self, "gs_get_stats");
 	if (!weapon)
 		return ::luabind::newtable(L);
-	return stats_to_lua(L, weapon, weapon->gs_stats(), weapon->IsSuppressorFitted(), weapon->gs_jam_type(),
+	gunsmith::SWeaponStats live;
+	weapon->gs_display_stats(live);
+	return stats_to_lua(L, weapon, live, live, weapon->IsSuppressorFitted(), weapon->gs_jam_type(),
 	                    weapon->gs_jam_node(), weapon->IsMisfire());
 }
 
@@ -399,11 +403,13 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 	}
 
 	gunsmith::SWeaponStats stats;
-	weapon->gs_compute_stats(tree, stats);
+	weapon->gs_compute_stats(tree, stats, true);
 	weapon->gs_script_stats(stats, true);
 	const bool has_silencer = (tree.legacy_addon_flags() & gunsmith::eLegacySilencer) ||
 		(weapon->IsSilencerAttached() && !(tree.legacy_mask() & gunsmith::eLegacySilencer)) || stats.suppressor_part;
-	::luabind::object result = stats_to_lua(L, weapon, stats, has_silencer, 0, 0, false);
+	gunsmith::SWeaponStats live;
+	weapon->gs_display_stats(live);
+	::luabind::object result = stats_to_lua(L, weapon, stats, live, has_silencer, 0, 0, false);
 	result["errors"] = errors;
 	result["carried"] = carried;
 	result["dropped"] = dropped;

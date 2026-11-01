@@ -1668,17 +1668,14 @@ void CWeaponMagazined::LoadScopeKoeffs()
 	clamp(m_scope_koef.zoom_rotate_time, 0.01f, 2.0f);
 }
 
-// Gunsmith: addon multipliers come from the part tree (gs_stats(), which reads the same
-// *_k keys), so the cur_* sets stay neutral; they hold only a factor a script sets through
-// Set_<Addon>_* (CWeapon::SetAddonKoefScript), until the next InitAddons.
 void CWeaponMagazined::ApplySilencerKoeffs()
 {
-	cur_silencer_koef.Reset();
+	cur_silencer_koef = m_silencer_koef;
 }
 
 void CWeaponMagazined::ApplyScopeKoeffs()
 {
-	cur_scope_koef.Reset();
+	cur_scope_koef = m_scope_koef;
 }
 
 void CWeaponMagazined::ResetSilencerKoeffs()

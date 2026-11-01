@@ -707,10 +707,9 @@ void CWeaponMagazinedWGrenade::LoadLauncherKoeffs()
 	clamp(m_launcher_koef.zoom_rotate_time, 0.01f, 2.0f);
 }
 
-// Gunsmith: launcher multipliers come from the part tree (see ApplySilencerKoeffs).
 void CWeaponMagazinedWGrenade::ApplyLauncherKoeffs()
 {
-	cur_launcher_koef.Reset();
+	cur_launcher_koef = m_launcher_koef;
 }
 
 void CWeaponMagazinedWGrenade::ResetLauncherKoeffs()
