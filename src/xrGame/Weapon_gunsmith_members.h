@@ -24,6 +24,11 @@ public:
 	// Gameplay checks (shot sound, tracers, AI hearing) use this; IsSilencerAttached() stays the addon flag.
 	bool IsSuppressorFitted() const { return IsSilencerAttached() || m_gs_stats.suppressor_part; }
 
+	// Fire blocked by a script (game_object:set_fire_blocked; not saved): the trigger only clicks, for the player
+	// and NPCs.
+	void SetFireBlocked(bool v) { m_fire_blocked = v; }
+	bool IsFireBlocked() const { return m_fire_blocked; }
+
 	// Vanilla readings for scripts. Weight() and Cost() count the fitted parts; these leave them out, as an
 	// unmodded exe's would (old-style addons counted).
 	float GetVanillaWeight() const { return Weight() - m_gs_stats.weight_add; }
@@ -136,7 +141,7 @@ protected:
 	// A malfunction a script decided for this shot (eFailNone: none): the jam recorded, the shooting stopped.
 	BOOL gs_misfire(u8 failure, u8 node);
 	void gs_set_jam(u8 type, u8 node) { m_gs_jam_type = type; m_gs_jam_node = node; }
-	// A required part is missing: the gun clicks instead of firing (FireStart).
+	// FireStart: fire blocked by a script (SetFireBlocked), the gun clicks instead of firing (a jam still fires as one).
 	bool gs_fire_blocked();
 
 	gunsmith::CVisuals m_gs_visuals;
@@ -180,7 +185,7 @@ protected:
 	gunsmith::SWeaponStats m_gs_stats;
 	u8 m_gs_jam_type = 0;
 	u8 m_gs_jam_node = 0;
-	bool m_gs_cant_fire_logged = false;
+	bool m_fire_blocked = false;
 
 	// Per-shot wear: the weapon_on_shot callback's for this shot when a script took it (CheckForMisfire asks
 	// before the shot), times the wear setting; else the receiver's own (condition_shot_dec, the cartridge's

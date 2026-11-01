@@ -31,7 +31,7 @@
 		The engine recomputed a weapon's stats from its parts: at spawn and load, when a part goes on or
 		off, when gunsmith.refresh_stats() runs, and for the builder's previews (t.preview
 		true: a build the weapon doesn't have yet). Not per shot. Any weapon, the player's and NPCs'.
-		t.section is the weapon's; t.parts the fitted part sections (old-style addons included) and
+		t.section is the weapon's; t.can_fire false when a required slot is empty; t.parts the fitted part sections (old-style addons included) and
 		t.stock_parts its stock build's (gs_default_build), for handlers to read their own keys from.
 		Handlers multiply into t.mul and add into t.add by stat name (the names gs_get_stats() lists:
 		cam_dispersion, zoom_rotate_time, pdm_base, ...), on top of what the parts give, e.g.

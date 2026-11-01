@@ -146,8 +146,6 @@ void CWeapon::gs_rebuild_stats(bool notify)
 		gs_apply_mag_size(m_gs_base_mag_size, notify);
 	}
 
-	if (m_gs_stats.can_fire)
-		m_gs_cant_fire_logged = false;
 	if (notify && was_suppressed != IsSuppressorFitted())
 		gs_on_suppression_changed();
 	gs_update_optic();
@@ -162,6 +160,7 @@ void CWeapon::gs_script_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStat
 	::luabind::object t = ::luabind::newtable(L);
 	t["section"] = cNameSect().c_str();
 	t["preview"] = preview;
+	t["can_fire"] = stats.can_fire;
 	::luabind::object parts = ::luabind::newtable(L);
 	int n = 0;
 	for (u32 i = 1; i < tree.size(); ++i)
@@ -1002,14 +1001,8 @@ BOOL CWeapon::gs_misfire(u8 failure, u8 node)
 
 bool CWeapon::gs_fire_blocked()
 {
-	// A required part is missing (e.g. no bolt), the gun can't fire.
-	if (!IsMisfire() && !m_gs_stats.can_fire)
+	if (!IsMisfire() && m_fire_blocked)
 	{
-		if (!m_gs_cant_fire_logged)
-		{
-			Msg("- [gunsmith] [%s] cannot fire: a required part is missing", cNameSect().c_str());
-			m_gs_cant_fire_logged = true;
-		}
 		OnEmptyClick();
 		return true;
 	}

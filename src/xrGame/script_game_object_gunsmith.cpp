@@ -216,6 +216,18 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 	return weapon && weapon->IsMisfire() ? gunsmith::failure_name(weapon->gs_jam_type()) : "none";
 }
 
+void set_fire_blocked_script(CScriptGameObject* self, bool blocked)
+{
+	if (CWeapon* weapon = self ? smart_cast<CWeapon*>(&self->object()) : nullptr)
+		weapon->SetFireBlocked(blocked);
+}
+
+bool fire_blocked_script(CScriptGameObject* self)
+{
+	const CWeapon* weapon = self ? smart_cast<const CWeapon*>(&self->object()) : nullptr;
+	return weapon && weapon->IsFireBlocked();
+}
+
 // The section of the sight the weapon aims through (gs_mode = full), or nil.
 ::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self)
 {
@@ -426,6 +438,8 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 		.def("gs_revision", &gs_revision_script)
 		.def("gs_fit_verdict", &gs_fit_verdict_script)
 		.def("gs_jam_type", &gs_jam_type_script)
+		.def("set_fire_blocked", &set_fire_blocked_script)
+		.def("fire_blocked", &fire_blocked_script)
 		.def("gs_can_attach", &gs_can_attach_script)
 		.def("gs_attach", &gs_attach_script)
 		.def("gs_detach", &gs_detach_spawn_script, raw<1>())
