@@ -85,3 +85,11 @@ bool gs_set_setting(LPCSTR name, float value);
 void gs_refresh_stats_script();
 // gunsmith.carries_parts(id): whether a part item carries parts mounted on it.
 bool gs_carries_parts(u16 id);
+
+// cse_alife_item_weapon:gs_get_tree() / gs_set_tree(nodes) (xrServer_Objects_ALife_Items_script.cpp).
+class CSE_ALifeItemWeapon;
+::luabind::object cse_gs_get_tree_script(lua_State* L, CSE_ALifeItemWeapon* weapon);
+bool cse_gs_set_tree_script(CSE_ALifeItemWeapon* weapon, ::luabind::object nodes);
+
+// Registers the gunsmith module (called from CLevel::script_register).
+void gunsmith_script_register(lua_State* L);

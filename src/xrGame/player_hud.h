@@ -5,7 +5,12 @@
 #include "../Include/xrRender/KinematicsAnimated.h"
 #include "actor_defs.h"
 #include "player_hud_legs.h"
-#include "gunsmith_grip_ik.h"
+#include "hud_hand_ik.h"
+
+namespace gunsmith
+{
+	class CGripIK;
+}
 
 #define SCOPE_ATTACH_IDX 2
 
@@ -457,7 +462,7 @@ private:
 public:
 	IKinematicsAnimated* m_model;
 	IKinematicsAnimated* m_model_2;
-	gunsmith::CGripIK m_gs_grip; // the left hand on the fitted handguard or foregrip: a target for m_hand_ik[1]
+	gunsmith::CGripIK* m_gs_grip = nullptr; // the left hand on the fitted handguard or foregrip: a target for m_hand_ik[1]
 
 	// Hand IK (hud_hand_ik.h). Hand 0 is the right arm (m_model), 1 the left arm (m_model_2), as m_attached_items.
 	// A script target (set_ik_target) takes its hand while set or blending out; otherwise Gunsmith's grip IK may
@@ -476,6 +481,7 @@ public:
 	Fmatrix m_ik_anim_hand[2]; // each hand as animated this frame (before any IK), in its arm model's space
 	bool m_ik_anim_ok[2];
 	void update_hand_ik();
+	void free_hand_ik(); // hud_hand_ik.cpp, as the methods below
 	// the HUD item `item`'s model space (or its bone `bone`) in hand `hand`'s arm model space
 	bool ik_item_frame(u8 hand, u8 item, const shared_str& bone, Fmatrix& out);
 

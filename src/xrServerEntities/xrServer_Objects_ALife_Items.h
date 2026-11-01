@@ -98,6 +98,9 @@ SERVER_ENTITY_DECLARE_BEGIN2(CSE_ALifeItem, CSE_ALifeDynamicObjectVisual, CSE_AL
 	// with them (node 0 is this item). Only plain part items (II_ATTCH) save it, in the
 	// "gs_subtree" block (CSE_Abstract::ext_*; in the state in saves of SPAWN_VERSION 130).
 	gunsmith::CTree m_gs_subtree;
+	// STATE_Write / STATE_Read of m_gs_subtree (gunsmith_server.cpp).
+	void gs_write_subtree();
+	void gs_read_subtree(NET_Packet& tNetPacket);
 
 	CSE_ALifeItem(LPCSTR caSection);
 	virtual ~CSE_ALifeItem();
@@ -204,6 +207,10 @@ SERVER_ENTITY_DECLARE_BEGIN(CSE_ALifeItemWeapon, CSE_ALifeItem)
 	// Installs a tree (from a save or a script): validates it against this weapon's
 	// section and makes the addon flags follow it.
 	void gs_set_tree(const gunsmith::CTree& tree);
+
+	// STATE_Write / STATE_Read of m_gs_tree (gunsmith_server.cpp).
+	void gs_write_tree();
+	void gs_read_tree(NET_Packet& tNetPacket);
 
 	CSE_ALifeItemWeapon(LPCSTR caSection);
 	virtual ~CSE_ALifeItemWeapon();

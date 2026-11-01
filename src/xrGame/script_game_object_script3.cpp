@@ -35,7 +35,6 @@
 #include "sight_manager_space.h"
 #include "script_attachment_manager.h"
 #include "WeaponBinoculars.h"
-#include "gunsmith_script.h"
 
 using namespace luabind;
 
@@ -552,24 +551,6 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		//For Weapons
 		.def("weapon_addon_attach", SAFE_WRAP(&CScriptGameObject::Weapon_AddonAttach))
 		.def("weapon_addon_detach", SAFE_WRAP(&CScriptGameObject::Weapon_AddonDetach))
-		// Gunsmith part tree
-		.def("gs_get_tree", &gs_get_tree_script, raw<1>())
-		.def("gs_revision", &gs_revision_script)
-		.def("gs_fit_verdict", &gs_fit_verdict_script)
-		.def("gs_jam_type", &gs_jam_type_script)
-		.def("gs_can_attach", SAFE_WRAP(&CScriptGameObject::gs_can_attach))
-		.def("gs_attach", SAFE_WRAP(&CScriptGameObject::gs_attach))
-		.def("gs_detach", &gs_detach_spawn_script, raw<1>())
-		.def("gs_get_stats", &gs_get_stats_script, raw<1>())
-		.def("gs_preview_attach", &gs_preview_attach_script, raw<1>())
-		.def("gs_sight_section", &gs_sight_section_script, raw<1>())
-		.def("gs_sight_mode", &gs_sight_mode_script, raw<1>())
-		.def("gs_sights", &gs_sights_script, raw<1>())
-		.def("gs_sight_node", &gs_sight_node_script, raw<1>())
-		.def("gs_sight_set", &gs_sight_set_script, raw<1>())
-		.def("gs_tactical_set_on", &gs_tactical_set_on_script, raw<1>())
-		.def("gs_tactical_state", &gs_tactical_state_script, raw<1>())
-		.def("gs_tactical_set_mode", &gs_tactical_set_mode_script, raw<1>())
 		//For Weapon & Outfit
 		.def("install_upgrade", SAFE_WRAP(&CScriptGameObject::InstallUpgrade))
 		.def("has_upgrade", SAFE_WRAP(&CScriptGameObject::HasUpgrade))

@@ -8774,6 +8774,12 @@
     <ClCompile Include="gunsmith_preview.cpp">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClCompile>
+    <ClCompile Include="gunsmith_console.cpp">
+      <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
+    </ClCompile>
+    <ClCompile Include="gunsmith_item.cpp">
+      <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
+    </ClCompile>
     <ClCompile Include="script_game_object_script.cpp">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClCompile>
@@ -10257,6 +10263,9 @@
       <Filter>Core\Server\ServerEntities\objects_alife_items</Filter>
     </ClCompile>
     <ClCompile Include="..\xrServerEntities\gunsmith_tree.cpp">
+      <Filter>Core\Server\ServerEntities\objects_alife_items</Filter>
+    </ClCompile>
+    <ClCompile Include="..\xrServerEntities\gunsmith_server.cpp">
       <Filter>Core\Server\ServerEntities\objects_alife_items</Filter>
     </ClCompile>
     <ClCompile Include="..\xrServerEntities\gunsmith_stats.cpp">

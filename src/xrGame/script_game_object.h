@@ -1290,11 +1290,6 @@ public:
 	// demonized: get and set scope UI
 	::luabind::object get_scope_ui();
 	void set_scope_ui(LPCSTR scope_texture);
-
-	// Gunsmith part tree (script_game_object_gunsmith.cpp). Node and slot numbers are 0-based.
-	// Methods returning tables are free functions in gunsmith_script.h.
-	bool gs_can_attach(LPCSTR section, u8 parent, u8 slot);
-	bool gs_attach(CScriptGameObject* part, u8 parent, u8 slot);
 #endif
 	//-Alundaio
 

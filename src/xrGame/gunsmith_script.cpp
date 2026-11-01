@@ -9,6 +9,7 @@
 #include "inventory_item_object.h"
 #include "Level.h"
 #include "Weapon.h"
+#include "xrServer_Objects_ALife_Items.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "../Include/xrRender/Kinematics.h"
@@ -302,4 +303,53 @@ bool gs_is_full_mode(LPCSTR section)
 	if (visual)
 		::Render->model_Delete(visual);
 	return result;
+}
+
+// Gunsmith: part tree access on a weapon's server object, for guns that are
+// offline (NPC loadouts, traders, stashes). Same table format as game_object:gs_get_tree.
+// Takes the calling lua_State (raw<1>): see gunsmith_script.h.
+::luabind::object cse_gs_get_tree_script(lua_State* L, CSE_ALifeItemWeapon* weapon)
+{
+	weapon->gs_ensure_tree();
+	return gunsmith::tree_to_lua(L, weapon->m_gs_tree);
+}
+
+bool cse_gs_set_tree_script(CSE_ALifeItemWeapon* weapon, ::luabind::object nodes)
+{
+	gunsmith::CTree tree;
+	xr_string error;
+	if (!gunsmith::tree_from_lua(nodes, weapon->s_name.c_str(), tree, error))
+	{
+		Msg("! cse_alife_item_weapon:gs_set_tree [%s]: %s", weapon->s_name.c_str(), error.c_str());
+		return false;
+	}
+	weapon->gs_set_tree(tree);
+	return true;
+}
+
+// The gunsmith module (from CLevel::script_register).
+void gunsmith_script_register(lua_State* L)
+{
+	using namespace luabind;
+	module(L, "gunsmith")
+		[
+		def("model_bones", &gs_model_bones_script, raw<1>()),
+		def("icon_rect", &gs_icon_rect_script, raw<1>()),
+		def("icon_rect_section", &gs_icon_rect_section_script, raw<1>()),
+		def("icon_texture", &gs_icon_texture),
+		def("preview_texture", &gs_preview_texture),
+		def("preview_size", &gs_preview_size_script, raw<1>()),
+		def("preview_available", &gs_preview_available),
+		def("preview_object", &gs_preview_object),
+		def("preview_clear", &gs_preview_clear),
+		def("preview_camera", &gs_preview_camera),
+		def("preview_tick", &gs_preview_tick),
+		def("preview_slots", &gs_preview_slots_script, raw<1>()),
+		def("preview_bounds", &gs_preview_bounds_script, raw<1>()),
+		def("preview_resolution", &gs_preview_resolution),
+		def("is_full_mode", &gs_is_full_mode),
+		def("set_setting", &gs_set_setting),
+		def("refresh_stats", &gs_refresh_stats_script),
+		def("carries_parts", &gs_carries_parts)
+	];
 }

@@ -10,10 +10,10 @@
 
 #include "physic_item.h"
 #include "inventory_item.h"
-#include "gunsmith_tree.h"
 
 namespace gunsmith
 {
+	class CTree;
 	class CVisuals;
 }
 
@@ -84,14 +84,15 @@ public:
 
 	// Gunsmith: a part item (class II_ATTCH) carrying the parts mounted on it, copied from
 	// its server object at spawn. Those parts are drawn on its world model, and its icon
-	// shows them (gunsmith_preview).
-	bool gs_carries_parts() const { return m_gs_subtree.size() > 1; }
-	const gunsmith::CTree& gs_subtree() const { return m_gs_subtree; }
+	// shows them (gunsmith_preview). The bodies are in gunsmith_item.cpp.
+	bool gs_carries_parts() const;
+	const gunsmith::CTree& gs_subtree() const;
 	gunsmith::CVisuals& gs_part_visuals();
 	virtual void RenderAttachments();
 
 private:
-	gunsmith::CTree m_gs_subtree;
+	void gs_spawn_parts(CSE_Abstract* DC);
+	gunsmith::CTree* m_gs_subtree = nullptr; // created at the first spawn
 	gunsmith::CVisuals* m_gs_visuals = nullptr; // only for items that carry parts
 
 public:

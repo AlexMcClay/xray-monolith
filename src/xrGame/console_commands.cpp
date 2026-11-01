@@ -48,9 +48,6 @@
 #include "cameralook.h"
 #include "character_hit_animations_params.h"
 #include "inventory_upgrade_manager.h"
-#include "gunsmith_grip_ik.h"
-#include "scope_timers.h"
-extern int g_gs_debug; // Weapon_gunsmith.cpp
 
 #include "ai_debug_variables.h"
 #include "../xrphysics/console_vars.h"
@@ -312,6 +309,7 @@ xr_token dead_body_collision_tokens[] =
 };
 
 void register_mp_console_commands();
+void register_gunsmith_console_commands();
 //-----------------------------------------------------------
 
 BOOL g_bCheckTime = FALSE;
@@ -2517,11 +2515,7 @@ void CCC_RegisterCommands()
 	//g_OptConCom.Init();
 
 	CMD1(CCC_MemStats, "stat_memory");
-	CMD4(CCC_Integer, "scope_timers", &g_scope_timers, 0, 1);
-	CMD4(CCC_Integer, "scope_timers_period", &g_scope_timers_period, 1, 60);
-	CMD4(CCC_Integer, "gs_grip_ik", &g_gs_grip_ik, 0, 1);
-	CMD4(CCC_Integer, "gs_grip_type", &g_gs_grip_type, -1, 1);
-	CMD4(CCC_Integer, "gs_debug", &g_gs_debug, 0, 7);
+	register_gunsmith_console_commands();
 #ifdef DEBUG
 	CMD1(CCC_MemCheckpoint, "stat_memory_checkpoint");
 #endif //#ifdef DEBUG

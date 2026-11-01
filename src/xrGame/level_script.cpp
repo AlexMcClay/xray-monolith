@@ -2941,27 +2941,7 @@ void CLevel::script_register(lua_State* L)
 		def("add", &scope_timers::add_script)
 	];
 
-	module(L, "gunsmith")
-		[
-		def("model_bones", &gs_model_bones_script, raw<1>()),
-		def("icon_rect", &gs_icon_rect_script, raw<1>()),
-		def("icon_rect_section", &gs_icon_rect_section_script, raw<1>()),
-		def("icon_texture", &gs_icon_texture),
-		def("preview_texture", &gs_preview_texture),
-		def("preview_size", &gs_preview_size_script, raw<1>()),
-		def("preview_available", &gs_preview_available),
-		def("preview_object", &gs_preview_object),
-		def("preview_clear", &gs_preview_clear),
-		def("preview_camera", &gs_preview_camera),
-		def("preview_tick", &gs_preview_tick),
-		def("preview_slots", &gs_preview_slots_script, raw<1>()),
-		def("preview_bounds", &gs_preview_bounds_script, raw<1>()),
-		def("preview_resolution", &gs_preview_resolution),
-		def("is_full_mode", &gs_is_full_mode),
-		def("set_setting", &gs_set_setting),
-		def("refresh_stats", &gs_refresh_stats_script),
-		def("carries_parts", &gs_carries_parts)
-	];
+	gunsmith_script_register(L);
 
 	module(L, "relation_registry")
 	[

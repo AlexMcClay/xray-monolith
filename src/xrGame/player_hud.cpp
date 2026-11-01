@@ -857,6 +857,7 @@ player_hud::~player_hud()
 	delete_data(m_script_layers);
 	delete_data(m_movement_layers);
 	delete_data(m_bone_callback_params);
+	free_hand_ik();
 }
 
 void player_hud::FingerCallback(CBoneInstance* B)
@@ -1443,130 +1444,6 @@ void player_hud::update(const Fmatrix& cam_trans)
 		script_anim_offset_factor -= Device.fTimeDelta * 5.f;
 
 	clamp(script_anim_offset_factor, 0.f, 1.f);
-}
-
-namespace
-{
-	const float IK_BLEND = 4.f; // a script target's weight moves at most this much a second (set, cleared, reweighted)
-}
-
-bool player_hud::ik_item_frame(u8 hand, u8 item, const shared_str& bone, Fmatrix& out)
-{
-	attachable_hud_item* it = item <= SCOPE_ATTACH_IDX ? m_attached_items[item] : nullptr;
-	if (!it || !it->m_model)
-		return false;
-	Fmatrix frame = it->m_item_transform;
-	if (bone.size())
-	{
-		const u16 id = it->m_model->LL_BoneID(bone.c_str());
-		if (id == BI_NONE)
-			return false;
-		frame.mulB_43(it->m_model->LL_GetTransform(id));
-	}
-	Fmatrix inv;
-	inv.invert(hand == 0 ? m_transform : m_transform_2);
-	out.mul_43(inv, frame);
-	return true;
-}
-
-void player_hud::update_hand_ik()
-{
-	static u32 blend_frame = u32(-1); // the script weights move once a frame
-	const bool new_frame = blend_frame != Device.dwFrame;
-	blend_frame = Device.dwFrame;
-	IKinematics* arms[2] = {m_model->dcast_PKinematics(), m_model_2->dcast_PKinematics()};
-	bool script[2] = {false, false};
-	for (u8 h = 0; h < 2; ++h)
-	{
-		CHudHandIK& ik = m_hand_ik[h];
-		m_ik_anim_ok[h] = ik.ready(arms[h]);
-		if (!m_ik_anim_ok[h])
-			continue;
-		m_ik_anim_hand[h] = arms[h]->LL_GetTransform(ik.hand_bone());
-
-		SScriptIK& s = m_script_ik[h];
-		if (new_frame)
-		{
-			const float want = s.set ? s.want : 0.f;
-			if (s.weight < want)
-				s.weight = _min(want, s.weight + IK_BLEND * Device.fTimeDelta);
-			else
-				s.weight = _max(want, s.weight - IK_BLEND * Device.fTimeDelta);
-		}
-		if (!s.set && s.weight <= 0.f)
-			continue;
-		script[h] = true; // the script has this hand, even when its item or bone is missing this frame
-		Fmatrix frame;
-		if (s.weight <= 0.f || !ik_item_frame(h, s.item, s.bone, frame))
-			continue;
-		CHudHandIK::SPose pose;
-		pose.hand.mul_43(frame, s.offset);
-		pose.weight = s.weight;
-		ik.solve(pose);
-	}
-
-	// Gunsmith: the left hand on the fitted grip (not while the left hand holds something else, a script
-	// animation has the hands, or a script target has the left hand)
-	if (!script[1] && m_attached_items[0] && !m_attached_items[1] && script_anim_part == u8(-1))
-		m_gs_grip.update(m_hand_ik[1], arms[1], m_transform_2, m_attached_items[0]);
-}
-
-void player_hud::set_ik_target(u32 hand, const Fmatrix& m)
-{
-	set_ik_target_bone(hand, m, 0, nullptr);
-}
-
-void player_hud::set_ik_target_bone(u32 hand, const Fmatrix& m, u32 item, LPCSTR bone)
-{
-	if (hand > 1 || item > SCOPE_ATTACH_IDX)
-	{
-		Msg("! player_hud:set_ik_target: hand %u, item %u: the hand is 0 (right) or 1 (left), the item 0 to 2", hand, item);
-		return;
-	}
-	SScriptIK& s = m_script_ik[hand];
-	s.set = true;
-	s.offset = m;
-	s.item = u8(item);
-	s.bone = bone && bone[0] ? bone : nullptr;
-}
-
-void player_hud::clear_ik_target(u32 hand)
-{
-	if (hand > 1)
-		return;
-	m_script_ik[hand].set = false;
-	m_script_ik[hand].want = 1.f;
-}
-
-void player_hud::set_ik_weight(u32 hand, float weight)
-{
-	if (hand > 1)
-		return;
-	clamp(weight, 0.f, 1.f);
-	m_script_ik[hand].want = weight;
-}
-
-float player_hud::get_ik_weight(u32 hand)
-{
-	return hand > 1 ? 0.f : m_script_ik[hand].weight;
-}
-
-Fmatrix player_hud::get_ik_hand(u32 hand)
-{
-	return get_ik_hand_bone(hand, 0, nullptr);
-}
-
-Fmatrix player_hud::get_ik_hand_bone(u32 hand, u32 item, LPCSTR bone)
-{
-	Fmatrix out;
-	out.identity();
-	Fmatrix frame, inv;
-	if (hand > 1 || item > SCOPE_ATTACH_IDX || !m_ik_anim_ok[hand] ||
-		!ik_item_frame(u8(hand), u8(item), shared_str(bone && bone[0] ? bone : nullptr), frame))
-		return out;
-	inv.invert(frame);
-	out.mul_43(inv, m_ik_anim_hand[hand]);
-	return out;
 }
 
 void player_hud::updateMovementLayerState()

@@ -93,15 +93,28 @@ namespace
 	return gunsmith::tree_to_lua(L, weapon->gs_tree());
 }
 
-bool CScriptGameObject::gs_can_attach(LPCSTR section, u8 parent, u8 slot)
+namespace
 {
-	CWeapon* weapon = gs_weapon(this, "gs_can_attach");
+	// What SAFE_WRAP (script_game_object.h) checks before a member call: with lua_busy_hands_debug, a destroyed
+	// object is reported.
+	void gs_safe_self(CScriptGameObject* self)
+	{
+		if (lua_busy_hands_debug && !(self != nullptr && self->is_valid()))
+			SafeWrapBase::log_and_callback("Accessing destroyed object");
+	}
+}
+
+static bool gs_can_attach_script(CScriptGameObject* self, LPCSTR section, u8 parent, u8 slot)
+{
+	gs_safe_self(self);
+	CWeapon* weapon = gs_weapon(self, "gs_can_attach");
 	return weapon && !*weapon->gs_check_place(weapon->gs_tree(), section, parent, slot, false);
 }
 
-bool CScriptGameObject::gs_attach(CScriptGameObject* part, u8 parent, u8 slot)
+static bool gs_attach_script(CScriptGameObject* self, CScriptGameObject* part, u8 parent, u8 slot)
 {
-	CWeapon* weapon = gs_weapon(this, "gs_attach");
+	gs_safe_self(self);
+	CWeapon* weapon = gs_weapon(self, "gs_attach");
 	if (!weapon)
 		return false;
 	CInventoryItem* item = part ? part->object().cast_inventory_item() : nullptr;
@@ -400,3 +413,32 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 }
 
 #endif // GAME_OBJECT_EXTENDED_EXPORTS
+
+// The gs_* game_object methods, chained into game_object's registration (script_game_object_script.cpp) like
+// script_register_game_object_trader. Node and slot numbers are 0-based.
+::luabind::class_<CScriptGameObject> script_register_game_object_gunsmith(::luabind::class_<CScriptGameObject>&& instance)
+{
+#ifdef GAME_OBJECT_EXTENDED_EXPORTS
+	using namespace luabind;
+	return std::move(instance)
+		.def("gs_get_tree", &gs_get_tree_script, raw<1>())
+		.def("gs_revision", &gs_revision_script)
+		.def("gs_fit_verdict", &gs_fit_verdict_script)
+		.def("gs_jam_type", &gs_jam_type_script)
+		.def("gs_can_attach", &gs_can_attach_script)
+		.def("gs_attach", &gs_attach_script)
+		.def("gs_detach", &gs_detach_spawn_script, raw<1>())
+		.def("gs_get_stats", &gs_get_stats_script, raw<1>())
+		.def("gs_preview_attach", &gs_preview_attach_script, raw<1>())
+		.def("gs_sight_section", &gs_sight_section_script, raw<1>())
+		.def("gs_sight_mode", &gs_sight_mode_script, raw<1>())
+		.def("gs_sights", &gs_sights_script, raw<1>())
+		.def("gs_sight_node", &gs_sight_node_script, raw<1>())
+		.def("gs_sight_set", &gs_sight_set_script, raw<1>())
+		.def("gs_tactical_set_on", &gs_tactical_set_on_script, raw<1>())
+		.def("gs_tactical_state", &gs_tactical_state_script, raw<1>())
+		.def("gs_tactical_set_mode", &gs_tactical_set_mode_script, raw<1>());
+#else
+	return std::move(instance);
+#endif
+}
