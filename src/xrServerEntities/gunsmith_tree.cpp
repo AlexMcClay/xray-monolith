@@ -146,9 +146,9 @@ namespace gunsmith
 			return false;
 
 		const u16 version = packet.r_u16();
-		if (version == 0 || version > GS_SAVE_VERSION)
+		if (version != GS_SAVE_VERSION)
 		{
-			Msg("! [gunsmith] part tree save version %u is not supported (engine reads up to %u), rebuilding from addon flags", u32(version), u32(GS_SAVE_VERSION));
+			Msg("! [gunsmith] part tree save version %u is not supported (engine reads %u), rebuilding from addon flags", u32(version), u32(GS_SAVE_VERSION));
 			return false;
 		}
 
@@ -164,17 +164,12 @@ namespace gunsmith
 
 			SNode n;
 			packet.r_stringZ(n.section);
-			if (packet.r_elapsed() < 2 * sizeof(u8) + sizeof(u16))
+			if (packet.r_elapsed() < 3 * sizeof(u8) + sizeof(u16))
 				goto corrupt;
 			packet.r_u8(n.parent);
 			packet.r_u8(n.slot);
 			packet.r_u16(); // unused, kept for the save layout
-			if (version >= 2)
-			{
-				if (packet.r_elapsed() < sizeof(u8))
-					goto corrupt;
-				packet.r_u8(n.mode);
-			}
+			packet.r_u8(n.mode);
 
 			if (n.section.size() == 0 || (i == 0 ? n.parent != GS_NO_PARENT : n.parent >= i))
 				goto corrupt;

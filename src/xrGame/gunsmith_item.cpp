@@ -49,9 +49,9 @@ void CInventoryItemObject::gs_spawn_parts(CSE_Abstract* DC)
 	m_gs_subtree->clear();
 	m_gs_subtree->set_part_root(true);
 	CSE_ALifeItem* se = smart_cast<CSE_ALifeItem*>(DC);
-	if (se && se->m_tClassID == CLSID_IITEM_ATTACH && se->m_gs_subtree.size() > 1)
+	if (se && se->m_tClassID == CLSID_IITEM_ATTACH && se->m_gs_subtree)
 	{
-		*m_gs_subtree = se->m_gs_subtree;
+		*m_gs_subtree = *se->m_gs_subtree;
 		m_gs_subtree->set_part_root(true);
 	}
 }

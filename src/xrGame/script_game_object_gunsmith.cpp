@@ -81,7 +81,7 @@ namespace
 		if (OnServer() && Level().Server && Level().Server->game)
 			if (CSE_ALifeItem* se = smart_cast<CSE_ALifeItem*>(Level().Server->game->get_entity_from_eid(self->object().ID())))
 				if (se->m_tClassID == CLSID_IITEM_ATTACH)
-					return gunsmith::tree_to_lua(L, se->m_gs_subtree);
+					return se->m_gs_subtree ? gunsmith::tree_to_lua(L, *se->m_gs_subtree) : ::luabind::newtable(L);
 	}
 	CWeapon* weapon = gs_weapon(self, "gs_get_tree");
 	if (!weapon)
@@ -364,8 +364,8 @@ bool fire_blocked_script(CScriptGameObject* self)
 	const gunsmith::CTree* subtree = nullptr;
 	if (OnServer() && Level().Server && Level().Server->game)
 		if (CSE_ALifeItem* se = smart_cast<CSE_ALifeItem*>(Level().Server->game->get_entity_from_eid(item->object().ID())))
-			if (se->m_tClassID == CLSID_IITEM_ATTACH && se->m_gs_subtree.size() > 1)
-				subtree = &se->m_gs_subtree;
+			if (se->m_tClassID == CLSID_IITEM_ATTACH)
+				subtree = se->m_gs_subtree;
 	if (!subtree)
 		if (CInventoryItemObject* io = smart_cast<CInventoryItemObject*>(&item->object()))
 			if (io->gs_carries_parts())

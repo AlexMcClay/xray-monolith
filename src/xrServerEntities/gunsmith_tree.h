@@ -9,8 +9,7 @@
 
 namespace gunsmith
 {
-	// Save layout version written after the weapon's legacy fields. Increment it
-	// only with a migration path in CTree::read. 2: each node also saves its mode.
+	// Save layout version. CTree::read reads this one only.
 	const u16 GS_SAVE_VERSION = 2;
 	const u8 GS_NO_PARENT = 0xFF;
 	const u8 GS_MAX_NODES = 64;
@@ -72,7 +71,7 @@ namespace gunsmith
 		const SLOTS& node_slots(u8 index) const;
 
 		// Save layout: gs_version u16, node_count u8, then per node
-		// section stringZ, parent u8, slot u8, an unused u16 (written as 1.0, ignored on read), mode u8 (version 2+).
+		// section stringZ, parent u8, slot u8, an unused u16 (written as 1.0, ignored on read), mode u8.
 		void write(NET_Packet& packet) const;
 
 		// Reads a tree written by write(). Never reads past the end of the packet.

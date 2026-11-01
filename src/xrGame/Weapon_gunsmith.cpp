@@ -59,7 +59,7 @@ void CWeapon::gs_sync_to_server()
 	CSE_ALifeItemWeapon* se = gs_server_entity();
 	if (!se)
 		return;
-	se->m_gs_tree = m_gs_tree;
+	se->gs_tree() = m_gs_tree;
 	se->m_addon_flags.flags = m_flagsAddOnState;
 }
 
@@ -526,12 +526,8 @@ u16 CWeapon::gs_spawn_part_item(LPCSTR section, const gunsmith::CTree* subtree)
 	                                      ai_location().game_vertex_id(), parent_id, false);
 	if (!item)
 		return u16(-1);
-	if (subtree && subtree->size() > 1)
-		if (CSE_ALifeItem* part = smart_cast<CSE_ALifeItem*>(item))
-		{
-			part->m_gs_subtree = *subtree;
-			part->m_gs_subtree.set_part_root(true);
-		}
+	if (CSE_ALifeItem* part = smart_cast<CSE_ALifeItem*>(item))
+		part->gs_set_subtree(subtree);
 
 	NET_Packet packet;
 	packet.w_begin(M_SPAWN);
@@ -639,8 +635,8 @@ bool CWeapon::gs_attach_item(CInventoryItem* item, u8 parent, u8 slot)
 	const gunsmith::CTree* subtree = nullptr;
 	if (OnServer() && Level().Server && Level().Server->game)
 		if (CSE_ALifeItem* se = smart_cast<CSE_ALifeItem*>(Level().Server->game->get_entity_from_eid(item->object().ID())))
-			if (se->m_tClassID == CLSID_IITEM_ATTACH && se->m_gs_subtree.size() > 1)
-				subtree = &se->m_gs_subtree;
+			if (se->m_tClassID == CLSID_IITEM_ATTACH)
+				subtree = se->m_gs_subtree;
 
 	if (!subtree)
 		return gs_attach_part(section, parent, slot);
@@ -966,7 +962,7 @@ void CWeapon::gs_load(LPCSTR section)
 void CWeapon::gs_on_spawn(CSE_ALifeItemWeapon* E)
 {
 	E->gs_ensure_tree();
-	m_gs_tree = E->m_gs_tree;
+	m_gs_tree = E->gs_tree();
 	m_gs_full_mode = gunsmith::is_full_mode(cNameSect().c_str());
 	if (m_gs_full_mode)
 		m_flagsAddOnState = 0; // no old-style addons on full-mode guns (Load disabled them); loadout scripts may still set the flags

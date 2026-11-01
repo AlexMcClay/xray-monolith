@@ -327,11 +327,11 @@ CSE_ALifeItem::CSE_ALifeItem(LPCSTR caSection) : CSE_ALifeDynamicObjectVisual(ca
                                                  CSE_ALifeInventoryItem(caSection)
 {
 	m_physics_disabled = false;
-	m_gs_subtree.set_part_root(true);
 }
 
 CSE_ALifeItem::~CSE_ALifeItem()
 {
+	gs_set_subtree(nullptr);
 }
 
 CSE_Abstract* CSE_ALifeItem::init()
@@ -521,6 +521,7 @@ CSE_ALifeItemWeapon::CSE_ALifeItemWeapon(LPCSTR caSection) : CSE_ALifeItem(caSec
 
 CSE_ALifeItemWeapon::~CSE_ALifeItemWeapon()
 {
+	gs_clone_tree(nullptr);
 }
 
 u32 CSE_ALifeItemWeapon::ef_main_weapon_type() const
@@ -551,9 +552,7 @@ void CSE_ALifeItemWeapon::UPDATE_Read(NET_Packet& tNetPacket)
 void CSE_ALifeItemWeapon::clone_addons(CSE_ALifeItemWeapon* parent)
 {
 	m_addon_flags = parent->m_addon_flags;
-	m_gs_tree = parent->m_gs_tree;
-	// The clone may be a different weapon section: re-root the tree and drop parts that no longer fit.
-	m_gs_tree.validate(*s_name);
+	gs_clone_tree(parent);
 }
 
 void CSE_ALifeItemWeapon::UPDATE_Write(NET_Packet& tNetPacket)

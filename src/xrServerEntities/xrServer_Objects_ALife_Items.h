@@ -14,7 +14,7 @@
 
 #include "character_info_defs.h"
 #include "infoportiondefs.h"
-#include "gunsmith_tree.h"
+namespace gunsmith { class CTree; }
 
 #pragma warning(push)
 #pragma warning(disable:4005)
@@ -94,11 +94,11 @@ SERVER_ENTITY_DECLARE_END
 SERVER_ENTITY_DECLARE_BEGIN2(CSE_ALifeItem, CSE_ALifeDynamicObjectVisual, CSE_ALifeInventoryItem)
 	bool m_physics_disabled;
 
-	// Gunsmith: the parts mounted on this part, when it was detached from a weapon
-	// with them (node 0 is this item). Only plain part items (II_ATTCH) save it, in the
-	// "gs_subtree" block (CSE_Abstract::ext_*; in the state in saves of SPAWN_VERSION 130).
-	gunsmith::CTree m_gs_subtree;
-	// STATE_Write / STATE_Read of m_gs_subtree (gunsmith_server.cpp).
+	// Gunsmith: the parts mounted on this part, when it was detached from a weapon with them (node 0 is this
+	// item; null when none). Only plain part items (II_ATTCH) save it, in the "gs_subtree" block
+	// (CSE_Abstract::ext_*). gunsmith_server.cpp.
+	gunsmith::CTree* m_gs_subtree = nullptr;
+	void gs_set_subtree(const gunsmith::CTree* tree); // a copy; null or a lone item: none
 	void gs_write_subtree();
 	void gs_read_subtree(NET_Packet& tNetPacket);
 
@@ -195,10 +195,11 @@ SERVER_ENTITY_DECLARE_BEGIN(CSE_ALifeItemWeapon, CSE_ALifeItem)
 	u32 m_ef_main_weapon_type;
 	u32 m_ef_weapon_type;
 
-	// Gunsmith part tree, saved in the "gs_tree" block (CSE_Abstract::ext_*; after the legacy fields in saves of
-	// SPAWN_VERSION 129 and 130).
-	// m_addon_flags stays as a cache of the tree's legacy slots.
-	gunsmith::CTree m_gs_tree;
+	// Gunsmith part tree, saved in the "gs_tree" block (CSE_Abstract::ext_*). Null or empty until the weapon
+	// spawns (or a script asks for it): it is then built from the addon flags. m_addon_flags stays as a cache of
+	// the tree's legacy slots. gunsmith_server.cpp.
+	gunsmith::CTree* m_gs_tree = nullptr;
+	gunsmith::CTree& gs_tree(); // created when missing
 
 	// Builds the tree from the addon flags if it is empty, otherwise brings its
 	// legacy slots in line with the flags.
@@ -207,8 +208,8 @@ SERVER_ENTITY_DECLARE_BEGIN(CSE_ALifeItemWeapon, CSE_ALifeItem)
 	// Installs a tree (from a save or a script): validates it against this weapon's
 	// section and makes the addon flags follow it.
 	void gs_set_tree(const gunsmith::CTree& tree);
+	void gs_clone_tree(CSE_ALifeItemWeapon* parent); // clone_addons; null frees the tree (the destructor)
 
-	// STATE_Write / STATE_Read of m_gs_tree (gunsmith_server.cpp).
 	void gs_write_tree();
 	void gs_read_tree(NET_Packet& tNetPacket);
 

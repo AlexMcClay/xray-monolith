@@ -310,7 +310,7 @@ bool gs_is_full_mode(LPCSTR section)
 ::luabind::object cse_gs_get_tree_script(lua_State* L, CSE_ALifeItemWeapon* weapon)
 {
 	weapon->gs_ensure_tree();
-	return gunsmith::tree_to_lua(L, weapon->m_gs_tree);
+	return gunsmith::tree_to_lua(L, weapon->gs_tree());
 }
 
 bool cse_gs_set_tree_script(CSE_ALifeItemWeapon* weapon, ::luabind::object nodes)
