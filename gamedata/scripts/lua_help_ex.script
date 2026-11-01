@@ -234,6 +234,14 @@
         CUIMessagesWindow get_messages_menu()
     }
 
+    // Console scope_timers 1: time spent in named code scopes, written to the log every scope_timers_period seconds (1..60, default 5),
+    // the costliest first. Engine code uses SCOPE_TIMER("name") (scope_timers.h); scripts add their own:
+    // local t = profile_timer(); t:start(); ... t:stop(); scope_timers.add("my_mod.update", t:time())
+    namespace scope_timers {
+        bool enabled() // whether scope_timers is on (skip the timing when not)
+        void add(string name, float microseconds) // adds one call of that many microseconds to the scope
+    }
+
     class cse_alife_object {
         vector draw_level_position() // position the map draws the object at, the interpolated point along its alife path for monsters and stalkers, the stored position otherwise
     }

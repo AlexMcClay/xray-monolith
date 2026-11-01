@@ -4,6 +4,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "scope_timers.h"
 #include "Weapon.h"
 #include "ParticlesObject.h"
 #include "entity_alive.h"
@@ -1881,6 +1882,7 @@ float CWeapon::GetConditionMisfireProbability() const
 
 BOOL CWeapon::CheckForMisfire()
 {
+	SCOPE_TIMER("weapon.check_misfire");
 	if (OnClient()) return FALSE;
 
 	// The receiver's own misfire curve plus every failure-capable part's curve.

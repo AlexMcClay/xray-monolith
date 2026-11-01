@@ -4,6 +4,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "pch_script.h"
+#include "scope_timers.h"
 #include "script_game_object.h"
 #include "script_game_object_impl.h"
 #include "Weapon.h"
@@ -83,6 +84,7 @@ namespace
 
 ::luabind::object gs_get_tree_script(lua_State* L, CScriptGameObject* self)
 {
+	SCOPE_TIMER("gs.lua_api.get_tree");
 	// A part item: the parts it carries (empty when none or not online on the server).
 	if (self && !smart_cast<CWeapon*>(&self->object()))
 	{
@@ -184,6 +186,7 @@ bool CScriptGameObject::gs_set_parts_condition(float value)
 
 ::luabind::object gs_get_stats_script(lua_State* L, CScriptGameObject* self)
 {
+	SCOPE_TIMER("gs.lua_api.get_stats");
 	CWeapon* weapon = gs_weapon(self, "gs_get_stats");
 	if (!weapon)
 		return ::luabind::newtable(L);
@@ -232,6 +235,7 @@ u32 gs_revision_script(CScriptGameObject* self)
 
 int gs_fit_verdict_script(CScriptGameObject* self, LPCSTR section)
 {
+	SCOPE_TIMER("gs.lua_api.fit_verdict");
 	if (!self || !section || !*section)
 		return 0;
 	CWeapon* weapon = smart_cast<CWeapon*>(&self->object());
@@ -323,6 +327,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 // Sight switching (Gunsmith Docs 13): the cyclable sights fitted, { { node, section }, ... } in tree order.
 ::luabind::object gs_sights_script(lua_State* L, CScriptGameObject* self)
 {
+	SCOPE_TIMER("gs.lua_api.sights");
 	::luabind::object t = ::luabind::newtable(L);
 	CWeapon* weapon = gs_weapon(self, "gs_sights");
 	if (!weapon)
@@ -365,6 +370,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 // Tactical devices: { on = bool, devices = { { node, section, mode, modes = { "light", "light, laser", ... } }, ... } }
 ::luabind::object gs_tactical_state_script(lua_State* L, CScriptGameObject* self)
 {
+	SCOPE_TIMER("gs.lua_api.tactical_state");
 	CWeapon* weapon = gs_weapon(self, "gs_tactical_state");
 	if (!weapon)
 		return ::luabind::object();
@@ -426,6 +432,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 // brings, itself first) and `dropped` (carried sections that wouldn't stay on).
 ::luabind::object gs_preview_attach_script(lua_State* L, CScriptGameObject* self, CScriptGameObject* item, u8 parent, u8 slot)
 {
+	SCOPE_TIMER("gs.lua_api.preview_attach");
 	CWeapon* weapon = gs_weapon(self, "gs_preview_attach");
 	if (!weapon || !item)
 		return ::luabind::newtable(L);
@@ -497,6 +504,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 
 ::luabind::object gs_preview_stats_script(lua_State* L, CScriptGameObject* self, ::luabind::object changes)
 {
+	SCOPE_TIMER("gs.lua_api.preview_stats");
 	CWeapon* weapon = gs_weapon(self, "gs_preview_stats");
 	if (!weapon)
 		return ::luabind::newtable(L);

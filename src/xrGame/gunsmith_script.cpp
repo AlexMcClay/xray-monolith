@@ -4,6 +4,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "pch_script.h"
+#include "scope_timers.h"
 #include "gunsmith_script.h"
 #include "gunsmith_preview.h"
 #include "inventory_item_object.h"
@@ -202,6 +203,7 @@ namespace
 
 ::luabind::object gs_icon_rect_script(lua_State* L, u16 id)
 {
+	SCOPE_TIMER("gs.lua_api.icon_rect");
 	Frect r;
 	const bool ok = gunsmith::CPreview::instance().icon_rect(id, r);
 	return rect_to_lua(L, ok, r);
@@ -209,6 +211,7 @@ namespace
 
 ::luabind::object gs_icon_rect_section_script(lua_State* L, LPCSTR section)
 {
+	SCOPE_TIMER("gs.lua_api.icon_rect");
 	Frect r;
 	const bool ok = gunsmith::CPreview::instance().icon_rect(section, r);
 	return rect_to_lua(L, ok, r);

@@ -38,6 +38,7 @@
 #include "trade_parameters.h"
 #include "game_cl_base_weapon_usage_statistic.h"
 #include "MainMenu.h"
+#include "scope_timers.h"
 #include "xrEngine/XR_IOConsole.h"
 #include "actor.h"
 #include "player_hud.h"
@@ -978,6 +979,7 @@ void CLevel::MakeReconnect()
 void CLevel::OnFrame()
 {
 	PROF_EVENT("CLevel::OnFrame()");
+	scope_timers::frame(); // console scope_timers: counts frames, reports each period
 
 #ifdef DEBUG_MEMORY_MANAGER
     debug_memory_guard __guard__;

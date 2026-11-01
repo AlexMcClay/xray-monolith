@@ -5,6 +5,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "scope_timers.h"
 #include "gunsmith_visuals.h"
 #include "gunsmith_config.h"
 #include "../Include/xrRender/Kinematics.h"
@@ -328,6 +329,7 @@ namespace gunsmith
 
 	void CVisuals::ensure(int ctx, IKinematics* root, const CTree& tree, LPCSTR receiver, LPCSTR hud_sect, bool enabled)
 	{
+		SCOPE_TIMER("gs.visuals.ensure");
 		SContext& c = m_ctx[ctx];
 		// The sight aimed through: a switch changes no layout, so it follows the state revision (it was read on
 		// every call until 1 Nov 2026).
@@ -536,6 +538,7 @@ namespace gunsmith
 
 	void CVisuals::render(int ctx, IKinematics* root, const Fmatrix& root_xform)
 	{
+		SCOPE_TIMER("gs.visuals.render");
 		SContext& c = m_ctx[ctx];
 		if (c.children.empty() || c.root != root)
 			return;

@@ -6,6 +6,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "scope_timers.h"
 #include "Weapon.h"
 #include "ParticlesObject.h"
 #include "entity_alive.h"
@@ -132,6 +133,7 @@ void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponSta
 
 void CWeapon::gs_rebuild_stats(bool notify)
 {
+	SCOPE_TIMER("gs.stats.rebuild");
 	if (!m_gs_tree.empty())
 		m_gs_tree.set_condition(0, GetCondition()); // the receiver is the gun
 
@@ -374,6 +376,7 @@ int g_gs_stats_check = 0;
 
 void CWeapon::gs_refresh_condition_stats()
 {
+	SCOPE_TIMER("gs.stats.refold_shot");
 	if (!m_gs_struct_valid || m_gs_struct_rev != m_gs_tree.layout_revision() || m_gs_struct_flags != m_flagsAddOnState
 		|| m_gs_struct_scope != m_cur_scope)
 	{
@@ -920,6 +923,7 @@ namespace
 
 void CWeapon::RenderAttachments()
 {
+	SCOPE_TIMER("gs.parts.world_render");
 	inherited::RenderAttachments();
 	IKinematics* K = m_gs_full_mode && Visual() ? Visual()->dcast_PKinematics() : nullptr;
 	if (!K)
@@ -941,6 +945,7 @@ void CWeapon::gs_world_layout(xr_vector<std::pair<u8, Fmatrix>>& out)
 
 void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
 {
+	SCOPE_TIMER("gs.parts.hud_render");
 	if (!m_gs_full_mode || !model)
 		return;
 	m_gs_visuals.ensure(gunsmith::CVisuals::eHud, model, m_gs_tree, cNameSect().c_str(), HudSection().c_str(), true);
@@ -996,6 +1001,7 @@ bool CWeapon::gs_set_device_mode(u8 node, u8 mode)
 // first person and on the world model otherwise.
 void CWeapon::gs_update_devices()
 {
+	SCOPE_TIMER("gs.devices.update");
 	if (!m_gs_full_mode)
 		return;
 	// Devices only light on the player's gun in hand: other guns (NPCs', the bag's) skip the device list's
@@ -1050,6 +1056,7 @@ bool CWeapon::hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& 
 void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const Fmatrix& gs_prev_cam, bool gs_prev_cam_ok,
 	Fvector& curr_offs, const Fvector& curr_rot, Fvector& curr_aim_rot)
 {
+	SCOPE_TIMER("gs.aim.update");
 	Fvector sight;
 	shared_str key;
 	if (m_gs_visuals.sight_point(hi->m_model, sight, key))

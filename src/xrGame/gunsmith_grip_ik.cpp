@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "scope_timers.h"
 #include "gunsmith_grip_ik.h"
 #include "gunsmith_visuals.h"
 #include "player_hud.h"
@@ -170,6 +171,7 @@ namespace gunsmith
 
 	void CGripIK::update(IKinematics* hands, const Fmatrix& hands_xform, attachable_hud_item* item)
 	{
+		SCOPE_TIMER("gs.grip_ik.update");
 		if (!g_gs_grip_ik || !hands || hands != m_hands || !item || m_upper.id == BI_NONE || m_fore.id == BI_NONE ||
 			m_hand.id == BI_NONE)
 			return;

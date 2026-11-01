@@ -5,6 +5,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "scope_timers.h"
 #include "gunsmith_preview.h"
 #include "gunsmith_visuals.h"
 #include "gunsmith_config.h"
@@ -349,6 +350,7 @@ namespace gunsmith
 
 	void CPreview::draw_icon(u32 index)
 	{
+		SCOPE_TIMER("gs.preview.icon");
 		SCell& c = m_cells[index];
 		c.dirty = false;
 		DRAW_LIST list;
@@ -396,6 +398,7 @@ namespace gunsmith
 
 	void CPreview::draw_view()
 	{
+		SCOPE_TIMER("gs.preview.view");
 		DRAW_LIST list;
 		if (!draw_list(m_view_id, m_view_section.c_str(), list))
 			return;
@@ -497,6 +500,7 @@ namespace gunsmith
 
 	void CPreview::OnRender()
 	{
+		SCOPE_TIMER("gs.preview.on_render");
 		if (!available() || !g_pGameLevel)
 			return;
 		// A gun whose build changed is redrawn in its cell, whether or not the UI asks again

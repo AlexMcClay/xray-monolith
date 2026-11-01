@@ -50,6 +50,7 @@
 #include "inventory_upgrade_manager.h"
 #include "Weapon.h"
 #include "gunsmith_grip_ik.h"
+#include "scope_timers.h"
 extern int g_gs_preview_debug; // gunsmith_preview.cpp
 #include "player_hud.h"
 #include "ActorEffector.h"
@@ -2642,6 +2643,8 @@ void CCC_RegisterCommands()
 	CMD1(CCC_GsAimEye, "gs_aim_eye");
 	CMD4(CCC_Integer, "gs_aim_debug", &g_gs_aim_debug, 0, 1);
 	CMD4(CCC_Integer, "gs_stats_check", &g_gs_stats_check, 0, 1);
+	CMD4(CCC_Integer, "scope_timers", &g_scope_timers, 0, 1);
+	CMD4(CCC_Integer, "scope_timers_period", &g_scope_timers_period, 1, 60);
 	CMD4(CCC_Float, "gs_aim_speed", &g_gs_aim_speed, 0.5f, 30.f);
 	CMD4(CCC_Integer, "gs_aim_rot", &g_gs_aim_rot, 0, 1);
 	CMD4(CCC_Integer, "gs_grip_ik", &g_gs_grip_ik, 0, 1);
