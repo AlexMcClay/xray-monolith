@@ -489,8 +489,10 @@ BOOL CSE_Abstract::Spawn_Read(NET_Packet& tNetPacket)
 	if (state_end != end && end == count)
 		tNetPacket.B.count = state_end;
 	STATE_Read(tNetPacket, u16(size - (end - state_end)));
-	if (state_end != end && end == count)
+	if (state_end != end)
 	{
+		// Past the blocks: the client's spawn packet carries the update data after them (M_SPAWN_UPDATE), and
+		// UPDATE_Read must start there (1 Nov 2026: it read the blocks as ammo type and state, a crash at a new game).
 		tNetPacket.B.count = count;
 		tNetPacket.r_seek(end);
 	}
