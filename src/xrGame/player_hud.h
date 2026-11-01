@@ -450,7 +450,36 @@ private:
 public:
 	IKinematicsAnimated* m_model;
 	IKinematicsAnimated* m_model_2;
-	gunsmith::CGripIK m_gs_grip; // the left hand on the fitted handguard or foregrip (m_model_2)
+	gunsmith::CGripIK m_gs_grip; // the left hand on the fitted handguard or foregrip: a target for m_hand_ik[1]
+
+	// Hand IK (hud_hand_ik.h). Hand 0 is the right arm (m_model), 1 the left arm (m_model_2), as m_attached_items.
+	// A script target (set_ik_target) takes its hand while set or blending out; otherwise Gunsmith's grip IK may
+	// take the left hand. Cleared by default.
+	CHudHandIK m_hand_ik[2];
+	struct SScriptIK
+	{
+		bool set = false;   // cleared: the hand blends back to the animation, then the target is dropped
+		Fmatrix offset;     // the hand bone's frame in the HUD item's model space, or in its bone's
+		u8 item = 0;        // m_attached_items index
+		shared_str bone;    // empty: the item's model space
+		float want = 1.f;   // set_ik_weight
+		float weight = 0.f; // now: moves toward want (0 when cleared) at most IK_BLEND a second
+	};
+	SScriptIK m_script_ik[2];
+	Fmatrix m_ik_anim_hand[2]; // each hand as animated this frame (before any IK), in its arm model's space
+	bool m_ik_anim_ok[2];
+	void update_hand_ik();
+	// the HUD item `item`'s model space (or its bone `bone`) in hand `hand`'s arm model space
+	bool ik_item_frame(u8 hand, u8 item, const shared_str& bone, Fmatrix& out);
+
+	// script (player_hud:...): hand 0 right, 1 left; item 0 the main item, 1 the left hand's (detector)
+	void set_ik_target(u32 hand, const Fmatrix& m);
+	void set_ik_target_bone(u32 hand, const Fmatrix& m, u32 item, LPCSTR bone);
+	void clear_ik_target(u32 hand);
+	void set_ik_weight(u32 hand, float weight);
+	float get_ik_weight(u32 hand);
+	Fmatrix get_ik_hand(u32 hand);
+	Fmatrix get_ik_hand_bone(u32 hand, u32 item, LPCSTR bone);
 	Fvector m_adjust_offset[2][10]; // pos,rot/ normal,aim,GL,aim_alt,safemode, normal2, attach_base, attach_mount, aim for attach, alt aim for attach
 	Fvector m_adjust_obj[2]; // pos,rot; used for the item/weapon itself
 	Fvector m_adjust_ui_offset[2]; // pos,rot; used for custom device ui

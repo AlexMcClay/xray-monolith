@@ -5118,6 +5118,9 @@
     <ClInclude Include="gunsmith_grip_ik.h">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClInclude>
+    <ClInclude Include="hud_hand_ik.h">
+      <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
+    </ClInclude>
     <ClInclude Include="Weapon_gunsmith_deps.h">
       <Filter>Core\Client\Level</Filter>
     </ClInclude>
@@ -8763,6 +8766,9 @@
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClCompile>
     <ClCompile Include="gunsmith_grip_ik.cpp">
+      <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
+    </ClCompile>
+    <ClCompile Include="hud_hand_ik.cpp">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClCompile>
     <ClCompile Include="gunsmith_preview.cpp">
