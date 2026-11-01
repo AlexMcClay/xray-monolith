@@ -1269,3 +1269,82 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const
 		}
 	}
 }
+
+// Vanilla readings for scripts (Weapon_gunsmith_members.h, Gunsmith Docs 24).
+
+float CWeapon::GetVanillaWeight() const
+{
+	// Weight() less every part (old-style addons included), plus the addons as upstream's Weight() counts them.
+	float addons = 0.f;
+	if (IsGrenadeLauncherAttached() && GetGrenadeLauncherName().size())
+		addons += pSettings->r_float(GetGrenadeLauncherName(), "inv_weight");
+	if (IsScopeAttached() && m_scopes.size())
+		addons += pSettings->r_float(GetScopeName(), "inv_weight");
+	if (IsSilencerAttached() && GetSilencerName().size())
+		addons += pSettings->r_float(GetSilencerName(), "inv_weight");
+	return Weight() - m_gs_stats.weight_add + addons;
+}
+
+u32 CWeapon::GetVanillaCost() const
+{
+	// Cost() less every part, plus the addons as upstream's Cost() counts them.
+	u32 res = Cost();
+	if (m_gs_stats.cost_add > 0.f)
+		res -= u32(m_gs_stats.cost_add + 0.5f);
+	if (IsGrenadeLauncherAttached() && GetGrenadeLauncherName().size())
+		res += pSettings->r_u32(GetGrenadeLauncherName(), "cost");
+	if (IsScopeAttached() && m_scopes.size())
+		res += pSettings->r_u32(GetScopeName(), "cost");
+	if (IsSilencerAttached() && GetSilencerName().size())
+		res += pSettings->r_u32(GetSilencerName(), "cost");
+	return res;
+}
+
+namespace
+{
+	// The four script-visible fields, alike in the silencer, scope and launcher multiplier sets.
+	template <class K>
+	auto addon_koef_field(K& k, u8 koef) -> decltype(&k.pdm_base)
+	{
+		switch (koef)
+		{
+		case CWeapon::eAddonKoefPdmBase: return &k.pdm_base;
+		case CWeapon::eAddonKoefPdmVel: return &k.pdm_vel;
+		case CWeapon::eAddonKoefPdmAccel: return &k.pdm_accel;
+		default: return &k.crosshair_inertion;
+		}
+	}
+
+	// `loaded`: the addon's *_k keys (Load*Koeffs, clamped to 0.01..2), what vanilla's Apply*Koeffs copied in.
+	template <class K>
+	float addon_koef_get(const K& loaded, const K& cur, bool attached, u8 koef)
+	{
+		return (attached ? *addon_koef_field(loaded, koef) : 1.f) * *addon_koef_field(cur, koef);
+	}
+
+	template <class K>
+	void addon_koef_set(const K& loaded, K& cur, bool attached, u8 koef, float value)
+	{
+		*addon_koef_field(cur, koef) = attached ? value / _max(*addon_koef_field(loaded, koef), 0.01f) : value;
+	}
+}
+
+float CWeapon::GetAddonKoefScript(u8 addon, u8 koef) const
+{
+	switch (addon)
+	{
+	case eAddonKindSilencer: return addon_koef_get(m_silencer_koef, cur_silencer_koef, IsSilencerAttached(), koef);
+	case eAddonKindScope: return addon_koef_get(m_scope_koef, cur_scope_koef, IsScopeAttached(), koef);
+	default: return addon_koef_get(m_launcher_koef, cur_launcher_koef, IsGrenadeLauncherAttached(), koef);
+	}
+}
+
+void CWeapon::SetAddonKoefScript(u8 addon, u8 koef, float value)
+{
+	switch (addon)
+	{
+	case eAddonKindSilencer: addon_koef_set(m_silencer_koef, cur_silencer_koef, IsSilencerAttached(), koef, value); break;
+	case eAddonKindScope: addon_koef_set(m_scope_koef, cur_scope_koef, IsScopeAttached(), koef, value); break;
+	default: addon_koef_set(m_launcher_koef, cur_launcher_koef, IsGrenadeLauncherAttached(), koef, value); break;
+	}
+}
