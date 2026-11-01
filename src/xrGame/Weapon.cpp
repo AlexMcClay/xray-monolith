@@ -1895,77 +1895,21 @@ BOOL CWeapon::CheckForMisfire()
 	SCOPE_TIMER("weapon.check_misfire");
 	if (OnClient()) return FALSE;
 
-	// The receiver's own misfire curve plus every failure-capable part's curve.
-	// One roll against the sum; the part that caused the jam is picked by its share.
-	struct SCandidate
+	// A script may decide the shot (the weapon_on_shot callback; the Gunsmith Framework does Tarkov's malfunctions
+	// there): its wear and whether, how and by which part it malfunctions. Otherwise the receiver's own misfire
+	// curve (vanilla's misfire_* keys). Parts had their own jam curves until 2 Nov 2026 (Gunsmith Docs 25).
+	u8 failure = gunsmith::eFailNone, node = 0;
+	if (!gs_script_shot(failure, node))
 	{
-		u8 node;
-		u8 type;
-		float probability;
-	};
-	SCandidate candidates[gunsmith::GS_MAX_NODES + 1];
-	u32 count = 0;
-	float total = 0.f;
-
-	const float receiver = GetConditionMisfireProbability();
-	if (receiver > 0.f)
-	{
-		candidates[count++] = { 0, gunsmith::eFailMisfire, receiver };
-		total += receiver;
+		const float chance = GetConditionMisfireProbability();
+		if (chance > 0.f && ::Random.randF(0.f, 1.f) < chance)
+			failure = gunsmith::eFailMisfire;
 	}
-
-	if (m_gs_tree.size() > 1)
-	{
-		// The script hook is opt-in (gunsmith_settings part_misfire_hook; nothing used it, and it cost a Lua call
-		// per part per shot), and looked up once, at the first part that can fail.
-		::luabind::functor<float> part_hook;
-		bool has_hook = false, hook_looked_up = gunsmith::settings().part_misfire_hook <= 0.f;
-		CGameObject* owner = smart_cast<CGameObject*>(H_Parent());
-
-		for (u32 i = 1; i < m_gs_tree.size() && count < gunsmith::GS_MAX_NODES + 1; ++i)
-		{
-			const gunsmith::SNode& n = m_gs_tree.node(u8(i));
-			const gunsmith::SPartData& p = gunsmith::part_data(n.section);
-			if (p.failure == gunsmith::eFailNone)
-				continue;
-			float probability = gunsmith::part_jam_probability(p, n.condition);
-			if (!hook_looked_up)
-			{
-				hook_looked_up = true;
-				has_hook = ai().script_engine().functor("xr_weapon_jam.GetPartMisfireProbability", part_hook);
-			}
-			if (has_hook)
-				probability = part_hook(lua_game_object(), owner ? owner->lua_game_object() : nullptr, int(i), p.kind.c_str(), probability);
-			clamp(probability, 0.f, 1.f);
-			if (probability <= 0.f)
-				continue;
-			candidates[count++] = { u8(i), p.failure, probability };
-			total += probability;
-		}
-	}
-
-	if (total <= 0.f)
+	if (failure == gunsmith::eFailNone)
 		return FALSE;
 
-	const float chance = _min(total, 1.f);
-	const float rnd = ::Random.randF(0.f, 1.f);
-	if (rnd >= chance)
-		return FALSE;
-
-	float pick = rnd / chance * total;
-	u32 culprit = count - 1;
-	for (u32 i = 0; i < count; ++i)
-	{
-		if (pick < candidates[i].probability)
-		{
-			culprit = i;
-			break;
-		}
-		pick -= candidates[i].probability;
-	}
-
-	m_gs_jam_type = candidates[culprit].type;
-	m_gs_jam_node = candidates[culprit].node;
+	m_gs_jam_type = failure;
+	m_gs_jam_node = node < m_gs_tree.size() ? node : 0;
 	StopShooting();
 	bMisfire = true;
 	gs_callback_failed(m_gs_jam_node, m_gs_jam_type);

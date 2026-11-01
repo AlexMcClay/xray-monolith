@@ -14,9 +14,18 @@
 		an old-style addon spawns the item asynchronously).
 
 	on_gs_part_failed(weapon, node, failure_type)
-		The weapon jammed, and this part caused it. failure_type is "misfire"
-		(node 0, the gun's own curve), "extraction", "feed" or "barrel".
+		The weapon jammed; node is the part a script named as its cause (weapon_on_shot), or 0 (the gun).
+		failure_type is "misfire", "extraction", "feed", "barrel" (soft slide) or "hard_slide".
 		Fires for the player and NPCs, before the existing weapon_jammed callback.
+
+	weapon_on_shot(weapon, owner, t)
+		A shot is about to be fired (the player's or an NPC's, owner nil when nobody holds the weapon).
+		t.condition (the weapon's, 0..1), t.rounds_left (in the magazine after this shot), t.magazine_size,
+		t.ammo (the round's section). Set t.handled = true to decide the shot: t.wear (condition lost, 0..1,
+		before Anomaly's weapon degradation setting; leave it nil for the engine's own wear), t.malfunction
+		("misfire", "extraction", "feed", "barrel", "hard_slide", or nil for none) and t.node (the culprit
+		part's node, 0 for the gun). Unhandled, the engine uses the weapon's own misfire curve and wear.
+		Since 2 Nov 2026; the Gunsmith Framework's Tarkov malfunctions are a handler (gunsmith_malfunctions).
 
 	weapon_on_recalc_stats(weapon, t)
 		The engine recomputed a weapon's stats from its parts: at spawn and load, when a part goes on or
@@ -41,6 +50,7 @@ AddScriptCallback("on_gs_part_detached")
 AddScriptCallback("on_gs_part_failed")
 AddScriptCallback("weapon_on_recalc_stats")
 AddScriptCallback("weapon_on_alt_aim_key")
+AddScriptCallback("weapon_on_shot")
 
 _G.CWeapon_gs_part_attached = function(weapon, node, section)
 	SendScriptCallback("on_gs_part_attached", weapon, node, section)
@@ -62,4 +72,8 @@ _G.CWeapon_OnAltAimKey = function(weapon)
 	local t = { handled = false }
 	SendScriptCallback("weapon_on_alt_aim_key", weapon, t)
 	return t.handled == true
+end
+
+_G.CWeapon_OnShot = function(weapon, owner, t)
+	SendScriptCallback("weapon_on_shot", weapon, owner, t)
 end

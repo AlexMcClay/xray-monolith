@@ -46,7 +46,6 @@ namespace gunsmith
 		bool stock_shoulder;
 		float weight_add; // parts' weight
 		float cost_add; // parts' cost
-		float barrel_wear_mul; // product of muzzle parts' barrel_wear_mul
 		float muzzle_condition; // lowest condition of muzzle parts with a suppression threshold, 1 if none
 		bool suppressor_worn; // a muzzle part is below its suppression_min_condition
 		float sight_sway; // zoomed movement sway multiplier from worn sights, 1 if none

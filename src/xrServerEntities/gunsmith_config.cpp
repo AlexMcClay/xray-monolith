@@ -297,26 +297,10 @@ namespace gunsmith
 			return stat == eStatFireDispersion || stat == eStatCamDispersion || stat == eStatCamDispersionInc;
 		}
 
-		u8 parse_failure(LPCSTR value, u8 fallback)
-		{
-			if (!value) return fallback;
-			if (!xr_strcmp(value, "none")) return eFailNone;
-			if (!xr_strcmp(value, "misfire")) return eFailMisfire;
-			if (!xr_strcmp(value, "extraction")) return eFailExtraction;
-			if (!xr_strcmp(value, "feed")) return eFailFeed;
-			if (!xr_strcmp(value, "barrel")) return eFailBarrel;
-			Msg("! [gunsmith] unknown failure type [%s], using the part kind's default", value);
-			return fallback;
-		}
-
 		struct SKindDefaults
 		{
-			bool wears_on_shot;
-			float wear_per_shot;
 			float condition_dispersion_factor;
-			u8 failure;
-			float jam_start_condition, jam_end_condition, jam_start_prob, jam_end_prob;
-			float barrel_wear_mul;
+			float jam_start_condition; // sights: zoomed sway below it
 			float suppression_min_condition;
 		};
 
@@ -324,39 +308,16 @@ namespace gunsmith
 		// in [gs_part_kind_<kind>], and per part in the part's own section.
 		SKindDefaults builtin_kind_defaults(LPCSTR kind)
 		{
-			SKindDefaults d = { false, 0.f, 0.f, eFailNone, 0.5f, 0.1f, 0.f, 0.f, 1.f, 0.f };
+			SKindDefaults d = { 0.f, 0.5f, 0.f };
 			auto is = [kind](LPCSTR k) { return !xr_strcmp(kind, k); };
 
 			if (is("barrel"))
-			{
-				d.wears_on_shot = true;
-				d.wear_per_shot = 0.0004f;
 				d.condition_dispersion_factor = 1.f;
-				d.failure = eFailBarrel;
-				d.jam_end_prob = 0.05f;
-			}
-			else if (is("bolt") || is("bolt_carrier") || is("trigger") || is("gas_tube"))
-			{
-				d.wears_on_shot = true;
-				d.wear_per_shot = 0.0003f;
-				d.failure = eFailExtraction;
-				d.jam_end_prob = 0.05f;
-			}
-			else if (is("magazine"))
-			{
-				d.wears_on_shot = true;
-				d.wear_per_shot = 0.0005f;
-				d.failure = eFailFeed;
-				d.jam_end_prob = 0.05f;
-			}
 			else if (is("muzzle"))
-			{
-				d.wears_on_shot = true;
-				d.wear_per_shot = 0.0004f;
 				d.suppression_min_condition = 0.3f;
-			}
 			// sight: jam_start_condition (0.5) is the condition below which it adds zoomed sway.
-			// stock, grip, handguard, rail, underbarrel, receiver, generic: no wear, no failure.
+			// Parts don't wear from shots and don't jam (2 Nov 2026; Gunsmith Docs 25): a found worn part keeps its
+			// effects (spread from a worn barrel, a worn suppressor, sight sway).
 			return d;
 		}
 
@@ -368,15 +329,8 @@ namespace gunsmith
 			if (!pSettings->section_exist(sect))
 				return d;
 
-			d.wears_on_shot = !!READ_IF_EXISTS(pSettings, r_bool, sect, "wears_on_shot", d.wears_on_shot);
-			d.wear_per_shot = READ_IF_EXISTS(pSettings, r_float, sect, "condition_wear_per_shot", d.wear_per_shot);
 			d.condition_dispersion_factor = READ_IF_EXISTS(pSettings, r_float, sect, "condition_dispersion_factor", d.condition_dispersion_factor);
-			d.failure = parse_failure(READ_IF_EXISTS(pSettings, r_string, sect, "failure", (LPCSTR)nullptr), d.failure);
 			d.jam_start_condition = READ_IF_EXISTS(pSettings, r_float, sect, "jam_start_condition", d.jam_start_condition);
-			d.jam_end_condition = READ_IF_EXISTS(pSettings, r_float, sect, "jam_end_condition", d.jam_end_condition);
-			d.jam_start_prob = READ_IF_EXISTS(pSettings, r_float, sect, "jam_start_prob", d.jam_start_prob);
-			d.jam_end_prob = READ_IF_EXISTS(pSettings, r_float, sect, "jam_end_prob", d.jam_end_prob);
-			d.barrel_wear_mul = READ_IF_EXISTS(pSettings, r_float, sect, "barrel_wear_mul", d.barrel_wear_mul);
 			d.suppression_min_condition = READ_IF_EXISTS(pSettings, r_float, sect, "suppression_min_condition", d.suppression_min_condition);
 			return d;
 		}
@@ -448,28 +402,14 @@ namespace gunsmith
 			d.suppressor = exists && d.declared && !!READ_IF_EXISTS(pSettings, r_bool, section, "suppressor", FALSE);
 			d.ammo_mag_size = exists && d.declared ? READ_IF_EXISTS(pSettings, r_s32, section, "ammo_mag_size", -1) : -1;
 
-			d.wears_on_shot = k.wears_on_shot;
-			d.wear_per_shot = k.wear_per_shot;
 			d.condition_dispersion_factor = k.condition_dispersion_factor;
-			d.failure = k.failure;
 			d.jam_start_condition = k.jam_start_condition;
-			d.jam_end_condition = k.jam_end_condition;
-			d.jam_start_prob = k.jam_start_prob;
-			d.jam_end_prob = k.jam_end_prob;
-			d.barrel_wear_mul = k.barrel_wear_mul;
 			d.suppression_min_condition = k.suppression_min_condition;
 
 			if (exists && d.declared)
 			{
-				d.wears_on_shot = !!READ_IF_EXISTS(pSettings, r_bool, section, "wears_on_shot", d.wears_on_shot);
-				d.wear_per_shot = READ_IF_EXISTS(pSettings, r_float, section, "condition_wear_per_shot", d.wear_per_shot);
 				d.condition_dispersion_factor = READ_IF_EXISTS(pSettings, r_float, section, "condition_dispersion_factor", d.condition_dispersion_factor);
-				d.failure = parse_failure(READ_IF_EXISTS(pSettings, r_string, section, "failure", (LPCSTR)nullptr), d.failure);
 				d.jam_start_condition = READ_IF_EXISTS(pSettings, r_float, section, "jam_start_condition", d.jam_start_condition);
-				d.jam_end_condition = READ_IF_EXISTS(pSettings, r_float, section, "jam_end_condition", d.jam_end_condition);
-				d.jam_start_prob = READ_IF_EXISTS(pSettings, r_float, section, "jam_start_prob", d.jam_start_prob);
-				d.jam_end_prob = READ_IF_EXISTS(pSettings, r_float, section, "jam_end_prob", d.jam_end_prob);
-				d.barrel_wear_mul = READ_IF_EXISTS(pSettings, r_float, section, "barrel_wear_mul", d.barrel_wear_mul);
 				d.suppression_min_condition = READ_IF_EXISTS(pSettings, r_float, section, "suppression_min_condition", d.suppression_min_condition);
 			}
 		}
@@ -488,8 +428,17 @@ namespace gunsmith
 		case eFailExtraction: return "extraction";
 		case eFailFeed: return "feed";
 		case eFailBarrel: return "barrel";
+		case eFailHardSlide: return "hard_slide";
 		default: return "none";
 		}
+	}
+
+	u8 failure_from_name(LPCSTR name)
+	{
+		for (u8 f = eFailMisfire; f <= eFailHardSlide; ++f)
+			if (name && !xr_strcmp(name, failure_name(f)))
+				return f;
+		return eFailNone;
 	}
 
 	const SPartData& part_data(const shared_str& section)
@@ -511,21 +460,6 @@ namespace gunsmith
 		return part_data(shared_str(section ? section : ""));
 	}
 
-	float part_jam_probability(const SPartData& part, float condition)
-	{
-		if (part.failure == eFailNone)
-			return 0.f;
-		if (condition > part.jam_start_condition)
-			return 0.f;
-		if (condition < part.jam_end_condition)
-			return part.jam_end_prob;
-		const float span = part.jam_start_condition - part.jam_end_condition;
-		if (span <= EPS)
-			return part.jam_end_prob;
-		const float t = (part.jam_start_condition - condition) / span;
-		return part.jam_start_prob + t * (part.jam_end_prob - part.jam_start_prob);
-	}
-
 	namespace
 	{
 		SSettings& settings_rw()
@@ -539,7 +473,6 @@ namespace gunsmith
 				s.recoil_recovery = READ_IF_EXISTS(pSettings, r_float, sect, "recoil_recovery", 1.0f);
 				s.sight_sway_factor = READ_IF_EXISTS(pSettings, r_float, sect, "sight_sway_factor", 1.0f);
 				s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
-				s.part_misfire_hook = READ_IF_EXISTS(pSettings, r_float, sect, "part_misfire_hook", 0.f);
 				s.aim_roll_min = READ_IF_EXISTS(pSettings, r_float, sect, "aim_roll_min", 1.f);
 				s.aim_turn_max = READ_IF_EXISTS(pSettings, r_float, sect, "aim_turn_max", 20.f);
 				s.aim_still_turn = READ_IF_EXISTS(pSettings, r_float, sect, "aim_still_turn", 0.1f);
@@ -555,7 +488,6 @@ namespace gunsmith
 			SSettings& s = settings_rw();
 			if (!name) return nullptr;
 			if (!xr_strcmp(name, "recoil_recovery")) return &s.recoil_recovery;
-			if (!xr_strcmp(name, "part_misfire_hook")) return &s.part_misfire_hook;
 			return nullptr;
 		}
 	}

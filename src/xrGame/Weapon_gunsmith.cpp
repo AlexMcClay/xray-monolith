@@ -406,28 +406,52 @@ void CWeapon::gs_modify_bullet(float& speed, float& hit_power, float& impulse)
 
 void CWeapon::gs_apply_shot_wear(float impair)
 {
-	ChangeCondition(-m_gs_stats.apply(gunsmith::eStatConditionShotDec, GetWeaponDeterioration()) * impair *
-		cur_silencer_koef.condition_shot_dec);
+	if (m_gs_shot_wear >= 0.f)
+		ChangeCondition(-m_gs_shot_wear * f_weapon_deterioration);
+	else
+		ChangeCondition(-m_gs_stats.apply(gunsmith::eStatConditionShotDec, GetWeaponDeterioration()) * impair *
+			cur_silencer_koef.condition_shot_dec);
+	m_gs_shot_wear = -1.f;
 
-	bool parts_wore = false;
-	for (u32 i = 1; i < m_gs_tree.size(); ++i)
-	{
-		const gunsmith::SNode& n = m_gs_tree.node(u8(i));
-		const gunsmith::SPartData& p = gunsmith::part_data(n.section);
-		if (!p.wears_on_shot || p.wear_per_shot <= 0.f)
-			continue;
-		float wear = p.wear_per_shot * impair * f_weapon_deterioration;
-		if (p.kind_id == gunsmith::eKindBarrel)
-			wear *= m_gs_stats.barrel_wear_mul;
-		m_gs_tree.set_condition(u8(i), n.condition - wear);
-		parts_wore = true;
-	}
-
-	// A shot changes only conditions: refold their terms instead of rebuilding every stat, and give the server
-	// copy the conditions instead of the whole tree (both ran in full on every shot until 1 Nov 2026).
+	// Only the receiver wears (parts don't since 2 Nov 2026): refold the condition terms on the cached stats
+	// rather than rebuilding them (a full rebuild per shot until 1 Nov 2026).
 	gs_refresh_condition_stats();
-	if (parts_wore)
-		gs_sync_conditions_to_server();
+}
+
+bool CWeapon::gs_script_shot(u8& failure, u8& node)
+{
+	m_gs_shot_wear = -1.f;
+	::luabind::functor<::luabind::object> funct;
+	if (!ai().script_engine().functor("_G.CWeapon_OnShot", funct))
+		return false;
+	lua_State* L = ai().script_engine().lua();
+	::luabind::object t = ::luabind::newtable(L);
+	t["handled"] = false;
+	t["condition"] = GetCondition();
+	t["rounds_left"] = _max(iAmmoElapsed - 1, 0); // after this shot
+	t["magazine_size"] = iMagazineSize;
+	if (!m_magazine.empty())
+		t["ammo"] = m_magazine.back().m_ammoSect.c_str(); // the round being fired
+	CGameObject* owner = smart_cast<CGameObject*>(H_Parent());
+	funct(lua_game_object(), owner ? owner->lua_game_object() : nullptr, t);
+
+	::luabind::object handled = t["handled"];
+	if (handled.type() != LUA_TBOOLEAN || !::luabind::object_cast<bool>(handled))
+		return false;
+	::luabind::object wear = t["wear"];
+	if (wear.type() == LUA_TNUMBER)
+	{
+		const float w = ::luabind::object_cast<float>(wear);
+		if (_valid(w) && w >= 0.f)
+			m_gs_shot_wear = w;
+	}
+	::luabind::object malfunction = t["malfunction"];
+	if (malfunction.type() == LUA_TSTRING)
+		failure = gunsmith::failure_from_name(::luabind::object_cast<LPCSTR>(malfunction));
+	::luabind::object culprit = t["node"];
+	if (culprit.type() == LUA_TNUMBER)
+		node = u8(_max(0, ::luabind::object_cast<int>(culprit)));
+	return true;
 }
 
 // gs_stats_check 1: after every shot, compare the refolded stats with a full rebuild and log differences.
@@ -484,7 +508,6 @@ void CWeapon::gs_check_stats() const
 	check("stock_recoil_sum", fast.stock_recoil_sum, full.stock_recoil_sum);
 	check("weight_add", fast.weight_add, full.weight_add);
 	check("cost_add", fast.cost_add, full.cost_add);
-	check("barrel_wear_mul", fast.barrel_wear_mul, full.barrel_wear_mul);
 	check("muzzle_condition", fast.muzzle_condition, full.muzzle_condition);
 	check("sight_sway", fast.sight_sway, full.sight_sway);
 	check("mag_size", float(fast.mag_size), float(full.mag_size));

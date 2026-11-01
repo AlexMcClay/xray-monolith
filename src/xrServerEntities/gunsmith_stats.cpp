@@ -87,8 +87,6 @@ namespace gunsmith
 			if (p.ammo_mag_size >= 0)
 				out.mag_size = p.ammo_mag_size;
 
-			if (p.kind_id == eKindMuzzle)
-				out.barrel_wear_mul *= p.barrel_wear_mul;
 			if (conditions)
 				take_condition(p, condition, out);
 		}
@@ -105,7 +103,6 @@ namespace gunsmith
 		recoil_sum = stock_recoil_sum = 0.f;
 		shoulder = stock_shoulder = false;
 		weight_add = cost_add = 0.f;
-		barrel_wear_mul = 1.f;
 		muzzle_condition = 1.f;
 		suppressor_worn = false;
 		sight_sway = 1.f;
@@ -203,8 +200,8 @@ namespace gunsmith
 		Msg("-   recoil %+.1f%% (stock %+.1f%%) shoulder=%s (stock %s); scripts: recoil x%.3f, aim time x%.3f, sway x%.3f",
 		    s.recoil_sum, s.stock_recoil_sum, s.shoulder ? "yes" : "no", s.stock_shoulder ? "yes" : "no",
 		    s.script_mul[eStatCamDispersion], s.script_mul[eStatZoomRotateTime], s.script_mul[eStatPdmBase]);
-		Msg("-   barrel_wear_mul=%.3f muzzle_condition=%.3f suppressor_worn=%s sight_sway=%.3f",
-		    s.barrel_wear_mul, s.muzzle_condition, s.suppressor_worn ? "yes" : "no", s.sight_sway);
+		Msg("-   muzzle_condition=%.3f suppressor_worn=%s sight_sway=%.3f",
+		    s.muzzle_condition, s.suppressor_worn ? "yes" : "no", s.sight_sway);
 		for (u32 i = 0; i < eStatCount; ++i)
 			if (!fsimilar(s.mul[i], 1.f) || !fis_zero(s.add[i]) || !fsimilar(s.script_mul[i], 1.f) || !fis_zero(s.script_add[i]))
 				Msg("-   %s: add %+.5f mul x%.4f, scripts add %+.5f mul x%.4f", stat_name(u8(i)), s.add[i], s.mul[i],

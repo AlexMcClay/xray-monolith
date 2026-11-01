@@ -58,7 +58,6 @@ namespace
 		t["suppressor_worn"] = stats.suppressor_worn;
 		t["suppressed"] = has_silencer && !stats.suppressor_worn;
 		t["muzzle_condition"] = stats.muzzle_condition;
-		t["barrel_wear_mul"] = stats.barrel_wear_mul;
 		t["sight_sway"] = stats.sight_sway;
 		t["jammed"] = jammed;
 		t["jam_type"] = jammed ? gunsmith::failure_name(jam_type) : "none";

@@ -188,8 +188,15 @@ protected:
 	u8 m_gs_jam_node = 0;
 	bool m_gs_cant_fire_logged = false;
 
-	// Per-shot wear of the receiver and every part in the firing path.
+	// Per-shot wear: the weapon_on_shot callback's for this shot when a script took it (CheckForMisfire asks
+	// before the shot), times the wear setting; else the receiver's own (condition_shot_dec, the cartridge's
+	// impair). Parts don't wear from shots since 2 Nov 2026.
 	void gs_apply_shot_wear(float impair);
+	// The weapon_on_shot callback (_G.CWeapon_OnShot in gunsmith_callbacks.script) for the shot about to be fired,
+	// the player's or an NPC's: true when a script took it, with its malfunction (`failure`, gunsmith::EFailure;
+	// eFailNone for none) and culprit node, and its wear in m_gs_shot_wear.
+	bool gs_script_shot(u8& failure, u8& node);
+	float m_gs_shot_wear = -1.f; // this shot's wear from a script (condition 0..1, before the wear setting); -1: none
 	virtual void gs_modify_bullet(float& speed, float& hit_power, float& impulse);
 	// Switches shot sound, particles and lights between suppressed and not.
 	virtual void gs_on_suppression_changed() {}

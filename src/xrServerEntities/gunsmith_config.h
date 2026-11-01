@@ -118,26 +118,32 @@ namespace gunsmith
 
 	LPCSTR stat_name(u8 stat);
 
-	// How a part fails when worn (`failure` key).
+	// A weapon malfunction's type: the receiver's own misfire curve gives eFailMisfire; a script deciding the shot
+	// (the weapon_on_shot callback, CWeapon::gs_script_shot) any of them. Every type is cleared by racking the bolt.
+	// Parts had their own types and jam curves until 2 Nov 2026 (Gunsmith Docs 25).
 	enum EFailure
 	{
 		eFailNone = 0,
-		eFailMisfire, // receiver: the weapon's own misfire curve
-		eFailExtraction, // bolt, carrier, trigger, gas tube: cleared by racking the bolt
-		eFailFeed, // magazine: cleared by racking the bolt (a full reload until 30 Oct 2026)
-		eFailBarrel, // barrel: cleared by racking the bolt
+		eFailMisfire, // "misfire"
+		eFailExtraction, // "extraction": a failure to eject (Tarkov's Jam)
+		eFailFeed, // "feed": a failure to feed
+		eFailBarrel, // "barrel": the slide or bolt not going home (Tarkov's SoftSlide)
+		eFailHardSlide, // "hard_slide": the same, stuck harder (Tarkov's HardSlide)
 	};
 
 	LPCSTR failure_name(u8 failure);
+	// The type of a name above; eFailNone for "none" or an unknown name.
+	u8 failure_from_name(LPCSTR name);
 
 	// Everything the engine reads from a part section, cached per section.
 	//
-	// Durability keys (`part_kind` must be set for any of them to apply; the
+	// Condition keys (`part_kind` must be set for any of them to apply; the
 	// defaults come from the kind, see kind table in gunsmith_config.cpp, and can
 	// be changed per kind in an optional [gs_part_kind_<kind>] section):
-	//   wears_on_shot, condition_wear_per_shot, condition_dispersion_factor,
-	//   failure, jam_start_condition, jam_end_condition, jam_start_prob, jam_end_prob,
-	//   barrel_wear_mul (muzzle), suppression_min_condition (muzzle)
+	//   condition_dispersion_factor, jam_start_condition (sights: zoomed sway below it),
+	//   suppression_min_condition (muzzle)
+	// Parts don't wear from shots and don't jam since 2 Nov 2026: only the weapon's condition wears, and a script
+	// may decide its wear and malfunctions per shot (weapon_on_shot; Gunsmith Docs 25).
 	// Weight and cost: old-style addons count their item `inv_weight` and `cost`,
 	// as before. Other parts count `weight` and `part_cost` (default 0), so
 	// internal parts that are also items don't add their item price to the gun.
@@ -164,12 +170,8 @@ namespace gunsmith
 		float weight, cost; // gunsmith keys
 		float legacy_weight, legacy_cost; // item inv_weight / cost
 
-		bool wears_on_shot;
-		float wear_per_shot;
 		float condition_dispersion_factor;
-		u8 failure;
-		float jam_start_condition, jam_end_condition, jam_start_prob, jam_end_prob;
-		float barrel_wear_mul;
+		float jam_start_condition; // sights: zoomed sway below this condition (the key keeps its old name)
 		float suppression_min_condition;
 
 		xr_vector<shared_str> blocks_slots;
@@ -187,9 +189,6 @@ namespace gunsmith
 	const SPartData& part_data(const shared_str& section);
 	const SPartData& part_data(LPCSTR section);
 
-	// Jam chance of a part at this condition, from its curve.
-	float part_jam_probability(const SPartData& part, float condition);
-
 	// Engine-wide tuning, [gunsmith_settings] in system configs (all optional). Some can also be changed while
 	// playing (set_setting; the Framework's MCM page does). The handling formulas' settings (recoil_strength,
 	// no_stock_recoil, ergo_strength, ergo_aim_k, ergo_sway_k) are the Framework's since 1 Nov 2026.
@@ -198,10 +197,6 @@ namespace gunsmith
 		float ergo_base; // receiver ergonomics when the weapon has no `ergonomics` key (50)
 		float recoil_recovery; // camera recoil relax speed multiplier on full-mode guns (1.0 = vanilla)
 		float sight_sway_factor; // extra zoomed sway per point of condition below a sight's threshold (1.0)
-		// 1: call the part misfire script hook (xr_weapon_jam.GetPartMisfireProbability, the
-		// weapon_get_part_misfire_probability callback) for every part that can fail, on every shot. 0 (default):
-		// skipped, as nothing uses it; a script that does turns it on with gunsmith.set_setting("part_misfire_hook", 1).
-		float part_misfire_hook;
 		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
 		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
 		float optic_base_fov;
@@ -213,7 +208,7 @@ namespace gunsmith
 	};
 
 	const SSettings& settings();
-	// Settings by name (recoil_recovery, part_misfire_hook). False for an unknown name. Takes effect at once.
+	// Settings by name (recoil_recovery). False for an unknown name. Takes effect at once.
 	bool set_setting(LPCSTR name, float value);
 	float get_setting(LPCSTR name);
 }
