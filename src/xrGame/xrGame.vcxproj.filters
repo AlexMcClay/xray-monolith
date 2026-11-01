@@ -5127,9 +5127,6 @@
     <ClInclude Include="Weapon_gunsmith_members.h">
       <Filter>Core\Client\Level</Filter>
     </ClInclude>
-    <ClInclude Include="scope_timers.h">
-      <Filter>Core\Client\Level</Filter>
-    </ClInclude>
     <ClInclude Include="gunsmith_preview.h">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClInclude>
@@ -9376,9 +9373,6 @@
     </ClCompile>
     <ClCompile Include="Weapon.cpp">
       <Filter>Core\Client\Objects\items &amp; weapons\Weapons\Custom Weapon\Weapon Generic</Filter>
-    </ClCompile>
-    <ClCompile Include="scope_timers.cpp">
-      <Filter>Core\Client\Level</Filter>
     </ClCompile>
     <ClCompile Include="Weapon_gunsmith.cpp">
       <Filter>Core\Client\Objects\items &amp; weapons\Weapons\Custom Weapon\Weapon Generic</Filter>

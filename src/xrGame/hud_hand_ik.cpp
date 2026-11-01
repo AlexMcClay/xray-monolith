@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "scope_timers.h"
 #include "hud_hand_ik.h"
 #include "player_hud.h"
 #include "gunsmith_grip_ik.h"
@@ -131,7 +130,6 @@ void CHudHandIK::begin_frame()
 
 bool CHudHandIK::solve(const SPose& pose)
 {
-	SCOPE_TIMER("hud.hand_ik.solve");
 	if (!m_ok || !m_arm || pose.weight <= 0.f)
 		return false;
 	IKinematics* arm = m_arm;

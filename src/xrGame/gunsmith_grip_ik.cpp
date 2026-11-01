@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "scope_timers.h"
 #include "gunsmith_grip_ik.h"
 #include "gunsmith_visuals.h"
 #include "player_hud.h"
@@ -41,7 +40,6 @@ namespace gunsmith
 
 	bool CGripIK::update(CHudHandIK& ik, IKinematics* hands, const Fmatrix& hands_xform, attachable_hud_item* item)
 	{
-		SCOPE_TIMER("gs.grip_ik.update");
 		if (!g_gs_grip_ik || !item || !ik.ready(hands))
 			return false;
 		CWeapon* wpn = smart_cast<CWeapon*>(item->m_parent_hud_item);

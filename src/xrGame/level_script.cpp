@@ -46,7 +46,6 @@
 #include "ui\UITaskWnd.h"
 #include "ui\UIMapWnd.h"
 #include "raypick.h"
-#include "scope_timers.h"
 #include "../xrcdb/xr_collide_defs.h"
 #include "../xrEngine/Rain.h"
 #include "Level_Bullet_Manager.h"
@@ -2932,13 +2931,6 @@ void CLevel::script_register(lua_State* L)
 		def("set_vector", hud_adj_offs),
 		def("set_value", hud_adj_value),
 		def("remove_hud_model", remove_hud_model)
-	];
-
-	// Console scope_timers: scripts add their own timings (microseconds, e.g. from profile_timer) to the report
-	module(L, "scope_timers")
-	[
-		def("enabled", &scope_timers::enabled),
-		def("add", &scope_timers::add_script)
 	];
 
 	gunsmith_script_register(L);

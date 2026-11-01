@@ -5,7 +5,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
-#include "scope_timers.h"
 #include "Weapon.h"
 #include "ParticlesObject.h"
 #include "entity_alive.h"
@@ -116,7 +115,6 @@ void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponSta
 
 void CWeapon::gs_rebuild_stats(bool notify)
 {
-	SCOPE_TIMER("gs.stats.rebuild");
 	const bool was_suppressed = IsSuppressorFitted();
 	gs_compute_stats(m_gs_tree, m_gs_stats);
 	gs_script_stats(m_gs_stats, false);
@@ -143,7 +141,6 @@ void CWeapon::gs_rebuild_stats(bool notify)
 
 void CWeapon::gs_script_stats(gunsmith::SWeaponStats& stats, bool preview)
 {
-	SCOPE_TIMER("gs.stats.script");
 	::luabind::functor<void> funct;
 	if (!ai().script_engine().functor("_G.CWeapon_OnRecalcStats", funct))
 		return;
@@ -765,7 +762,6 @@ namespace
 
 void CWeapon::RenderAttachments()
 {
-	SCOPE_TIMER("gs.parts.world_render");
 	inherited::RenderAttachments();
 	IKinematics* K = m_gs_full_mode && Visual() ? Visual()->dcast_PKinematics() : nullptr;
 	if (!K)
@@ -777,7 +773,6 @@ void CWeapon::RenderAttachments()
 
 void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
 {
-	SCOPE_TIMER("gs.parts.hud_render");
 	if (!m_gs_full_mode || !model)
 		return;
 	m_gs_visuals.ensure(gunsmith::CVisuals::eHud, model, m_gs_tree, cNameSect().c_str(), HudSection().c_str(), true);
@@ -818,7 +813,6 @@ bool CWeapon::gs_set_device_mode(u8 node, u8 mode)
 // first person and on the world model otherwise.
 void CWeapon::gs_update_devices()
 {
-	SCOPE_TIMER("gs.devices.update");
 	if (!m_gs_full_mode)
 		return;
 	// Other guns (NPCs', the bag's) skip the device list's rebuild check each frame and keep whatever
@@ -1038,7 +1032,6 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 	if (!(idx == 1 && !m_modular_attachments && m_gs_full_mode))
 		return;
 
-	SCOPE_TIMER("gs.aim.update");
 	Fvector sight;
 	shared_str key;
 	if (m_gs_visuals.sight_point(hi->m_model, sight, key))

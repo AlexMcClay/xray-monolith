@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "scope_timers.h"
 #include "HudItem.h"
 #include "physic_item.h"
 #include "actor.h"
@@ -630,7 +629,6 @@ bool CHudItem::gs_snd_covers(LPCSTR anm) const
 
 void CHudItem::gs_snd_update()
 {
-	SCOPE_TIMER("gs.hud_sounds.update");
 	if (m_gs_snd_next >= m_gs_snd.size())
 		return;
 	if (!IsAttachedToHUD())
