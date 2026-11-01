@@ -35,27 +35,7 @@ namespace gunsmith
 			}
 		}
 
-		// The terms that depend on a part's condition: spread from wear, a worn suppressor, sight sway.
-		void take_condition(const SPartData& p, float condition, SWeaponStats& out)
-		{
-			if (p.condition_dispersion_factor > 0.f)
-				out.mul[eStatFireDispersion] *= 1.f + p.condition_dispersion_factor * (1.f - condition);
-
-			if (p.kind_id == eKindMuzzle)
-			{
-				if (p.suppression_min_condition > 0.f)
-				{
-					out.muzzle_condition = _min(out.muzzle_condition, condition);
-					if (condition < p.suppression_min_condition)
-						out.suppressor_worn = true;
-				}
-			}
-			else if (p.kind_id == eKindSight && condition < p.jam_start_condition)
-				out.sight_sway += (p.jam_start_condition - condition) * settings().sight_sway_factor;
-		}
-
-		// `conditions` false: the part as if new (no condition terms), for the structural stats a shot refolds.
-		void take_part(LPCSTR section, u8 legacy_addon, float condition, SWeaponStats& out, bool conditions)
+		void take_part(LPCSTR section, u8 legacy_addon, SWeaponStats& out)
 		{
 			const SPartData& p = part_data(section);
 
@@ -86,9 +66,6 @@ namespace gunsmith
 				out.suppressor_part = true;
 			if (p.ammo_mag_size >= 0)
 				out.mag_size = p.ammo_mag_size;
-
-			if (conditions)
-				take_condition(p, condition, out);
 		}
 	}
 
@@ -103,9 +80,6 @@ namespace gunsmith
 		recoil_sum = stock_recoil_sum = 0.f;
 		shoulder = stock_shoulder = false;
 		weight_add = cost_add = 0.f;
-		muzzle_condition = 1.f;
-		suppressor_worn = false;
-		sight_sway = 1.f;
 		can_fire = true;
 		suppressor_part = false;
 		mag_size = -1;
@@ -114,14 +88,14 @@ namespace gunsmith
 	namespace
 	{
 		// The parts' modifiers as they are, before relating them to the stock build.
-		void compute_raw(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out, bool conditions = true)
+		void compute_raw(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out)
 		{
 			out.reset();
 
 			for (u32 i = 1; i < tree.size(); ++i)
-				take_part(tree.node(u8(i)).section.c_str(), tree.node_legacy_addon(u8(i)), tree.node(u8(i)).condition, out, conditions);
+				take_part(tree.node(u8(i)).section.c_str(), tree.node_legacy_addon(u8(i)), out);
 			for (const SExtraPart& e : extra)
-				take_part(e.section.c_str(), e.legacy_addon, 1.f, out, conditions);
+				take_part(e.section.c_str(), e.legacy_addon, out);
 
 			const SSettings& cfg = settings();
 			const float base = tree.empty() ? cfg.ergo_base
@@ -141,24 +115,15 @@ namespace gunsmith
 				return it->second;
 			SWeaponStats s;
 			CTree t;
-			t.build_default(section.c_str(), 0, 1.f);
+			t.build_default(section.c_str(), 0);
 			compute_raw(t, xr_vector<SExtraPart>(), s);
 			return cache.insert(mk_pair(section, s)).first->second;
 		}
 	}
 
-	void SWeaponStats::copy_script(const SWeaponStats& from)
+	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out)
 	{
-		for (u32 s = 0; s < eStatCount; ++s)
-		{
-			script_add[s] = from.script_add[s];
-			script_mul[s] = from.script_mul[s];
-		}
-	}
-
-	static void compute_impl(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out, bool conditions)
-	{
-		compute_raw(tree, extra, out, conditions);
+		compute_raw(tree, extra, out);
 		if (tree.empty())
 			return;
 
@@ -177,22 +142,6 @@ namespace gunsmith
 		out.stock_shoulder = st.shoulder;
 	}
 
-	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out)
-	{
-		compute_impl(tree, extra, out, true);
-	}
-
-	void compute_structure(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out)
-	{
-		compute_impl(tree, extra, out, false);
-	}
-
-	void apply_conditions(const CTree& tree, SWeaponStats& out)
-	{
-		for (u32 i = 1; i < tree.size(); ++i)
-			take_condition(part_data(tree.node(u8(i)).section), tree.node(u8(i)).condition, out);
-	}
-
 	void dump(const SWeaponStats& s)
 	{
 		Msg("- [gunsmith] stats: ergonomics=%.1f (stock %.1f) weight+%.3f cost+%.0f can_fire=%s", s.ergonomics, s.stock_ergonomics,
@@ -200,8 +149,6 @@ namespace gunsmith
 		Msg("-   recoil %+.1f%% (stock %+.1f%%) shoulder=%s (stock %s); scripts: recoil x%.3f, aim time x%.3f, sway x%.3f",
 		    s.recoil_sum, s.stock_recoil_sum, s.shoulder ? "yes" : "no", s.stock_shoulder ? "yes" : "no",
 		    s.script_mul[eStatCamDispersion], s.script_mul[eStatZoomRotateTime], s.script_mul[eStatPdmBase]);
-		Msg("-   muzzle_condition=%.3f suppressor_worn=%s sight_sway=%.3f",
-		    s.muzzle_condition, s.suppressor_worn ? "yes" : "no", s.sight_sway);
 		for (u32 i = 0; i < eStatCount; ++i)
 			if (!fsimilar(s.mul[i], 1.f) || !fis_zero(s.add[i]) || !fsimilar(s.script_mul[i], 1.f) || !fis_zero(s.script_add[i]))
 				Msg("-   %s: add %+.5f mul x%.4f, scripts add %+.5f mul x%.4f", stat_name(u8(i)), s.add[i], s.mul[i],

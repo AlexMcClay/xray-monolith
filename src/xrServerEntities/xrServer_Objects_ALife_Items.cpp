@@ -600,12 +600,9 @@ void CSE_ALifeItemWeapon::clone_addons(CSE_ALifeItemWeapon* parent)
 void CSE_ALifeItemWeapon::gs_ensure_tree()
 {
 	if (m_gs_tree.empty())
-		m_gs_tree.build_default(*s_name, m_addon_flags.get(), m_fCondition);
+		m_gs_tree.build_default(*s_name, m_addon_flags.get());
 	else
-		m_gs_tree.sync_legacy_flags(m_addon_flags.get(), m_fCondition);
-
-	// The receiver is the gun: its condition is the weapon's condition.
-	m_gs_tree.set_condition(0, m_fCondition);
+		m_gs_tree.sync_legacy_flags(m_addon_flags.get());
 }
 
 void CSE_ALifeItemWeapon::UPDATE_Write(NET_Packet& tNetPacket)
@@ -662,7 +659,6 @@ void CSE_ALifeItemWeapon::gs_set_tree(const gunsmith::CTree& tree)
 {
 	m_gs_tree = tree;
 	m_gs_tree.validate(*s_name);
-	m_gs_tree.set_condition(0, m_fCondition);
 
 	// Flags the tree has slots for follow the tree (a part whose pack was
 	// removed clears its flag). Other flags are kept as they were.

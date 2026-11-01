@@ -2337,6 +2337,7 @@ void CScriptGameObject::Weapon_SetCurrentScope(u8 type)
 	}
 
 	weapon->m_cur_scope = type;
+	weapon->gs_rebuild_stats(); // gunsmith: the scope's stats
 }
 
 u8 CScriptGameObject::Weapon_GetCurrentScope()

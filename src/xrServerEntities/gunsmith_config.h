@@ -89,7 +89,7 @@ namespace gunsmith
 	LPCSTR legacy_addon_name(u8 legacy_addon);
 
 	//==========================================================================
-	// Phase 2: part stats and durability
+	// Phase 2: part stats
 	//==========================================================================
 
 	// Stats a part can change. Each has `<name>_add` (default 0) and `<name>_mul`
@@ -137,30 +137,15 @@ namespace gunsmith
 
 	// Everything the engine reads from a part section, cached per section.
 	//
-	// Condition keys (`part_kind` must be set for any of them to apply; the
-	// defaults come from the kind, see kind table in gunsmith_config.cpp, and can
-	// be changed per kind in an optional [gs_part_kind_<kind>] section):
-	//   condition_dispersion_factor, jam_start_condition (sights: zoomed sway below it),
-	//   suppression_min_condition (muzzle)
-	// Parts don't wear from shots and don't jam since 2 Nov 2026: only the weapon's condition wears, and a script
-	// may decide its wear and malfunctions per shot (weapon_on_shot; Gunsmith Docs 25).
+	// Parts have no condition: only the weapon's condition wears, and a script may decide its wear and
+	// malfunctions per shot (weapon_on_shot; Gunsmith Docs 25).
 	// Weight and cost: old-style addons count their item `inv_weight` and `cost`,
 	// as before. Other parts count `weight` and `part_cost` (default 0), so
 	// internal parts that are also items don't add their item price to the gun.
-	// The part kinds the engine itself acts on (SPartData::kind_id); every other kind is eKindOther.
-	enum EPartKind : u8
-	{
-		eKindOther,
-		eKindMuzzle,
-		eKindSight,  // "sight" or "optic"
-		eKindBarrel,
-	};
-
 	struct SPartData
 	{
 		shared_str kind; // part_kind, or inferred from the item class, or "generic"
-		u8 kind_id; // kind as an EPartKind, resolved once (was compared as a string per shot and rebuild)
-		bool declared; // part_kind was set: durability applies
+		bool declared; // part_kind was set: the keys below that need it apply
 
 		float add[eStatCount];
 		float mul[eStatCount];
@@ -170,10 +155,6 @@ namespace gunsmith
 		float weight, cost; // gunsmith keys
 		float legacy_weight, legacy_cost; // item inv_weight / cost
 
-		float condition_dispersion_factor;
-		float jam_start_condition; // sights: zoomed sway below this condition (the key keeps its old name)
-		float suppression_min_condition;
-
 		xr_vector<shared_str> blocks_slots;
 
 		// Handling, as Tarkov (Gunsmith Docs 02):
@@ -181,8 +162,7 @@ namespace gunsmith
 		bool shoulder_contact; // `shoulder_contact = true`: a stock the shooter's shoulder rests on
 
 		// Need part_kind set:
-		bool suppressor; // `suppressor = true`: the gun is suppressed while this part is fitted and not
-						 // worn below its suppression_min_condition, as with a silencer addon
+		bool suppressor; // `suppressor = true`: the gun is suppressed while this part is fitted, as with a silencer addon
 		int ammo_mag_size; // `ammo_mag_size`: the gun's magazine size while this part is fitted, -1 if unset
 	};
 
@@ -196,7 +176,6 @@ namespace gunsmith
 	{
 		float ergo_base; // receiver ergonomics when the weapon has no `ergonomics` key (50)
 		float recoil_recovery; // camera recoil relax speed multiplier on full-mode guns (1.0 = vanilla)
-		float sight_sway_factor; // extra zoomed sway per point of condition below a sight's threshold (1.0)
 		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
 		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
 		float optic_base_fov;

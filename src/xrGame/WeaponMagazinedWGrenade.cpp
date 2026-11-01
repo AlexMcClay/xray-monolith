@@ -621,7 +621,7 @@ bool CWeaponMagazinedWGrenade::Attach(PIItem pIItem, bool b_send_event)
 		!xr_strcmp(*m_sGrenadeLauncherName, pIItem->object().cNameSect()))
 	{
 		m_flagsAddOnState |= CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher;
-		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, pIItem->object().cNameSect().c_str(), pIItem->GetCondition());
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, pIItem->object().cNameSect().c_str());
 
 		CRocketLauncher::m_fLaunchSpeed = pGrenadeLauncher->GetGrenadeVel();
 
@@ -650,7 +650,7 @@ bool CWeaponMagazinedWGrenade::Detach(LPCSTR item_section_name, bool b_spawn_ite
 		!xr_strcmp(*m_sGrenadeLauncherName, item_section_name))
 	{
 		m_flagsAddOnState &= ~CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher;
-		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, nullptr, 0.f);
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, nullptr);
 
 		// Now we need to unload GL's magazine
 		if (!m_bGrenadeMode)

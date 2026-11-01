@@ -20,12 +20,11 @@ namespace gunsmith
 		shared_str section;
 		u8 parent; // index of the parent node, GS_NO_PARENT for the receiver
 		u8 slot; // index into the parent's slot list
-		float condition; // 0..1
 		// A tactical device's selected mode (index into its tactical_modes). On node 0, the
 		// receiver, it is the weapon's devices-on flag (0 off, 1 on). See gunsmith_tactical.h.
 		u8 mode;
 
-		SNode() : parent(GS_NO_PARENT), slot(0), condition(1.f), mode(0) {}
+		SNode() : parent(GS_NO_PARENT), slot(0), mode(0) {}
 	};
 
 	// Node 0 is the receiver (the weapon section itself). Every other node's parent
@@ -45,12 +44,12 @@ namespace gunsmith
 		// Change counters (1 Nov 2026): a new number, never reused in the session, whenever the tree changes, so
 		// users can tell "changed?" with one compare instead of walking the tree. layout_revision: the parts, where
 		// they sit, the part-root flag. state_revision: that and the nodes' modes (the selected sight, sight and
-		// device modes). Conditions change neither. A copied tree keeps its numbers.
+		// device modes). A copied tree keeps its numbers.
 		u32 layout_revision() const { return m_layout_rev; }
 		u32 state_revision() const { return m_state_rev; }
 
 		// Returns the new node's index, or -1 when the tree is full or the parent is invalid.
-		int add_node(LPCSTR section, u8 parent, u8 slot, float condition);
+		int add_node(LPCSTR section, u8 parent, u8 slot);
 
 		// Removes the node and all its descendants. Removing node 0 clears the tree.
 		void remove_subtree(u8 index);
@@ -58,9 +57,6 @@ namespace gunsmith
 		// Index of the node occupying parent's slot, or -1.
 		int find_in_slot(u8 parent, u8 slot) const;
 
-		void set_condition(u8 index, float condition);
-		// Every node, the receiver included (a found gun's parts match the gun).
-		void set_all_conditions(float condition);
 		void set_mode(u8 index, u8 mode);
 
 		// A weapon tree's own state, saved in node 0's mode: bit 0 its tactical devices are on, bits 1-7 the node the
@@ -71,15 +67,12 @@ namespace gunsmith
 		void set_devices_on(bool on);
 		u8 selected_sight() const { return m_part_root || m_nodes.empty() ? 0 : u8(m_nodes[0].mode >> 1); }
 		void set_selected_sight(u8 node);
-		// Takes other's node conditions when both trees hold the same parts and modes (the same revisions: one is a
-		// copy of the other). Returns false, changing nothing, when they don't.
-		bool copy_conditions_from(const CTree& other);
 
 		// A node's slots (the cached list of its section; empty for a node that doesn't exist)
 		const SLOTS& node_slots(u8 index) const;
 
 		// Save layout: gs_version u16, node_count u8, then per node
-		// section stringZ, parent u8, slot u8, condition u16 (0..65535 = 0..1), mode u8 (version 2+).
+		// section stringZ, parent u8, slot u8, an unused u16 (written as 1.0, ignored on read), mode u8 (version 2+).
 		void write(NET_Packet& packet) const;
 
 		// Reads a tree written by write(). Never reads past the end of the packet.
@@ -87,8 +80,8 @@ namespace gunsmith
 		bool read(NET_Packet& packet);
 
 		// Builds a fresh tree: the receiver, its gs_default_build, then the parts
-		// that the old addon flags stand for. Every node takes `condition`.
-		void build_default(LPCSTR receiver, u8 addon_flags, float condition);
+		// that the old addon flags stand for.
+		void build_default(LPCSTR receiver, u8 addon_flags);
 
 		// Drops nodes whose section no longer exists or which no longer fit their
 		// slot (moving them to another free fitting slot on the same parent first).
@@ -111,10 +104,10 @@ namespace gunsmith
 
 		// Puts `part` into the slot for this old addon flag, replacing what was there.
 		// A null or empty part only removes. Returns false if there is no free slot.
-		bool set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition);
+		bool set_legacy_addon(u8 legacy_addon, LPCSTR part);
 
 		// Adds or removes legacy parts so the tree matches the old addon flags.
-		void sync_legacy_flags(u8 addon_flags, float condition);
+		void sync_legacy_flags(u8 addon_flags);
 
 		void dump(LPCSTR label) const;
 
@@ -142,13 +135,13 @@ namespace gunsmith
 		void extract_subtree(u8 node, CTree& out) const;
 
 		// Adds a part-root tree under `parent`'s `slot`: its node 0 becomes the part
-		// in that slot (with `root_condition`), its other nodes keep their conditions.
+		// in that slot.
 		// Returns the new index of that part, or -1 if the slot is taken, the parent
 		// doesn't exist or the tree would get too big.
-		int graft(const CTree& sub, u8 parent, u8 slot, float root_condition);
+		int graft(const CTree& sub, u8 parent, u8 slot);
 
 	private:
-		int place_in_free_slot(LPCSTR part, float condition);
+		int place_in_free_slot(LPCSTR part);
 
 		void touch_layout();
 		void touch_state();

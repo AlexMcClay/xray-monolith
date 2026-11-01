@@ -163,7 +163,7 @@ void CWeaponMagazined::Load(LPCSTR section)
 	if (WeaponSoundExist(actor_sect("snd_holster_actor"), "snd_holster_actor"))
 		m_sounds.LoadSound(actor_sect("snd_holster_actor"), "snd_holster_actor", "sndHideActor", true, m_eSoundHide);
 
-	m_sSndShotCurrent = IsSuppressed() ? "sndSilencerShot" : "sndShot";
+	m_sSndShotCurrent = IsSuppressorFitted() ? "sndSilencerShot" : "sndShot";
 
 	//звуки и партиклы глушителя, еслит такой есть
 	// (also for guns without a silencer addon that may take a suppressor part)
@@ -1414,7 +1414,7 @@ bool CWeaponMagazined::Attach(PIItem pIItem, bool b_send_event)
 			}
 		}
 		m_flagsAddOnState |= CSE_ALifeItemWeapon::eWeaponAddonScope;
-		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonScope, pIItem->object().cNameSect().c_str(), pIItem->GetCondition());
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonScope, pIItem->object().cNameSect().c_str());
 		if (m_modular_attachments) {
 			LoadScopeKoeffs();
 			m_scopeItem = xr_new<CAnonHudItem>();
@@ -1432,7 +1432,7 @@ bool CWeaponMagazined::Attach(PIItem pIItem, bool b_send_event)
 		(m_sSilencerName == pIItem->object().cNameSect()))
 	{
 		m_flagsAddOnState |= CSE_ALifeItemWeapon::eWeaponAddonSilencer;
-		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonSilencer, pIItem->object().cNameSect().c_str(), pIItem->GetCondition());
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonSilencer, pIItem->object().cNameSect().c_str());
 		result = true;
 	}
 	else if (pGrenadeLauncher &&
@@ -1441,7 +1441,7 @@ bool CWeaponMagazined::Attach(PIItem pIItem, bool b_send_event)
 		(m_sGrenadeLauncherName == pIItem->object().cNameSect()))
 	{
 		m_flagsAddOnState |= CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher;
-		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, pIItem->object().cNameSect().c_str(), pIItem->GetCondition());
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, pIItem->object().cNameSect().c_str());
 		result = true;
 	}
 
@@ -1498,7 +1498,7 @@ bool CWeaponMagazined::Detach(const char* item_section_name, bool b_spawn_item)
 			return true;
 		}
 		m_flagsAddOnState &= ~CSE_ALifeItemWeapon::eWeaponAddonScope;
-		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonScope, nullptr, 0.f);
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonScope, nullptr);
 
 		if (m_scopeItem) {
 			g_player_hud->detach_item(m_scopeItem);
@@ -1523,7 +1523,7 @@ bool CWeaponMagazined::Detach(const char* item_section_name, bool b_spawn_item)
 			return true;
 		}
 		m_flagsAddOnState &= ~CSE_ALifeItemWeapon::eWeaponAddonSilencer;
-		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonSilencer, nullptr, 0.f);
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonSilencer, nullptr);
 
 		UpdateAddonsVisibility();
 		InitAddons();
@@ -1538,7 +1538,7 @@ bool CWeaponMagazined::Detach(const char* item_section_name, bool b_spawn_item)
 			return true;
 		}
 		m_flagsAddOnState &= ~CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher;
-		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, nullptr, 0.f);
+		gs_set_legacy_addon(CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher, nullptr);
 
 		UpdateAddonsVisibility();
 		InitAddons();
@@ -1618,8 +1618,8 @@ void CWeaponMagazined::gs_apply_mag_size(int size, bool live)
 
 void CWeaponMagazined::gs_on_suppression_changed()
 {
-	// A silencer worn below its suppression threshold fires like an unsuppressed gun.
-	if (IsSuppressed())
+	// A silencer addon or a suppressor part: suppressed shot sound, particles and lights.
+	if (IsSuppressorFitted())
 	{
 		m_sFlameParticlesCurrent = m_sSilencerFlameParticles;
 		m_sSmokeParticlesCurrent = m_sSilencerSmokeParticles;

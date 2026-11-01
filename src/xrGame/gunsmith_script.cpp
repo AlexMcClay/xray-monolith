@@ -38,7 +38,6 @@ namespace gunsmith
 				t["parent"] = int(n.parent);
 				t["slot"] = int(n.slot);
 			}
-			t["condition"] = n.condition;
 			t["mode"] = int(n.mode);
 			t["kind"] = i == 0 ? "receiver" : part_data(n.section).kind.c_str();
 			const u8 legacy = tree.node_legacy_addon(u8(i));
@@ -89,8 +88,7 @@ namespace gunsmith
 		}
 	}
 
-	bool tree_from_lua(const ::luabind::object& nodes, LPCSTR receiver, float receiver_condition, CTree& out,
-	                   xr_string& error)
+	bool tree_from_lua(const ::luabind::object& nodes, LPCSTR receiver, CTree& out, xr_string& error)
 	{
 		out.clear();
 		string512 msg;
@@ -112,7 +110,7 @@ namespace gunsmith
 				return false;
 			}
 		}
-		out.add_node(receiver, GS_NO_PARENT, 0, receiver_condition);
+		out.add_node(receiver, GS_NO_PARENT, 0);
 
 		for (u32 i = 2;; ++i)
 		{
@@ -143,7 +141,7 @@ namespace gunsmith
 				return false;
 			}
 
-			double parent = 0.0, slot = 0.0, condition = 1.0;
+			double parent = 0.0, slot = 0.0;
 			read_number(row, "parent", parent);
 			if (!read_number(row, "slot", slot))
 			{
@@ -151,7 +149,6 @@ namespace gunsmith
 				error = msg;
 				return false;
 			}
-			read_number(row, "condition", condition);
 
 			if (parent < 0.0 || u32(parent) >= node)
 			{
@@ -173,7 +170,7 @@ namespace gunsmith
 			}
 			double mode = 0.0;
 			read_number(row, "mode", mode);
-			const int added = out.add_node(section, u8(parent), u8(slot), float(condition));
+			const int added = out.add_node(section, u8(parent), u8(slot));
 			if (added >= 0)
 				out.set_mode(u8(added), u8(clampr(mode, 0.0, 255.0)));
 			if (added < 0)

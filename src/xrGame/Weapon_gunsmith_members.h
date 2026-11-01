@@ -13,24 +13,15 @@ public:
 	const gunsmith::CTree& gs_tree() const { return m_gs_tree; }
 	CSE_ALifeItemWeapon* gs_server_entity() const;
 	void gs_sync_to_server();
-	// After a shot's wear: the server copy takes the part conditions only, when it holds the same parts
-	void gs_sync_conditions_to_server();
 
 	// Stat modifiers from the parts. Read sites use gs_stats().apply(stat, base).
 	const gunsmith::SWeaponStats& gs_stats() const { return m_gs_stats; }
 	// Recomputes gs_stats() from the tree; `notify` re-applies suppressed sound and
-	// particles when a worn suppressor crosses its threshold.
+	// particles when a suppressor part comes on or off.
 	void gs_rebuild_stats(bool notify = true);
-	// After a shot's wear (only part conditions changed): refolds the condition terms onto the cached structural
-	// stats; a full gs_rebuild_stats when the parts, addon flags or scope changed since they were made
-	void gs_refresh_condition_stats();
-	// gs_stats_check 1: compares the refolded stats with a full rebuild after every shot, logging differences
-	void gs_check_stats() const;
 
-	// A silencer is attached and not worn below its suppression threshold.
-	bool IsSuppressed() const;
-	// A suppressor is fitted, worn or not: a silencer addon, or a part with `suppressor = true`.
-	// Gameplay checks (shot sound, AI hearing) use this; IsSilencerAttached() stays the addon flag.
+	// A suppressor is fitted: a silencer addon, or a part with `suppressor = true`.
+	// Gameplay checks (shot sound, tracers, AI hearing) use this; IsSilencerAttached() stays the addon flag.
 	bool IsSuppressorFitted() const { return IsSilencerAttached() || m_gs_stats.suppressor_part; }
 
 	// Vanilla readings for scripts (Gunsmith Docs 24, "Vanilla readings"). Weight() and Cost() count every fitted
@@ -56,10 +47,7 @@ public:
 	u8 gs_jam_type() const { return m_gs_jam_type; }
 	u8 gs_jam_node() const { return m_gs_jam_node; }
 
-	// The gun and every part at one condition (Lua gs_set_parts_condition: found and spawned guns).
-	void gs_set_parts_condition(float value);
 	// Debug and test helpers for the gs_* console commands.
-	bool gs_debug_set_condition(u8 node, float value);
 	bool gs_debug_set_part(u8 parent, u8 slot, LPCSTR section);
 	void gs_dump_stats() const;
 
@@ -69,19 +57,18 @@ public:
 	// `preview` (stats only), where any old-style addon of that type fits.
 	LPCSTR gs_check_place(const gunsmith::CTree& tree, LPCSTR section, u8 parent, u8 slot, bool preview) const;
 	// Puts a part into a free non-addon slot and fires on_gs_part_attached.
-	bool gs_attach_part(LPCSTR section, u8 parent, u8 slot, float condition);
+	bool gs_attach_part(LPCSTR section, u8 parent, u8 slot);
 	// Removes a part and its children. With `spawn`, each comes back as an inventory
-	// item with its condition; `item_id` is the first one, or 0xffff.
+	// item; `item_id` is the first one, or 0xffff.
 	bool gs_detach_part(u8 node, bool spawn, u16& item_id);
 	// Spawns a part section as an item next to (or in the inventory of) the weapon's
-	// owner, with the given condition and, for part items, the parts mounted on it.
-	// Returns its id, or 0xffff.
-	u16 gs_spawn_part_item(LPCSTR section, float condition, const gunsmith::CTree* subtree = nullptr);
+	// owner, for part items with the parts mounted on it. Returns its id, or 0xffff.
+	u16 gs_spawn_part_item(LPCSTR section, const gunsmith::CTree* subtree = nullptr);
 	// Puts an inventory item into a free non-addon slot, with any parts it carries.
 	// Fires on_gs_part_attached. The caller destroys the item.
 	bool gs_attach_item(CInventoryItem* item, u8 parent, u8 slot);
 	// Stats a tree would give this weapon (the live tree, or a preview copy), without the scripts' layer.
-	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out, bool conditions = true) const;
+	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out) const;
 	// The scripts' layer of `stats` (script_add, script_mul): the weapon_on_recalc_stats callback, through
 	// _G.CWeapon_OnRecalcStats (gunsmith_callbacks.script), given the parts' totals; `preview` for a build that
 	// isn't the weapon's (the builder). Runs on every full recompute and preview, not per shot.
@@ -190,20 +177,13 @@ protected:
 protected:
 	gunsmith::CTree m_gs_tree;
 	gunsmith::SWeaponStats m_gs_stats;
-	// m_gs_stats without the part-condition terms, which a shot refolds (gs_refresh_condition_stats), and what it
-	// was made for: the tree's layout revision, the addon flags and the scope
-	gunsmith::SWeaponStats m_gs_struct_stats;
-	u32 m_gs_struct_rev = 0;
-	u8 m_gs_struct_flags = 0;
-	u8 m_gs_struct_scope = 0;
-	bool m_gs_struct_valid = false;
 	u8 m_gs_jam_type = 0;
 	u8 m_gs_jam_node = 0;
 	bool m_gs_cant_fire_logged = false;
 
 	// Per-shot wear: the weapon_on_shot callback's for this shot when a script took it (CheckForMisfire asks
 	// before the shot), times the wear setting; else the receiver's own (condition_shot_dec, the cartridge's
-	// impair). Parts don't wear from shots since 2 Nov 2026.
+	// impair). Parts don't wear.
 	void gs_apply_shot_wear(float impair);
 	// The weapon_on_shot callback (_G.CWeapon_OnShot in gunsmith_callbacks.script) for the shot about to be fired,
 	// the player's or an NPC's: true when a script took it, with its malfunction (`failure`, gunsmith::EFailure;
@@ -215,6 +195,6 @@ protected:
 	virtual void gs_on_suppression_changed() {}
 
 	// Mirrors an attach (part != null) or detach of an old-style addon into the tree.
-	void gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition);
+	void gs_set_legacy_addon(u8 legacy_addon, LPCSTR part);
 	// Makes the tree's scope part match the scope the weapon actually uses (m_cur_scope).
 	void gs_match_scope_part();

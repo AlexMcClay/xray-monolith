@@ -66,7 +66,7 @@ bool cse_item_gs_set_tree_script(CSE_ALifeItem* item, ::luabind::object nodes)
 	}
 	gunsmith::CTree tree;
 	xr_string error;
-	if (!gunsmith::tree_from_lua(nodes, item->s_name.c_str(), item->m_fCondition, tree, error))
+	if (!gunsmith::tree_from_lua(nodes, item->s_name.c_str(), tree, error))
 	{
 		Msg("! cse_alife_item:gs_set_tree [%s]: %s", item->s_name.c_str(), error.c_str());
 		return false;
@@ -77,25 +77,11 @@ bool cse_item_gs_set_tree_script(CSE_ALifeItem* item, ::luabind::object nodes)
 	return true;
 }
 
-// Gunsmith: the gun and every part at one condition (offline guns: loot, NPC loadouts, traders).
-bool cse_gs_set_parts_condition_script(CSE_ALifeItemWeapon* weapon, float value)
-{
-	if (value < 0.f || value > 1.f)
-	{
-		Msg("! cse_alife_item_weapon:gs_set_parts_condition [%s]: %f, must be between 0 and 1", weapon->s_name.c_str(), value);
-		return false;
-	}
-	weapon->gs_ensure_tree();
-	weapon->m_fCondition = value;
-	weapon->m_gs_tree.set_all_conditions(value);
-	return true;
-}
-
 bool cse_gs_set_tree_script(CSE_ALifeItemWeapon* weapon, ::luabind::object nodes)
 {
 	gunsmith::CTree tree;
 	xr_string error;
-	if (!gunsmith::tree_from_lua(nodes, weapon->s_name.c_str(), weapon->m_fCondition, tree, error))
+	if (!gunsmith::tree_from_lua(nodes, weapon->s_name.c_str(), tree, error))
 	{
 		Msg("! cse_alife_item_weapon:gs_set_tree [%s]: %s", weapon->s_name.c_str(), error.c_str());
 		return false;
@@ -174,7 +160,6 @@ void CSE_ALifeItemWeapon::script_register(lua_State* L)
 #ifdef XRGAME_EXPORTS
 		.def("gs_get_tree", &cse_gs_get_tree_script, raw<1>())
 		.def("gs_set_tree", &cse_gs_set_tree_script)
-		.def("gs_set_parts_condition", &cse_gs_set_parts_condition_script)
 #endif
 	];
 }

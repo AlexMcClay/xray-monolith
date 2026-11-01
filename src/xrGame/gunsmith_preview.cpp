@@ -291,7 +291,7 @@ namespace gunsmith
 		{
 			s = xr_new<SScene>();
 			s->root = root;
-			s->tree.build_default(section, 0, 1.f);
+			s->tree.build_default(section, 0);
 			s->visuals.ensure(CVisuals::eWorld, K, s->tree, section, nullptr, is_full_mode(section));
 			if (is_full_mode(section))
 			{

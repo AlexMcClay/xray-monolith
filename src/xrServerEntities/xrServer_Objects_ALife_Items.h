@@ -198,11 +198,11 @@ SERVER_ENTITY_DECLARE_BEGIN(CSE_ALifeItemWeapon, CSE_ALifeItem)
 	gunsmith::CTree m_gs_tree;
 
 	// Builds the tree from the addon flags if it is empty, otherwise brings its
-	// legacy slots in line with the flags. Keeps the receiver's condition current.
+	// legacy slots in line with the flags.
 	void gs_ensure_tree();
 
 	// Installs a tree (from a save or a script): validates it against this weapon's
-	// section, sets the receiver's condition, and makes the addon flags follow it.
+	// section and makes the addon flags follow it.
 	void gs_set_tree(const gunsmith::CTree& tree);
 
 	CSE_ALifeItemWeapon(LPCSTR caSection);

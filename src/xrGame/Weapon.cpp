@@ -1180,7 +1180,7 @@ void CWeapon::net_Import(NET_Packet& P)
 
 	const bool addons_changed = NewAddonState != m_flagsAddOnState;
 	if (addons_changed)
-		m_gs_tree.sync_legacy_flags(NewAddonState, GetCondition()); // remote copy only, multiplayer
+		m_gs_tree.sync_legacy_flags(NewAddonState); // remote copy only, multiplayer
 	m_flagsAddOnState = NewAddonState;
 	if (addons_changed)
 		gs_rebuild_stats(false);
@@ -1259,7 +1259,7 @@ void CWeapon::OnEvent(NET_Packet& P, u16 type)
 	case GE_ADDON_CHANGE:
 		{
 			P.r_u8(m_flagsAddOnState);
-			m_gs_tree.sync_legacy_flags(m_flagsAddOnState, GetCondition()); // multiplayer buy menu only
+			m_gs_tree.sync_legacy_flags(m_flagsAddOnState); // multiplayer buy menu only
 			gs_rebuild_stats(false);
 			InitAddons();
 			UpdateAddonsVisibility();

@@ -490,27 +490,6 @@ static CWeapon* gs_active_weapon(LPCSTR command)
 	return wpn;
 }
 
-// Gunsmith test helper: gs_set_condition <node> <0..1>
-class CCC_GsSetCondition : public IConsole_Command
-{
-public:
-	CCC_GsSetCondition(LPCSTR N) : IConsole_Command(N) {}
-
-	virtual void Execute(LPCSTR args)
-	{
-		u32 node = 0;
-		float value = 0.f;
-		if (sscanf_s(args, "%u %f", &node, &value) != 2 || node > 255)
-		{
-			Msg("! usage: gs_set_condition <node> <0..1>   (node numbers from gs_dump_tree; 0 is the gun)");
-			return;
-		}
-		if (CWeapon* wpn = gs_active_weapon("gs_set_condition"))
-			if (wpn->gs_debug_set_condition(u8(node), value))
-				Msg("- gs_set_condition: node %u = %.3f", node, value);
-	}
-};
-
 // Gunsmith test helper: gs_set_part <parent node> <slot> <part section | none>
 class CCC_GsSetPart : public IConsole_Command
 {
@@ -2642,7 +2621,6 @@ void CCC_RegisterCommands()
 	CMD1(CCC_GsDumpTree, "gs_dump_tree");
 	CMD1(CCC_GsAimEye, "gs_aim_eye");
 	CMD4(CCC_Integer, "gs_aim_debug", &g_gs_aim_debug, 0, 1);
-	CMD4(CCC_Integer, "gs_stats_check", &g_gs_stats_check, 0, 1);
 	CMD4(CCC_Integer, "scope_timers", &g_scope_timers, 0, 1);
 	CMD4(CCC_Integer, "scope_timers_period", &g_scope_timers_period, 1, 60);
 	CMD4(CCC_Float, "gs_aim_speed", &g_gs_aim_speed, 0.5f, 30.f);
@@ -2652,7 +2630,6 @@ void CCC_RegisterCommands()
 	CMD4(CCC_Integer, "gs_grip_debug", &g_gs_grip_debug, 0, 1);
 	CMD4(CCC_Vector3, "gs_grip_offset", &g_gs_grip_offset, Fvector().set(-0.1f, -0.1f, -0.1f), Fvector().set(0.1f, 0.1f, 0.1f));
 	CMD4(CCC_Integer, "gs_preview_debug", &g_gs_preview_debug, 0, 1);
-	CMD1(CCC_GsSetCondition, "gs_set_condition");
 	CMD1(CCC_GsSetPart, "gs_set_part");
 #ifdef DEBUG
 	CMD1(CCC_MemCheckpoint, "stat_memory_checkpoint");

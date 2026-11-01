@@ -528,7 +528,7 @@ CSE_Abstract* CALifeSimulator__create_weapon_with_build(CALifeSimulator* self, L
 
 	gunsmith::CTree tree;
 	xr_string error;
-	if (!gunsmith::tree_from_lua(build, section, weapon->m_fCondition, tree, error))
+	if (!gunsmith::tree_from_lua(build, section, tree, error))
 	{
 		Msg("! alife():create_weapon_with_build [%s]: %s", section, error.c_str());
 		self->server().FreeID(abs->ID, 0);

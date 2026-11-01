@@ -271,7 +271,7 @@ namespace gunsmith
 	}
 
 	//==========================================================================
-	// Phase 2: part stats and durability
+	// Phase 2: part stats
 	//==========================================================================
 
 	namespace
@@ -297,44 +297,6 @@ namespace gunsmith
 			return stat == eStatFireDispersion || stat == eStatCamDispersion || stat == eStatCamDispersionInc;
 		}
 
-		struct SKindDefaults
-		{
-			float condition_dispersion_factor;
-			float jam_start_condition; // sights: zoomed sway below it
-			float suppression_min_condition;
-		};
-
-		// Built-in defaults per part kind. Any of them can be changed for a whole kind
-		// in [gs_part_kind_<kind>], and per part in the part's own section.
-		SKindDefaults builtin_kind_defaults(LPCSTR kind)
-		{
-			SKindDefaults d = { 0.f, 0.5f, 0.f };
-			auto is = [kind](LPCSTR k) { return !xr_strcmp(kind, k); };
-
-			if (is("barrel"))
-				d.condition_dispersion_factor = 1.f;
-			else if (is("muzzle"))
-				d.suppression_min_condition = 0.3f;
-			// sight: jam_start_condition (0.5) is the condition below which it adds zoomed sway.
-			// Parts don't wear from shots and don't jam (2 Nov 2026; Gunsmith Docs 25): a found worn part keeps its
-			// effects (spread from a worn barrel, a worn suppressor, sight sway).
-			return d;
-		}
-
-		SKindDefaults kind_defaults(LPCSTR kind)
-		{
-			SKindDefaults d = builtin_kind_defaults(kind);
-			string128 sect;
-			xr_sprintf(sect, "gs_part_kind_%s", kind);
-			if (!pSettings->section_exist(sect))
-				return d;
-
-			d.condition_dispersion_factor = READ_IF_EXISTS(pSettings, r_float, sect, "condition_dispersion_factor", d.condition_dispersion_factor);
-			d.jam_start_condition = READ_IF_EXISTS(pSettings, r_float, sect, "jam_start_condition", d.jam_start_condition);
-			d.suppression_min_condition = READ_IF_EXISTS(pSettings, r_float, sect, "suppression_min_condition", d.suppression_min_condition);
-			return d;
-		}
-
 		void read_part_data(LPCSTR section, SPartData& d)
 		{
 			for (u32 s = 0; s < eStatCount; ++s)
@@ -352,7 +314,7 @@ namespace gunsmith
 			if (!d.declared)
 			{
 				// Old-style addons without part_kind still get a kind for display and
-				// sight handling, but no durability: the engine alone changes nothing.
+				// sight handling.
 				LPCSTR cls = exists ? READ_IF_EXISTS(pSettings, r_string, section, "class", (LPCSTR)nullptr) : nullptr;
 				kind = (cls && !xr_strcmp(cls, "WP_SILEN")) ? "muzzle"
 					: (cls && !xr_strcmp(cls, "WP_SCOPE")) ? "sight"
@@ -360,14 +322,6 @@ namespace gunsmith
 					: "generic";
 			}
 			d.kind = kind;
-			d.kind_id = !xr_strcmp(kind, "muzzle") ? eKindMuzzle
-				: (!xr_strcmp(kind, "sight") || !xr_strcmp(kind, "optic")) ? eKindSight
-				: !xr_strcmp(kind, "barrel") ? eKindBarrel
-				: eKindOther;
-
-			SKindDefaults k = d.declared ? kind_defaults(kind) : builtin_kind_defaults("generic");
-			if (!d.declared)
-				k.jam_start_condition = 0.f; // no sight sway either
 
 			if (exists)
 			{
@@ -401,17 +355,6 @@ namespace gunsmith
 			d.shoulder_contact = exists && !!READ_IF_EXISTS(pSettings, r_bool, section, "shoulder_contact", FALSE);
 			d.suppressor = exists && d.declared && !!READ_IF_EXISTS(pSettings, r_bool, section, "suppressor", FALSE);
 			d.ammo_mag_size = exists && d.declared ? READ_IF_EXISTS(pSettings, r_s32, section, "ammo_mag_size", -1) : -1;
-
-			d.condition_dispersion_factor = k.condition_dispersion_factor;
-			d.jam_start_condition = k.jam_start_condition;
-			d.suppression_min_condition = k.suppression_min_condition;
-
-			if (exists && d.declared)
-			{
-				d.condition_dispersion_factor = READ_IF_EXISTS(pSettings, r_float, section, "condition_dispersion_factor", d.condition_dispersion_factor);
-				d.jam_start_condition = READ_IF_EXISTS(pSettings, r_float, section, "jam_start_condition", d.jam_start_condition);
-				d.suppression_min_condition = READ_IF_EXISTS(pSettings, r_float, section, "suppression_min_condition", d.suppression_min_condition);
-			}
 		}
 	}
 
@@ -471,7 +414,6 @@ namespace gunsmith
 				LPCSTR sect = "gunsmith_settings";
 				s.ergo_base = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_base", 50.f);
 				s.recoil_recovery = READ_IF_EXISTS(pSettings, r_float, sect, "recoil_recovery", 1.0f);
-				s.sight_sway_factor = READ_IF_EXISTS(pSettings, r_float, sect, "sight_sway_factor", 1.0f);
 				s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
 				s.aim_roll_min = READ_IF_EXISTS(pSettings, r_float, sect, "aim_roll_min", 1.f);
 				s.aim_turn_max = READ_IF_EXISTS(pSettings, r_float, sect, "aim_turn_max", 20.f);

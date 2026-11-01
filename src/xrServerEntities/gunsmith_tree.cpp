@@ -26,7 +26,7 @@ namespace gunsmith
 		m_state_rev = ++g_revision;
 	}
 
-	int CTree::add_node(LPCSTR section, u8 parent, u8 slot, float condition)
+	int CTree::add_node(LPCSTR section, u8 parent, u8 slot)
 	{
 		if (!section || !*section || m_nodes.size() >= GS_MAX_NODES)
 			return -1;
@@ -37,7 +37,6 @@ namespace gunsmith
 		n.section = section;
 		n.parent = parent;
 		n.slot = m_nodes.empty() ? 0 : slot;
-		n.condition = clampr(condition, 0.f, 1.f);
 		m_nodes.push_back(n);
 		touch_layout();
 		return int(m_nodes.size() - 1);
@@ -96,18 +95,6 @@ namespace gunsmith
 		return -1;
 	}
 
-	void CTree::set_condition(u8 index, float condition)
-	{
-		if (index < m_nodes.size())
-			m_nodes[index].condition = clampr(condition, 0.f, 1.f);
-	}
-
-	void CTree::set_all_conditions(float condition)
-	{
-		for (SNode& n : m_nodes)
-			n.condition = clampr(condition, 0.f, 1.f);
-	}
-
 	void CTree::set_mode(u8 index, u8 mode)
 	{
 		if (index < m_nodes.size() && m_nodes[index].mode != mode)
@@ -129,15 +116,6 @@ namespace gunsmith
 			set_mode(0, u8((m_nodes[0].mode & 1) | (u8(_min(u32(node), 127u)) << 1)));
 	}
 
-	bool CTree::copy_conditions_from(const CTree& other)
-	{
-		if (m_state_rev != other.m_state_rev || m_nodes.size() != other.m_nodes.size())
-			return false;
-		for (u32 i = 0; i < m_nodes.size(); ++i)
-			m_nodes[i].condition = other.m_nodes[i].condition;
-		return true;
-	}
-
 	const SLOTS& CTree::node_slots(u8 index) const
 	{
 		static const SLOTS none;
@@ -155,7 +133,7 @@ namespace gunsmith
 			packet.w_stringZ(n.section);
 			packet.w_u8(n.parent);
 			packet.w_u8(n.slot);
-			packet.w_float_q16(clampr(n.condition, 0.f, 1.f), 0.f, 1.f);
+			packet.w_float_q16(1.f, 0.f, 1.f); // unused (was the part's condition)
 			packet.w_u8(n.mode);
 		}
 	}
@@ -190,7 +168,7 @@ namespace gunsmith
 				goto corrupt;
 			packet.r_u8(n.parent);
 			packet.r_u8(n.slot);
-			packet.r_float_q16(n.condition, 0.f, 1.f);
+			packet.r_u16(); // unused (was the part's condition)
 			if (version >= 2)
 			{
 				if (packet.r_elapsed() < sizeof(u8))
@@ -211,7 +189,7 @@ namespace gunsmith
 		return false;
 	}
 
-	int CTree::place_in_free_slot(LPCSTR part, float condition)
+	int CTree::place_in_free_slot(LPCSTR part)
 	{
 		for (u32 i = 0; i < m_nodes.size(); ++i)
 		{
@@ -221,16 +199,16 @@ namespace gunsmith
 				if (slots[s].implicit || find_in_slot(u8(i), u8(s)) >= 0 || is_slot_blocked(slots[s].section))
 					continue;
 				if (part_fits_slot(part, slots[s], m_nodes[0].section.c_str(), true))
-					return add_node(part, u8(i), u8(s), condition);
+					return add_node(part, u8(i), u8(s));
 			}
 		}
 		return -1;
 	}
 
-	void CTree::build_default(LPCSTR receiver, u8 addon_flags, float condition)
+	void CTree::build_default(LPCSTR receiver, u8 addon_flags)
 	{
 		clear();
-		add_node(receiver, GS_NO_PARENT, 0, condition);
+		add_node(receiver, GS_NO_PARENT, 0);
 
 		LPCSTR build = READ_IF_EXISTS(pSettings, r_string, receiver, "gs_default_build", (LPCSTR)nullptr);
 		if (build)
@@ -276,17 +254,17 @@ namespace gunsmith
 								slot = int(s);
 					if (pSettings->section_exist(part) && slot >= 0 && slot < int(slots.size()) &&
 						find_in_slot(u8(parent), u8(slot)) < 0 && part_fits_slot(part, slots[slot], receiver, false))
-						added = add_node(part, u8(parent), u8(slot), condition);
+						added = add_node(part, u8(parent), u8(slot));
 				}
 				else if (pSettings->section_exist(part))
-					added = place_in_free_slot(part, condition);
+					added = place_in_free_slot(part);
 
 				if (added < 0 && !(optional && (parent_missing || !pSettings->section_exist(part))))
 					Msg("! [gunsmith] [%s] gs_default_build entry [%s] could not be placed", receiver, entry);
 			}
 		}
 
-		sync_legacy_flags(addon_flags, condition);
+		sync_legacy_flags(addon_flags);
 	}
 
 	void CTree::validate(LPCSTR receiver, xr_vector<shared_str>* dropped)
@@ -394,7 +372,7 @@ namespace gunsmith
 		return -1;
 	}
 
-	bool CTree::set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition)
+	bool CTree::set_legacy_addon(u8 legacy_addon, LPCSTR part)
 	{
 		if (m_nodes.empty())
 			return false;
@@ -403,10 +381,7 @@ namespace gunsmith
 		if (existing >= 0)
 		{
 			if (part && m_nodes[existing].section == part)
-			{
-				set_condition(u8(existing), condition);
 				return true;
-			}
 			remove_subtree(u8(existing));
 		}
 
@@ -418,14 +393,14 @@ namespace gunsmith
 			const SLOTS& slots = node_slots(u8(i));
 			for (u32 s = 0; s < slots.size(); ++s)
 				if (slots[s].legacy_addon == legacy_addon && find_in_slot(u8(i), u8(s)) < 0)
-					return add_node(part, u8(i), u8(s), condition) >= 0;
+					return add_node(part, u8(i), u8(s)) >= 0;
 		}
 
 		Msg("! [gunsmith] [%s] has no free %s slot for [%s]", m_nodes[0].section.c_str(), legacy_addon_name(legacy_addon), part);
 		return false;
 	}
 
-	void CTree::sync_legacy_flags(u8 addon_flags, float condition)
+	void CTree::sync_legacy_flags(u8 addon_flags)
 	{
 		if (m_nodes.empty())
 			return;
@@ -442,12 +417,12 @@ namespace gunsmith
 			{
 				const shared_str part = legacy_default_part(m_nodes[0].section.c_str(), addon);
 				if (part.size())
-					set_legacy_addon(addon, part.c_str(), condition);
+					set_legacy_addon(addon, part.c_str());
 				else
 					Msg("! [gunsmith] [%s] has the %s flag but no part section for it", m_nodes[0].section.c_str(), legacy_addon_name(addon));
 			}
 			else if (!want && have)
-				set_legacy_addon(addon, nullptr, 0.f);
+				set_legacy_addon(addon, nullptr);
 		}
 	}
 
@@ -458,9 +433,9 @@ namespace gunsmith
 		{
 			const SNode& n = m_nodes[i];
 			if (i == 0)
-				Msg("-   #0 [%s] receiver cond=%.4f", n.section.c_str(), n.condition);
+				Msg("-   #0 [%s] receiver", n.section.c_str());
 			else
-				Msg("-   #%u [%s] parent=#%u slot=%u cond=%.4f", i, n.section.c_str(), u32(n.parent), u32(n.slot), n.condition);
+				Msg("-   #%u [%s] parent=#%u slot=%u", i, n.section.c_str(), u32(n.parent), u32(n.slot));
 
 			const SLOTS& slots = node_slots(u8(i));
 			for (u32 s = 0; s < slots.size(); ++s)
@@ -529,7 +504,7 @@ namespace gunsmith
 		out.touch_layout();
 	}
 
-	int CTree::graft(const CTree& sub, u8 parent, u8 slot, float root_condition)
+	int CTree::graft(const CTree& sub, u8 parent, u8 slot)
 	{
 		if (sub.empty() || parent >= m_nodes.size() || find_in_slot(parent, slot) >= 0 ||
 			m_nodes.size() + sub.size() > GS_MAX_NODES)
@@ -543,7 +518,6 @@ namespace gunsmith
 			{
 				c.parent = parent;
 				c.slot = slot;
-				c.condition = clampr(root_condition, 0.f, 1.f);
 			}
 			else
 				c.parent = u8(base + c.parent);

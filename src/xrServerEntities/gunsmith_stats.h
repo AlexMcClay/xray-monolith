@@ -18,7 +18,7 @@ namespace gunsmith
 		u8 legacy_addon;
 	};
 
-	// Modifiers from every part, computed once per tree or condition change.
+	// Modifiers from every part, computed once per tree change.
 	// Stats are kept relative to the weapon's own values (which upgrades and
 	// scripts change in place), so read sites use apply(stat, base_value).
 	//
@@ -46,9 +46,6 @@ namespace gunsmith
 		bool stock_shoulder;
 		float weight_add; // parts' weight
 		float cost_add; // parts' cost
-		float muzzle_condition; // lowest condition of muzzle parts with a suppression threshold, 1 if none
-		bool suppressor_worn; // a muzzle part is below its suppression_min_condition
-		float sight_sway; // zoomed movement sway multiplier from worn sights, 1 if none
 		bool can_fire; // every required slot is filled
 		bool suppressor_part; // a part with `suppressor = true` is fitted
 		int mag_size; // magazine size from the fitted magazine part (`ammo_mag_size`), -1 if none
@@ -60,18 +57,9 @@ namespace gunsmith
 		float k(u8 stat) const { return script_mul[stat]; }
 		float apply(u8 stat, float base) const { return (base + add[stat] + script_add[stat]) * mul[stat] * script_mul[stat]; }
 		float horz_k() const { return mul[eStatCamHorz] * script_mul[eStatCamHorz]; } // horizontal: multiplier only
-		// Takes another result's script layer (the structural half and the per-shot check don't ask scripts again).
-		void copy_script(const SWeaponStats& from);
 	};
 
 	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out);
-
-	// compute() in two halves for a shot, which changes only part conditions (1 Nov 2026): the stats as if every
-	// part were new (relative to the stock build, as compute()), then the condition terms of the tree's parts
-	// (spread from worn parts, a worn suppressor, sight sway). Together they make compute()'s result, up to the
-	// order of the float multiplications.
-	void compute_structure(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out);
-	void apply_conditions(const CTree& tree, SWeaponStats& out);
 
 	void dump(const SWeaponStats& stats);
 }

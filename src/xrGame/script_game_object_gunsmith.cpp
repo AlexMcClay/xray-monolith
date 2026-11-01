@@ -55,10 +55,7 @@ namespace
 		t["parts_weight"] = stats.weight_add;
 		t["parts_cost"] = stats.cost_add;
 		t["can_fire"] = stats.can_fire;
-		t["suppressor_worn"] = stats.suppressor_worn;
-		t["suppressed"] = has_silencer && !stats.suppressor_worn;
-		t["muzzle_condition"] = stats.muzzle_condition;
-		t["sight_sway"] = stats.sight_sway;
+		t["suppressed"] = has_silencer;
 		t["jammed"] = jammed;
 		t["jam_type"] = jammed ? gunsmith::failure_name(jam_type) : "none";
 		if (jammed)
@@ -148,10 +145,10 @@ bool CScriptGameObject::gs_attach(CScriptGameObject* part, u8 parent, u8 slot)
 	return true;
 }
 
-bool CScriptGameObject::gs_attach_section(LPCSTR section, u8 parent, u8 slot, float condition)
+bool CScriptGameObject::gs_attach_section(LPCSTR section, u8 parent, u8 slot)
 {
 	CWeapon* weapon = gs_weapon(this, "gs_attach_section");
-	return weapon && weapon->gs_attach_part(section, parent, slot, condition);
+	return weapon && weapon->gs_attach_part(section, parent, slot);
 }
 
 ::luabind::object gs_detach_spawn_script(lua_State* L, CScriptGameObject* self, u8 node, bool spawn)
@@ -166,21 +163,6 @@ bool CScriptGameObject::gs_attach_section(LPCSTR section, u8 parent, u8 slot, fl
 ::luabind::object gs_detach_script(lua_State* L, CScriptGameObject* self, u8 node)
 {
 	return gs_detach_spawn_script(L, self, node, true);
-}
-
-bool CScriptGameObject::gs_set_condition(u8 node, float value)
-{
-	CWeapon* weapon = gs_weapon(this, "gs_set_condition");
-	return weapon && weapon->gs_debug_set_condition(node, value);
-}
-
-bool CScriptGameObject::gs_set_parts_condition(float value)
-{
-	CWeapon* weapon = gs_weapon(this, "gs_set_parts_condition");
-	if (!weapon)
-		return false;
-	weapon->gs_set_parts_condition(value);
-	return true;
 }
 
 ::luabind::object gs_get_stats_script(lua_State* L, CScriptGameObject* self)
@@ -456,9 +438,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 	CWeapon* weapon = gs_weapon(self, "gs_preview_attach");
 	if (!weapon || !item)
 		return ::luabind::newtable(L);
-	CInventoryItem* ii = smart_cast<CInventoryItem*>(&item->object());
 	LPCSTR section = item->object().cNameSect().c_str();
-	const float condition = ii ? ii->GetCondition() : 1.f;
 
 	// What it carries: from its server object, as an attach reads it; else the client's copy.
 	const gunsmith::CTree* subtree = nullptr;
@@ -496,8 +476,8 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 			tree = weapon->gs_tree();
 		}
 		else if (!subtree)
-			tree.add_node(section, parent, slot, condition);
-		else if (tree.graft(*subtree, parent, slot, condition) < 0)
+			tree.add_node(section, parent, slot);
+		else if (tree.graft(*subtree, parent, slot) < 0)
 		{
 			errors[1] = "1: tree_full";
 			tree = weapon->gs_tree();
@@ -552,7 +532,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 				fail(i, "not_a_table");
 				continue;
 			}
-			::luabind::object parent_obj = row["parent"], slot_obj = row["slot"], section_obj = row["section"], cond_obj = row["condition"];
+			::luabind::object parent_obj = row["parent"], slot_obj = row["slot"], section_obj = row["section"];
 			if (parent_obj.type() != LUA_TNUMBER || slot_obj.type() != LUA_TNUMBER || section_obj.type() != LUA_TSTRING)
 			{
 				fail(i, "needs_parent_slot_section");
@@ -561,7 +541,6 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 			const int parent = ::luabind::object_cast<int>(parent_obj);
 			const int slot = ::luabind::object_cast<int>(slot_obj);
 			LPCSTR section = ::luabind::object_cast<LPCSTR>(section_obj);
-			const float condition = cond_obj.type() == LUA_TNUMBER ? ::luabind::object_cast<float>(cond_obj) : 1.f;
 			if (parent < 0 || parent >= int(tree.size()) || slot < 0 || slot > 255)
 			{
 				fail(i, "no_such_node");
@@ -583,7 +562,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 				fail(i, reason);
 				continue;
 			}
-			tree.add_node(section, u8(parent), u8(slot), condition);
+			tree.add_node(section, u8(parent), u8(slot));
 		}
 	}
 	else if (changes.type() != LUA_TNIL)

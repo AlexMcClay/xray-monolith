@@ -10,6 +10,5 @@
 #include "gunsmith_tactical.h"
 
 extern int g_gs_aim_debug;
-extern int g_gs_stats_check;
 extern float g_gs_aim_speed;
 extern int g_gs_aim_rot;
