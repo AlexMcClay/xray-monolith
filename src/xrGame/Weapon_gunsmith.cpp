@@ -138,8 +138,10 @@ void CWeapon::gs_rebuild_stats(bool notify)
 
 	const bool was_suppressed = IsSuppressed();
 	gs_compute_stats(m_gs_tree, m_gs_stats);
+	gs_script_stats(m_gs_stats, false);
 	// and the structural half a shot refolds its condition terms onto (gs_refresh_condition_stats)
 	gs_compute_stats(m_gs_tree, m_gs_struct_stats, false);
+	m_gs_struct_stats.copy_script(m_gs_stats);
 	m_gs_struct_rev = m_gs_tree.layout_revision();
 	m_gs_struct_flags = m_flagsAddOnState;
 	m_gs_struct_scope = m_cur_scope;
@@ -163,6 +165,54 @@ void CWeapon::gs_rebuild_stats(bool notify)
 	if (notify && was_suppressed != IsSuppressed())
 		gs_on_suppression_changed();
 	gs_update_optic();
+}
+
+void CWeapon::gs_script_stats(gunsmith::SWeaponStats& stats, bool preview)
+{
+	SCOPE_TIMER("gs.stats.script");
+	::luabind::functor<void> funct;
+	if (!ai().script_engine().functor("_G.CWeapon_OnRecalcStats", funct))
+		return;
+	lua_State* L = ai().script_engine().lua();
+	::luabind::object t = ::luabind::newtable(L);
+	t["section"] = cNameSect().c_str();
+	t["preview"] = preview;
+	t["ergonomics"] = stats.ergonomics;
+	t["stock_ergonomics"] = stats.stock_ergonomics;
+	t["recoil"] = stats.recoil_sum;
+	t["stock_recoil"] = stats.stock_recoil_sum;
+	t["shoulder"] = stats.shoulder;
+	t["stock_shoulder"] = stats.stock_shoulder;
+	t["mul"] = ::luabind::newtable(L);
+	t["add"] = ::luabind::newtable(L);
+	funct(lua_game_object(), t);
+
+	// What the handlers left in t.mul and t.add, by stat name; anything not a finite number is ignored.
+	::luabind::object mul = t["mul"], add = t["add"];
+	for (u32 s = 0; s < gunsmith::eStatCount; ++s)
+	{
+		LPCSTR name = gunsmith::stat_name(u8(s));
+		if (mul.type() == LUA_TTABLE)
+		{
+			::luabind::object v = mul[name];
+			if (v.type() == LUA_TNUMBER)
+			{
+				const float f = ::luabind::object_cast<float>(v);
+				if (_valid(f))
+					stats.script_mul[s] = f;
+			}
+		}
+		if (add.type() == LUA_TTABLE)
+		{
+			::luabind::object v = add[name];
+			if (v.type() == LUA_TNUMBER)
+			{
+				const float f = ::luabind::object_cast<float>(v);
+				if (_valid(f))
+					stats.script_add[s] = f;
+			}
+		}
+	}
 }
 
 const gunsmith::SPartVisual* CWeapon::gs_sight_part(shared_str* section) const
@@ -399,6 +449,7 @@ void CWeapon::gs_check_stats() const
 	static u32 s_checked = 0, s_different = 0;
 	gunsmith::SWeaponStats full;
 	gs_compute_stats(m_gs_tree, full);
+	full.copy_script(m_gs_struct_stats); // scripts aren't asked per shot; their layer comes from the last rebuild
 	const gunsmith::SWeaponStats& fast = m_gs_stats;
 
 	u32 different = 0;
@@ -811,7 +862,7 @@ void CWeapon::gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float
 		v = stats.ergonomics;
 	else
 		v = stats.apply(stat, b);
-	float a = stat < gunsmith::eStatCount ? stats.add[stat] : 0.f;
+	float a = stat < gunsmith::eStatCount ? stats.add[stat] + stats.script_add[stat] : 0.f;
 
 	if (angle)
 	{

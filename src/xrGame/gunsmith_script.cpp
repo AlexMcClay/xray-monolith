@@ -9,6 +9,7 @@
 #include "gunsmith_preview.h"
 #include "inventory_item_object.h"
 #include "Level.h"
+#include "Weapon.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "../Include/xrRender/Kinematics.h"
@@ -272,6 +273,16 @@ bool gs_carries_parts(u16 id)
 
 bool gs_set_setting(LPCSTR name, float value) { return gunsmith::set_setting(name, value); }
 float gs_get_setting(LPCSTR name) { return gunsmith::get_setting(name); }
+
+void gs_refresh_stats_script()
+{
+	if (!g_pGameLevel)
+		return;
+	for (u32 i = 0, n = Level().Objects.o_count(); i < n; ++i)
+		if (CWeapon* weapon = smart_cast<CWeapon*>(Level().Objects.o_get_by_iterator(i)))
+			if (!weapon->getDestroy())
+				weapon->gs_rebuild_stats();
+}
 
 bool gs_is_full_mode(LPCSTR section)
 {

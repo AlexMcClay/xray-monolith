@@ -91,5 +91,8 @@ void gs_preview_tick();
 bool gs_is_full_mode(LPCSTR section);
 bool gs_set_setting(LPCSTR name, float value);
 float gs_get_setting(LPCSTR name);
+// Every weapon in play recomputes its stats, so weapon_on_recalc_stats runs for each (after a handling setting
+// changes: the Framework's MCM page).
+void gs_refresh_stats_script();
 // gunsmith.carries_parts(id): whether a part item carries parts mounted on it.
 bool gs_carries_parts(u16 id);

@@ -46,7 +46,7 @@ namespace
 		t["stock_ergonomics"] = stats.stock_ergonomics;
 		t["recoil"] = stats.recoil_sum; // Tarkov's summed recoil percent of the fitted parts
 		t["stock_recoil"] = stats.stock_recoil_sum;
-		t["recoil_k"] = stats.recoil_k(); // the recoil multiplier against the stock build, penalty included
+		t["recoil_k"] = stats.k(gunsmith::eStatCamDispersion); // the scripts' recoil multiplier (gunsmith_handling)
 		t["shoulder"] = stats.shoulder;
 		t["no_stock"] = stats.stock_shoulder && !stats.shoulder;
 		// The weapon's weight and price with these parts instead of its current ones.
@@ -493,6 +493,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 
 	gunsmith::SWeaponStats stats;
 	weapon->gs_compute_stats(tree, stats);
+	weapon->gs_script_stats(stats, true);
 	const bool has_silencer = (tree.legacy_addon_flags() & gunsmith::eLegacySilencer) ||
 		(weapon->IsSilencerAttached() && !(tree.legacy_mask() & gunsmith::eLegacySilencer)) || stats.suppressor_part;
 	::luabind::object result = stats_to_lua(L, weapon, stats, has_silencer, 0, 0, false);
@@ -570,6 +571,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 
 	gunsmith::SWeaponStats stats;
 	weapon->gs_compute_stats(tree, stats);
+	weapon->gs_script_stats(stats, true);
 	const bool has_silencer = (tree.legacy_addon_flags() & gunsmith::eLegacySilencer) ||
 		(weapon->IsSilencerAttached() && !(tree.legacy_mask() & gunsmith::eLegacySilencer)) || stats.suppressor_part;
 	::luabind::object result = stats_to_lua(L, weapon, stats, has_silencer, 0, 0, false);

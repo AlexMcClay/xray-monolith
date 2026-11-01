@@ -67,8 +67,12 @@ public:
 	// Puts an inventory item into a free non-addon slot, with any parts it carries.
 	// Fires on_gs_part_attached. The caller destroys the item.
 	bool gs_attach_item(CInventoryItem* item, u8 parent, u8 slot);
-	// Stats a tree would give this weapon (the live tree, or a preview copy).
+	// Stats a tree would give this weapon (the live tree, or a preview copy), without the scripts' layer.
 	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out, bool conditions = true) const;
+	// The scripts' layer of `stats` (script_add, script_mul): the weapon_on_recalc_stats callback, through
+	// _G.CWeapon_OnRecalcStats (gunsmith_callbacks.script), given the parts' totals; `preview` for a build that
+	// isn't the weapon's (the builder). Runs on every full recompute and preview, not per shot.
+	void gs_script_stats(gunsmith::SWeaponStats& stats, bool preview);
 	// One stat in display units (degrees for angles, rounds per minute for rpm):
 	// the weapon's own value, the parts' add, and the effective value.
 	void gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float& base, float& add, float& value) const;

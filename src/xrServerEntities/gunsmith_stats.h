@@ -23,13 +23,20 @@ namespace gunsmith
 	// scripts change in place), so read sites use apply(stat, base_value).
 	//
 	// They are also relative to the gun's stock build (its gs_default_build): a stock gun handles
-	// exactly as its section says (vanilla's numbers), and parts change it from there. Recoil and
-	// ergonomics are kept as Tarkov's totals and turned into multipliers when read, with the current
-	// handling settings (recoil_k, ergo_k), so changing those settings takes effect at once.
+	// exactly as its section says (vanilla's numbers), and parts change it from there.
+	//
+	// On top, a script layer (script_add, script_mul) that scripts set whenever the stats are recomputed
+	// (CWeapon::gs_script_stats, the weapon_on_recalc_stats callback). The parts' recoil percents and
+	// ergonomics are only summed here, with the stock build's; the Gunsmith Framework turns them into
+	// multipliers with Tarkov's formulas and the handling settings (gunsmith_handling.script; 1 Nov 2026,
+	// before that in this file).
 	struct SWeaponStats
 	{
 		float add[eStatCount];
 		float mul[eStatCount];
+		// The scripts' terms, added and multiplied on top of the parts' (0 and 1 without a script).
+		float script_add[eStatCount];
+		float script_mul[eStatCount];
 
 		float ergonomics; // 0..100, receiver `ergonomics` (default 50) plus parts
 		float recoil_sum; // parts' `recoil` percents, summed (Tarkov)
@@ -50,15 +57,12 @@ namespace gunsmith
 		SWeaponStats() { reset(); }
 		void reset();
 
-		// Vertical and horizontal recoil multiplier: summed recoil against the stock build's (times
-		// recoil_strength), and no_stock_recoil when the stock build rests on the shoulder and this doesn't.
-		float recoil_k() const;
-		// Aim time (aim_k) or sway (sway_k) multiplier from ergonomics against the stock build's.
-		float ergo_k(float k) const;
-		// Every stat's multiplier, the live ones included.
-		float k(u8 stat) const;
-		float apply(u8 stat, float base) const { return (base + add[stat]) * mul[stat] * k(stat); }
-		float horz_k() const { return mul[eStatCamHorz] * k(eStatCamHorz); } // horizontal: multiplier only
+		// A stat's multiplier on top of the parts' (the scripts').
+		float k(u8 stat) const { return script_mul[stat]; }
+		float apply(u8 stat, float base) const { return (base + add[stat] + script_add[stat]) * mul[stat] * script_mul[stat]; }
+		float horz_k() const { return mul[eStatCamHorz] * script_mul[eStatCamHorz]; } // horizontal: multiplier only
+		// Takes another result's script layer (the structural half and the per-shot check don't ask scripts again).
+		void copy_script(const SWeaponStats& from);
 	};
 
 	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out);

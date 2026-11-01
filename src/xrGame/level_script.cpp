@@ -2961,6 +2961,7 @@ void CLevel::script_register(lua_State* L)
 		def("is_full_mode", &gs_is_full_mode),
 		def("set_setting", &gs_set_setting),
 		def("get_setting", &gs_get_setting),
+		def("refresh_stats", &gs_refresh_stats_script),
 		def("carries_parts", &gs_carries_parts)
 	];
 

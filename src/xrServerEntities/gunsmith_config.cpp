@@ -536,11 +536,6 @@ namespace gunsmith
 			{
 				LPCSTR sect = "gunsmith_settings";
 				s.ergo_base = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_base", 50.f);
-				s.ergo_aim_k = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_aim_k", 1.0f);
-				s.ergo_sway_k = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_sway_k", 1.0f);
-				s.ergo_strength = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_strength", 1.0f);
-				s.recoil_strength = READ_IF_EXISTS(pSettings, r_float, sect, "recoil_strength", 1.5f);
-				s.no_stock_recoil = READ_IF_EXISTS(pSettings, r_float, sect, "no_stock_recoil", 1.5f);
 				s.recoil_recovery = READ_IF_EXISTS(pSettings, r_float, sect, "recoil_recovery", 1.0f);
 				s.sight_sway_factor = READ_IF_EXISTS(pSettings, r_float, sect, "sight_sway_factor", 1.0f);
 				s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
@@ -554,11 +549,6 @@ namespace gunsmith
 		{
 			SSettings& s = settings_rw();
 			if (!name) return nullptr;
-			if (!xr_strcmp(name, "ergo_aim_k")) return &s.ergo_aim_k;
-			if (!xr_strcmp(name, "ergo_sway_k")) return &s.ergo_sway_k;
-			if (!xr_strcmp(name, "ergo_strength")) return &s.ergo_strength;
-			if (!xr_strcmp(name, "recoil_strength")) return &s.recoil_strength;
-			if (!xr_strcmp(name, "no_stock_recoil")) return &s.no_stock_recoil;
 			if (!xr_strcmp(name, "recoil_recovery")) return &s.recoil_recovery;
 			if (!xr_strcmp(name, "part_misfire_hook")) return &s.part_misfire_hook;
 			return nullptr;

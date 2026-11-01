@@ -98,8 +98,8 @@ namespace gunsmith
 	{
 		for (u32 s = 0; s < eStatCount; ++s)
 		{
-			add[s] = 0.f;
-			mul[s] = 1.f;
+			add[s] = script_add[s] = 0.f;
+			mul[s] = script_mul[s] = 1.f;
 		}
 		ergonomics = stock_ergonomics = 50.f;
 		recoil_sum = stock_recoil_sum = 0.f;
@@ -150,33 +150,12 @@ namespace gunsmith
 		}
 	}
 
-	float SWeaponStats::recoil_k() const
+	void SWeaponStats::copy_script(const SWeaponStats& from)
 	{
-		const SSettings& cfg = settings();
-		const float now = _max(0.1f, 1.f + cfg.recoil_strength * recoil_sum / 100.f);
-		const float stock = _max(0.1f, 1.f + cfg.recoil_strength * stock_recoil_sum / 100.f);
-		float k = now / stock;
-		if (stock_shoulder && !shoulder)
-			k *= cfg.no_stock_recoil;
-		return k;
-	}
-
-	float SWeaponStats::ergo_k(float k) const
-	{
-		// Above the stock build's ergonomics: faster aiming and less sway; below: the reverse.
-		return _max(0.1f, 1.f + k * settings().ergo_strength * (stock_ergonomics - ergonomics) / 100.f);
-	}
-
-	float SWeaponStats::k(u8 stat) const
-	{
-		switch (stat)
+		for (u32 s = 0; s < eStatCount; ++s)
 		{
-		case eStatCamDispersion:
-		case eStatCamDispersionInc:
-		case eStatCamHorz: return recoil_k();
-		case eStatZoomRotateTime: return ergo_k(settings().ergo_aim_k);
-		case eStatPdmBase: return ergo_k(settings().ergo_sway_k);
-		default: return 1.f;
+			script_add[s] = from.script_add[s];
+			script_mul[s] = from.script_mul[s];
 		}
 	}
 
@@ -221,13 +200,14 @@ namespace gunsmith
 	{
 		Msg("- [gunsmith] stats: ergonomics=%.1f (stock %.1f) weight+%.3f cost+%.0f can_fire=%s", s.ergonomics, s.stock_ergonomics,
 		    s.weight_add, s.cost_add, s.can_fire ? "yes" : "NO");
-		Msg("-   recoil %+.1f%% (stock %+.1f%%) shoulder=%s (stock %s): recoil x%.3f, aim time x%.3f, sway x%.3f",
-		    s.recoil_sum, s.stock_recoil_sum, s.shoulder ? "yes" : "no", s.stock_shoulder ? "yes" : "no", s.recoil_k(),
-		    s.k(eStatZoomRotateTime), s.k(eStatPdmBase));
+		Msg("-   recoil %+.1f%% (stock %+.1f%%) shoulder=%s (stock %s); scripts: recoil x%.3f, aim time x%.3f, sway x%.3f",
+		    s.recoil_sum, s.stock_recoil_sum, s.shoulder ? "yes" : "no", s.stock_shoulder ? "yes" : "no",
+		    s.script_mul[eStatCamDispersion], s.script_mul[eStatZoomRotateTime], s.script_mul[eStatPdmBase]);
 		Msg("-   barrel_wear_mul=%.3f muzzle_condition=%.3f suppressor_worn=%s sight_sway=%.3f",
 		    s.barrel_wear_mul, s.muzzle_condition, s.suppressor_worn ? "yes" : "no", s.sight_sway);
 		for (u32 i = 0; i < eStatCount; ++i)
-			if (!fsimilar(s.mul[i], 1.f) || !fis_zero(s.add[i]))
-				Msg("-   %s: add %+.5f mul x%.4f", stat_name(u8(i)), s.add[i], s.mul[i]);
+			if (!fsimilar(s.mul[i], 1.f) || !fis_zero(s.add[i]) || !fsimilar(s.script_mul[i], 1.f) || !fis_zero(s.script_add[i]))
+				Msg("-   %s: add %+.5f mul x%.4f, scripts add %+.5f mul x%.4f", stat_name(u8(i)), s.add[i], s.mul[i],
+				    s.script_add[i], s.script_mul[i]);
 	}
 }
