@@ -279,7 +279,7 @@ namespace gunsmith
 			"fire_dispersion", "cam_dispersion", "cam_dispersion_inc", "cam_horz",
 			"hit_power", "hit_impulse", "bullet_speed", "rpm",
 			"pdm_base", "pdm_accel", "pdm_vel", "crosshair_inertion",
-			"zoom_rotate_time", "condition_shot_dec", "ergonomics",
+			"zoom_rotate_time", "condition_shot_dec", "ergonomics", "cam_relax_speed",
 		};
 
 		// Old addon multiplier keys, read from silencer/scope/launcher sections by
@@ -288,7 +288,7 @@ namespace gunsmith
 			"fire_dispersion_base_k", "cam_dispersion_k", "cam_dispersion_inc_k", nullptr,
 			"bullet_hit_power_k", "bullet_hit_impulse_k", "bullet_speed_k", nullptr,
 			"PDM_disp_base_k", "PDM_disp_accel_k", "PDM_disp_vel_k", "crosshair_inertion_k",
-			"zoom_rotate_time_k", "condition_shot_dec_k", nullptr,
+			"zoom_rotate_time_k", "condition_shot_dec_k", nullptr, nullptr,
 		};
 
 		bool stat_add_in_degrees(u8 stat)
@@ -412,7 +412,6 @@ namespace gunsmith
 			{
 				LPCSTR sect = "gunsmith_settings";
 				s.ergo_base = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_base", 50.f);
-				s.recoil_recovery = READ_IF_EXISTS(pSettings, r_float, sect, "recoil_recovery", 1.0f);
 				s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
 				s.aim_roll_min = READ_IF_EXISTS(pSettings, r_float, sect, "aim_roll_min", 1.f);
 				s.aim_turn_max = READ_IF_EXISTS(pSettings, r_float, sect, "aim_turn_max", 20.f);
@@ -424,24 +423,7 @@ namespace gunsmith
 			}
 			return s;
 		}
-
-		float* setting_ptr(LPCSTR name)
-		{
-			SSettings& s = settings_rw();
-			if (!name) return nullptr;
-			if (!xr_strcmp(name, "recoil_recovery")) return &s.recoil_recovery;
-			return nullptr;
-		}
 	}
 
 	const SSettings& settings() { return settings_rw(); }
-
-	bool set_setting(LPCSTR name, float value)
-	{
-		float* p = setting_ptr(name);
-		if (!p)
-			return false;
-		*p = _max(0.f, value);
-		return true;
-	}
 }

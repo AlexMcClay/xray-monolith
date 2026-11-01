@@ -94,6 +94,7 @@ namespace gunsmith
 		eStatZoomRotateTime, // aim-in time
 		eStatConditionShotDec, // receiver wear per shot
 		eStatErgonomics,
+		eStatCamRelax, // camera recoil relax speed (cam_relax_speed, zoom_cam_relax_speed)
 		eStatCount
 	};
 
@@ -149,13 +150,11 @@ namespace gunsmith
 	const SPartData& part_data(const shared_str& section);
 	const SPartData& part_data(LPCSTR section);
 
-	// Engine-wide tuning, [gunsmith_settings] in system configs (all optional). Some can also be changed while
-	// playing (set_setting; the Framework's MCM page does). The handling formulas and their settings are the
-	// Framework's.
+	// Engine-wide tuning, [gunsmith_settings] in system configs (all optional). The handling formulas and their
+	// settings are the Framework's.
 	struct SSettings
 	{
 		float ergo_base; // receiver ergonomics when the weapon has no `ergonomics` key (50)
-		float recoil_recovery; // camera recoil relax speed multiplier on full-mode guns (1.0 = vanilla)
 		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
 		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
 		float optic_base_fov;
@@ -168,6 +167,4 @@ namespace gunsmith
 	};
 
 	const SSettings& settings();
-	// Settings by name (recoil_recovery). False for an unknown name. Takes effect at once.
-	bool set_setting(LPCSTR name, float value);
 }

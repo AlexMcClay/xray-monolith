@@ -265,7 +265,6 @@ bool gs_carries_parts(u16 id)
 	return item && item->gs_carries_parts();
 }
 
-bool gs_set_setting(LPCSTR name, float value) { return gunsmith::set_setting(name, value); }
 
 void gs_refresh_stats_script()
 {
@@ -348,7 +347,6 @@ void gunsmith_script_register(lua_State* L)
 		def("preview_bounds", &gs_preview_bounds_script, raw<1>()),
 		def("preview_resolution", &gs_preview_resolution),
 		def("is_full_mode", &gs_is_full_mode),
-		def("set_setting", &gs_set_setting),
 		def("refresh_stats", &gs_refresh_stats_script),
 		def("carries_parts", &gs_carries_parts)
 	];

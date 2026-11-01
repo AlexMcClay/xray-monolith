@@ -649,6 +649,7 @@ void CWeapon::gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float
 	case gunsmith::eStatZoomRotateTime: b = m_zoom_params.m_fZoomRotateTime; break;
 	case gunsmith::eStatConditionShotDec: b = conditionDecreasePerShot; break;
 	case gunsmith::eStatErgonomics: b = READ_IF_EXISTS(pSettings, r_float, cNameSect(), "ergonomics", gunsmith::settings().ergo_base); break;
+	case gunsmith::eStatCamRelax: b = cam_recoil.RelaxSpeed; angle = true; break;
 	default: break;
 	}
 

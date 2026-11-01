@@ -1201,7 +1201,7 @@
         // Stats table: { ergonomics, weight, cost, parts_weight, parts_cost, can_fire, suppressed,
         //   jammed, jam_type, jam_node, stats = { <name> = { base, add, mul, value } } }
         //   stat names: fire_dispersion, cam_dispersion, cam_dispersion_inc, cam_horz (degrees), hit_power, hit_impulse, bullet_speed,
-        //   rpm (rounds per minute), pdm_base, pdm_accel, pdm_vel, crosshair_inertion, zoom_rotate_time, condition_shot_dec, ergonomics
+        //   rpm (rounds per minute), pdm_base, pdm_accel, pdm_vel, crosshair_inertion, zoom_rotate_time, condition_shot_dec, ergonomics, cam_relax_speed (degrees per second)
         table gs_get_tree()
         bool gs_can_attach(string section, number parent, number slot) -- free slot, not blocked, tags fit; addon slots take only what weapon_addon_attach would
         bool gs_attach(game_object item, number parent, number slot) -- moves an inventory item into the tree; addon slots go through the weapon's own attach

@@ -266,15 +266,14 @@ void CActor::on_weapon_shot_start(CWeapon* weapon)
 {
 	//CWeaponMagazined* pWM = smart_cast<CWeaponMagazined*> (weapon);
 	CameraRecoil const& base_recoil = (IsZoomAimingMode()) ? weapon->zoom_cam_recoil : weapon->cam_recoil;
-	// Horizontal recoil from the weapon's parts (gunsmith recoil and cam_horz_mul); the vertical kick
-	// takes them in the shot effector. Full-mode guns also take the recoil_recovery setting.
+	// Horizontal recoil and the relax speed from the weapon's parts and scripts; the vertical kick takes them
+	// in the shot effector.
 	CameraRecoil camera_recoil;
 	camera_recoil.Clone(base_recoil);
 	const float horz = weapon->gs_stats().horz_k();
 	camera_recoil.StepAngleHorz *= horz;
 	camera_recoil.MaxAngleHorz *= horz;
-	if (weapon->gs_full_mode())
-		camera_recoil.RelaxSpeed *= _max(0.05f, gunsmith::settings().recoil_recovery);
+	camera_recoil.RelaxSpeed = weapon->gs_stats().apply(gunsmith::eStatCamRelax, camera_recoil.RelaxSpeed);
 
 	CCameraShotEffector* effector = smart_cast<CCameraShotEffector*>(Cameras().GetCamEffector(eCEShot));
 	if (!effector)

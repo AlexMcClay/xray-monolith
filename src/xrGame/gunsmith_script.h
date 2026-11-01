@@ -75,7 +75,6 @@ void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pa
 void gs_preview_resolution(u32 w, u32 h);
 void gs_preview_tick();
 bool gs_is_full_mode(LPCSTR section);
-bool gs_set_setting(LPCSTR name, float value);
 // Every weapon in play recomputes its stats, so weapon_on_recalc_stats runs for each (after a handling setting
 // changes: the Framework's MCM page).
 void gs_refresh_stats_script();
