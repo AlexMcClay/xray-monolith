@@ -88,8 +88,7 @@ void CWeapon::gs_set_legacy_addon(u8 legacy_addon, LPCSTR part, float condition)
 			detached_section = m_gs_tree.node(u8(node)).section;
 	}
 	m_gs_tree.set_legacy_addon(legacy_addon, part, condition);
-	gs_sync_to_server();
-	gs_rebuild_stats(false); // callers run InitAddons next
+	gs_commit_tree(false); // callers run InitAddons next
 
 	if (detach)
 	{
@@ -446,8 +445,7 @@ void CWeapon::gs_set_parts_condition(float value)
 	clamp(value, 0.f, 1.f);
 	SetCondition(value);
 	m_gs_tree.set_all_conditions(value);
-	gs_rebuild_stats();
-	gs_sync_to_server();
+	gs_commit_tree();
 }
 
 bool CWeapon::gs_debug_set_condition(u8 node, float value)
@@ -462,8 +460,7 @@ bool CWeapon::gs_debug_set_condition(u8 node, float value)
 		SetCondition(value);
 	else
 		m_gs_tree.set_condition(node, value);
-	gs_rebuild_stats();
-	gs_sync_to_server();
+	gs_commit_tree();
 	return true;
 }
 
@@ -508,18 +505,14 @@ bool CWeapon::gs_debug_set_part(u8 parent, u8 slot, LPCSTR section)
 
 	const int existing = m_gs_tree.find_in_slot(parent, slot);
 	if (existing >= 0)
-	{
-		gs_sight_forget();
 		m_gs_tree.remove_subtree(u8(existing));
-	}
 	if (!remove && m_gs_tree.add_node(section, parent, slot, 1.f) < 0)
 	{
 		Msg("! gunsmith: could not add [%s] (tree full?)", section);
 		return false;
 	}
 
-	gs_rebuild_stats();
-	gs_sync_to_server();
+	gs_commit_tree();
 	return true;
 }
 
@@ -600,26 +593,37 @@ LPCSTR CWeapon::gs_check_place(const gunsmith::CTree& tree, LPCSTR section, u8 p
 	return "";
 }
 
-bool CWeapon::gs_attach_part(LPCSTR section, u8 parent, u8 slot, float condition)
+bool CWeapon::gs_refuse_place(LPCSTR section, u8 parent, u8 slot) const
 {
 	LPCSTR reason = gs_check_place(m_gs_tree, section, parent, slot, false);
 	if (*reason)
 	{
 		Msg("! [gunsmith] [%s] cannot attach [%s] to node %u slot %u: %s", cNameSect().c_str(), section ? section : "", u32(parent), u32(slot), reason);
-		return false;
+		return true;
 	}
 	const gunsmith::SLOTS& slots = m_gs_tree.node_slots(parent);
 	if (slots[slot].legacy_addon != gunsmith::eLegacyNone)
 	{
 		Msg("! [gunsmith] [%s] slot %u is an addon slot (%s): attach the item itself", cNameSect().c_str(), u32(slot), gunsmith::legacy_addon_name(slots[slot].legacy_addon));
-		return false;
+		return true;
 	}
+	return false;
+}
 
+void CWeapon::gs_commit_tree(bool notify)
+{
+	gs_rebuild_stats(notify);
+	gs_sync_to_server();
+}
+
+bool CWeapon::gs_attach_part(LPCSTR section, u8 parent, u8 slot, float condition)
+{
+	if (gs_refuse_place(section, parent, slot))
+		return false;
 	const int node = m_gs_tree.add_node(section, parent, slot, condition);
 	if (node < 0)
 		return false;
-	gs_rebuild_stats();
-	gs_sync_to_server();
+	gs_commit_tree();
 	gs_callback_attached(u8(node), section);
 	return true;
 }
@@ -726,10 +730,8 @@ bool CWeapon::gs_detach_part(u8 node, bool spawn, u16& item_id)
 	}
 	else
 	{
-		gs_sight_forget();
 		m_gs_tree.remove_subtree(node);
-		gs_rebuild_stats();
-		gs_sync_to_server();
+		gs_commit_tree();
 	}
 
 	if (bundle)
@@ -763,16 +765,8 @@ bool CWeapon::gs_attach_item(CInventoryItem* item, u8 parent, u8 slot)
 	if (!subtree)
 		return gs_attach_part(section, parent, slot, item->GetCondition());
 
-	LPCSTR reason = gs_check_place(m_gs_tree, section, parent, slot, false);
-	if (*reason)
-	{
-		Msg("! [gunsmith] [%s] cannot attach [%s] to node %u slot %u: %s", cNameSect().c_str(), section, u32(parent), u32(slot), reason);
+	if (gs_refuse_place(section, parent, slot))
 		return false;
-	}
-	const gunsmith::SLOTS& slots = m_gs_tree.node_slots(parent);
-	if (slots[slot].legacy_addon != gunsmith::eLegacyNone)
-		return false;
-
 	const int root = m_gs_tree.graft(*subtree, parent, slot, item->GetCondition());
 	if (root < 0)
 	{
@@ -781,8 +775,7 @@ bool CWeapon::gs_attach_item(CInventoryItem* item, u8 parent, u8 slot)
 	}
 	// Carried parts that no longer fit their slots are dropped and logged, as on load.
 	m_gs_tree.validate(cNameSect().c_str());
-	gs_rebuild_stats();
-	gs_sync_to_server();
+	gs_commit_tree();
 	gs_callback_attached(u8(root), section);
 	return true;
 }

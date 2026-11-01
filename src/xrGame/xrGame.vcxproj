@@ -1565,6 +1565,8 @@
     <ClInclude Include="gunsmith_grip_ik.h" />
     <ClInclude Include="gunsmith_preview.h" />
     <ClInclude Include="scope_timers.h" />
+    <ClInclude Include="Weapon_gunsmith_deps.h" />
+    <ClInclude Include="Weapon_gunsmith_members.h" />
     <ClInclude Include="script_game_object_impl.h" />
     <ClInclude Include="script_hit.h" />
     <ClInclude Include="script_hit_inline.h" />

@@ -5118,6 +5118,12 @@
     <ClInclude Include="gunsmith_grip_ik.h">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClInclude>
+    <ClInclude Include="Weapon_gunsmith_deps.h">
+      <Filter>Core\Client\Level</Filter>
+    </ClInclude>
+    <ClInclude Include="Weapon_gunsmith_members.h">
+      <Filter>Core\Client\Level</Filter>
+    </ClInclude>
     <ClInclude Include="scope_timers.h">
       <Filter>Core\Client\Level</Filter>
     </ClInclude>
