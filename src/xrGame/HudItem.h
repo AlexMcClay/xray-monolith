@@ -298,7 +298,7 @@ public:
 private:
 	SPickParam PP;
 
-	// Gunsmith: sounds timed to the HUD motion, like Tarkov's animation events (Gunsmith Docs 21). The HUD
+	// Gunsmith: sounds timed to the HUD motion, like Tarkov's animation events (Gunsmith Docs 19). The HUD
 	// section's gs_snd_<anm> lists "fraction of the motion, file[|another file]" pairs; when that motion starts on
 	// the actor's HUD, the item's own state sounds (snd_reload, snd_draw, ...) stop and these play in 2D at their
 	// times, scaled to the motion's actual length (so a faster reload keeps them in step). A motion with the key

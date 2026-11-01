@@ -95,8 +95,8 @@ SERVER_ENTITY_DECLARE_BEGIN2(CSE_ALifeItem, CSE_ALifeDynamicObjectVisual, CSE_AL
 	bool m_physics_disabled;
 
 	// Gunsmith: the parts mounted on this part, when it was detached from a weapon
-	// with them (node 0 is this item). Only plain part items (II_ATTCH) save it
-	// (SPAWN_VERSION > 129).
+	// with them (node 0 is this item). Only plain part items (II_ATTCH) save it, in the
+	// "gs_subtree" block (CSE_Abstract::ext_*; in the state in saves of SPAWN_VERSION 130).
 	gunsmith::CTree m_gs_subtree;
 
 	CSE_ALifeItem(LPCSTR caSection);
@@ -192,7 +192,8 @@ SERVER_ENTITY_DECLARE_BEGIN(CSE_ALifeItemWeapon, CSE_ALifeItem)
 	u32 m_ef_main_weapon_type;
 	u32 m_ef_weapon_type;
 
-	// Gunsmith part tree, saved after the legacy fields (SPAWN_VERSION > 128).
+	// Gunsmith part tree, saved in the "gs_tree" block (CSE_Abstract::ext_*; after the legacy fields in saves of
+	// SPAWN_VERSION 129 and 130).
 	// m_addon_flags stays as a cache of the tree's legacy slots.
 	gunsmith::CTree m_gs_tree;
 

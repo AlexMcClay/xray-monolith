@@ -12,7 +12,7 @@ extern Fvector g_gs_grip_offset; // gs_grip_offset x,y,z: moves the hand on the 
 
 namespace gunsmith
 {
-	// The left hand on the fitted grip (Gunsmith Docs 19, phase 3), like Tarkov's runtime IK.
+	// The left hand on the fitted grip (Gunsmith Docs 17, phase 3), like Tarkov's runtime IK.
 	//
 	// Tarkov's handguards and foregrips carry the left hand's pose (GripPose). The pipeline turns it into the pose
 	// of Anomaly's left hand on the part (part keys grip_hand_<type>, grip_fingers_<type>, grip_priority), and the

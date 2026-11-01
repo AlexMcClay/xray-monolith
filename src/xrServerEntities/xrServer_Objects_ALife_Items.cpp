@@ -356,10 +356,17 @@ void CSE_ALifeItem::STATE_Write(NET_Packet& tNetPacket)
 	inherited1::STATE_Write(tNetPacket);
 	inherited2::STATE_Write(tNetPacket);
 
-	// Gunsmith: a part item carries the parts mounted on it. Only plain part items:
-	// derived item classes append their own state after this.
-	if (m_tClassID == CLSID_IITEM_ATTACH)
-		m_gs_subtree.write(tNetPacket);
+	// Gunsmith: a part item carries the parts mounted on it (plain part items only), in the "gs_subtree" block
+	// after the state (CSE_Abstract::ext_*), not in it.
+	if (m_tClassID == CLSID_IITEM_ATTACH && m_gs_subtree.size() > 1)
+	{
+		NET_Packet p;
+		p.write_start();
+		m_gs_subtree.write(p);
+		ext_set("gs_subtree", p.B.data, p.B.count);
+	}
+	else
+		ext_remove("gs_subtree");
 }
 
 void CSE_ALifeItem::STATE_Read(NET_Packet& tNetPacket, u16 size)
@@ -373,22 +380,35 @@ void CSE_ALifeItem::STATE_Read(NET_Packet& tNetPacket, u16 size)
 	}
 	inherited2::STATE_Read(tNetPacket, size);
 
-	// Gunsmith sub-tree. Older packets, and script-built packets that stop after the
-	// upgrades, have none; the item then keeps what it had.
-	if (m_tClassID == CLSID_IITEM_ATTACH && m_wVersion > 129 && !tNetPacket.r_eof())
+	// Gunsmith sub-tree: in the state itself in saves of SPAWN_VERSION 130 (29 Oct to 1 Nov 2026), in the
+	// "gs_subtree" block since. Packets with neither (vanilla saves, script-built state packets) leave the item
+	// with what it had.
+	if (m_tClassID != CLSID_IITEM_ATTACH)
+		return;
+	NET_Packet block;
+	NET_Packet* from = nullptr;
+	if (m_wVersion > 129 && !tNetPacket.r_eof())
+		from = &tNetPacket;
+	else if (const xr_vector<u8>* b = ext_block("gs_subtree"))
 	{
-		gunsmith::CTree tree;
-		tree.set_part_root(true);
-		if (tree.read(tNetPacket))
-		{
-			tree.validate(*s_name);
-			m_gs_subtree = tree;
-		}
-		else
-		{
-			m_gs_subtree.clear();
-			m_gs_subtree.set_part_root(true);
-		}
+		block.B.count = u32(b->size());
+		CopyMemory(block.B.data, b->data(), b->size());
+		block.read_start();
+		from = &block;
+	}
+	if (!from)
+		return;
+	gunsmith::CTree tree;
+	tree.set_part_root(true);
+	if (tree.read(*from))
+	{
+		tree.validate(*s_name);
+		m_gs_subtree = tree;
+	}
+	else
+	{
+		m_gs_subtree.clear();
+		m_gs_subtree.set_part_root(true);
 	}
 }
 
@@ -617,13 +637,23 @@ void CSE_ALifeItemWeapon::STATE_Read(NET_Packet& tNetPacket, u16 size)
 	if (m_wVersion > 122)
 		a_elapsed_grenades.unpack_from_byte(tNetPacket.r_u8());
 
-	// Gunsmith part tree. Older packets, and hand-built script packets that stop
-	// after the grenades byte, have none: the tree is then built from the addon
-	// flags on the next write or spawn.
+	// Gunsmith part tree: in the state itself in saves of SPAWN_VERSION 129 and 130 (29 Oct to 1 Nov 2026), in
+	// the "gs_tree" block since. Packets with neither (vanilla saves, script-built state packets) leave the
+	// weapon's tree as it is: it is built from the addon flags on the next write or spawn when empty.
 	if (m_wVersion > 128 && !tNetPacket.r_eof())
 	{
 		gunsmith::CTree tree;
 		if (tree.read(tNetPacket))
+			gs_set_tree(tree);
+	}
+	else if (const xr_vector<u8>* b = ext_block("gs_tree"))
+	{
+		NET_Packet block;
+		block.B.count = u32(b->size());
+		CopyMemory(block.B.data, b->data(), b->size());
+		block.read_start();
+		gunsmith::CTree tree;
+		if (tree.read(block))
 			gs_set_tree(tree);
 	}
 }
@@ -651,7 +681,10 @@ void CSE_ALifeItemWeapon::STATE_Write(NET_Packet& tNetPacket)
 	tNetPacket.w_u8(a_elapsed_grenades.pack_to_byte());
 
 	gs_ensure_tree();
-	m_gs_tree.write(tNetPacket);
+	NET_Packet p; // the "gs_tree" block after the state (CSE_Abstract::ext_*), not in it
+	p.write_start();
+	m_gs_tree.write(p);
+	ext_set("gs_tree", p.B.data, p.B.count);
 }
 
 void CSE_ALifeItemWeapon::OnEvent(NET_Packet& tNetPacket, u16 type, u32 time, ClientID sender)

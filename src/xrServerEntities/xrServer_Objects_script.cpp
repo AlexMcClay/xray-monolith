@@ -138,6 +138,8 @@ void CSE_Abstract::script_register(lua_State* L)
 		.def("STATE_Write", &BaseType::STATE_Write, &WrapType::STATE_Write_static)
 		.def("UPDATE_Read", &BaseType::UPDATE_Read, &WrapType::UPDATE_Read_static)
 		.def("UPDATE_Write", &BaseType::UPDATE_Write, &WrapType::UPDATE_Write_static)
+		.def("get_script_data", &BaseType::get_script_data)
+		.def("set_script_data", &BaseType::set_script_data)
 		//			.def(		constructor<LPCSTR>())
 	];
 }

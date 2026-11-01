@@ -195,6 +195,117 @@ CInifile& CSE_Abstract::spawn_ini()
 	return (*m_ini_file);
 }
 
+namespace
+{
+	const u32 EXT_MAGIC = 0x31545845; // "EXT1"
+	const u32 EXT_SCRIPT_MAX = 8 * 1024;
+}
+
+const xr_vector<u8>* CSE_Abstract::ext_block(LPCSTR name) const
+{
+	for (const SExtBlock& b : m_ext_blocks)
+		if (!xr_strcmp(b.name, name))
+			return &b.data;
+	return nullptr;
+}
+
+void CSE_Abstract::ext_set(LPCSTR name, const void* data, u32 size)
+{
+	for (u32 i = 0; i < m_ext_blocks.size(); ++i)
+		if (!xr_strcmp(m_ext_blocks[i].name, name))
+		{
+			if (!size)
+				m_ext_blocks.erase(m_ext_blocks.begin() + i);
+			else
+				m_ext_blocks[i].data.assign((const u8*)data, (const u8*)data + size);
+			return;
+		}
+	if (!size)
+		return;
+	m_ext_blocks.push_back(SExtBlock());
+	m_ext_blocks.back().name = name;
+	m_ext_blocks.back().data.assign((const u8*)data, (const u8*)data + size);
+}
+
+// [name z-string, u16 size, data] per block, u16 count, u32 length of all that, u32 EXT_MAGIC
+void CSE_Abstract::ext_write(NET_Packet& tNetPacket) const
+{
+	if (m_ext_blocks.empty())
+		return;
+	const u32 start = tNetPacket.w_tell();
+	for (const SExtBlock& b : m_ext_blocks)
+	{
+		tNetPacket.w_stringZ(b.name);
+		tNetPacket.w_u16(u16(b.data.size()));
+		if (!b.data.empty())
+			tNetPacket.w(b.data.data(), u32(b.data.size()));
+	}
+	tNetPacket.w_u16(u16(m_ext_blocks.size()));
+	tNetPacket.w_u32(tNetPacket.w_tell() - start);
+	tNetPacket.w_u32(EXT_MAGIC);
+}
+
+u32 CSE_Abstract::ext_read(NET_Packet& tNetPacket, u32 end)
+{
+	m_ext_blocks.clear();
+	const u32 begin = tNetPacket.r_tell();
+	if (tNetPacket.inistream || end > tNetPacket.B.count || end < begin + 2 * sizeof(u32) + sizeof(u16))
+		return end;
+	u32 magic, length;
+	CopyMemory(&magic, tNetPacket.B.data + end - sizeof(u32), sizeof(u32));
+	CopyMemory(&length, tNetPacket.B.data + end - 2 * sizeof(u32), sizeof(u32));
+	if (magic != EXT_MAGIC || length < sizeof(u16) || length > end - 2 * sizeof(u32) - begin)
+		return end;
+	const u32 start = end - 2 * sizeof(u32) - length;
+	u16 count;
+	CopyMemory(&count, tNetPacket.B.data + start + length - sizeof(u16), sizeof(u16));
+
+	// Parse the blocks; anything that doesn't add up exactly is not a block list (keep the state as it is).
+	xr_vector<SExtBlock> blocks;
+	u32 pos = start;
+	const u32 list_end = start + length - sizeof(u16);
+	for (u16 i = 0; i < count; ++i)
+	{
+		u32 z = pos;
+		while (z < list_end && tNetPacket.B.data[z])
+			++z;
+		if (z >= list_end || z + 1 + sizeof(u16) > list_end)
+			return end;
+		SExtBlock b;
+		b.name = (LPCSTR)(tNetPacket.B.data + pos);
+		u16 size;
+		CopyMemory(&size, tNetPacket.B.data + z + 1, sizeof(u16));
+		pos = z + 1 + sizeof(u16);
+		if (pos + size > list_end)
+			return end;
+		b.data.assign(tNetPacket.B.data + pos, tNetPacket.B.data + pos + size);
+		pos += size;
+		blocks.push_back(b);
+	}
+	if (pos != list_end)
+		return end;
+	m_ext_blocks.swap(blocks);
+	return start;
+}
+
+LPCSTR CSE_Abstract::get_script_data() const
+{
+	const xr_vector<u8>* b = ext_block("script");
+	return b && !b->empty() ? (LPCSTR)b->data() : ""; // stored with its terminating zero
+}
+
+bool CSE_Abstract::set_script_data(LPCSTR text)
+{
+	const u32 len = text ? xr_strlen(text) : 0;
+	if (len + 1 > EXT_SCRIPT_MAX)
+	{
+		Msg("! set_script_data: [%s] %u bytes, more than %u: not stored", name_replace(), len, EXT_SCRIPT_MAX - 1);
+		return false;
+	}
+	ext_set("script", text, len ? len + 1 : 0);
+	return true;
+}
+
 void CSE_Abstract::Spawn_Write(NET_Packet& tNetPacket, BOOL bLocal)
 {
 	// generic
@@ -248,6 +359,7 @@ void CSE_Abstract::Spawn_Write(NET_Packet& tNetPacket, BOOL bLocal)
 	u32 position = tNetPacket.w_tell();
 	tNetPacket.w_u16(0);
 	STATE_Write(tNetPacket);
+	ext_write(tNetPacket); // after the class state; STATE_Write may have set blocks
 	u16 size = u16(tNetPacket.w_tell() - position);
 	//#ifdef XRSE_FACTORY_EXPORTS
 	R_ASSERT3((m_tClassID == CLSID_SPECTATOR) || (size > sizeof(size)),
@@ -368,7 +480,25 @@ BOOL CSE_Abstract::Spawn_Read(NET_Packet& tNetPacket)
 	bool b1 = (m_tClassID == CLSID_SPECTATOR);
 	bool b2 = (size > sizeof(size)) || (tNetPacket.inistream != NULL);
 	R_ASSERT3((b1 || b2), "cannot read object, which is not successfully saved :(", name_replace());
-	STATE_Read(tNetPacket, size);
+
+	// Named blocks off the end first; the class state is then read with the packet ending where it ends, so
+	// STATE_Read (and its r_eof checks) see exactly the bytes they always did.
+	const u32 end = tNetPacket.r_tell() - sizeof(u16) + size;
+	const u32 state_end = ext_read(tNetPacket, end);
+	const u32 count = tNetPacket.B.count;
+	if (state_end != end && end == count)
+		tNetPacket.B.count = state_end;
+	STATE_Read(tNetPacket, u16(size - (end - state_end)));
+	if (state_end != end && end == count)
+	{
+		tNetPacket.B.count = count;
+		tNetPacket.r_seek(end);
+	}
+	// Gunsmith's saves of 29 Oct to 1 Nov 2026 were SPAWN_VERSION 129 and 130; once read, the object is in
+	// memory as a current one, so a later STATE_Read of a packet its own STATE_Write made (script tools)
+	// takes the current layout.
+	if (m_wVersion > SPAWN_VERSION)
+		m_wVersion = SPAWN_VERSION;
 	return TRUE;
 }
 

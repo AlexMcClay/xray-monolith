@@ -242,6 +242,11 @@
         void add(string name, float microseconds) // adds one call of that many microseconds to the scope
     }
 
+    class cse_abstract {
+        string get_script_data() // text a script keeps on this server object, saved with it; "" without (1 Nov 2026)
+        bool set_script_data(string text) // stores it (up to 8 KB; "" removes it); false when too long. Saved as a named block after the object's state, so it needs no layout or SPAWN_VERSION change and survives saves, loads and online/offline switches
+    }
+
     class cse_alife_object {
         vector draw_level_position() // position the map draws the object at, the interpolated point along its alife path for monsters and stalkers, the stored position otherwise
     }

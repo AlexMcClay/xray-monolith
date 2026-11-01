@@ -2,7 +2,7 @@
 //	Module 		: Weapon_gunsmith.cpp
 //	Description : CWeapon's Gunsmith code: the part tree, stats, sights, parts, devices and aiming through a
 //	              fitted sight. Moved out of Weapon.cpp unchanged (1 Nov 2026), so Weapon.cpp stays close to
-//	              upstream (Gunsmith Docs 32).
+//	              upstream (Gunsmith Docs 24).
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
