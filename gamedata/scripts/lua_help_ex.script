@@ -1200,7 +1200,7 @@
         //     required, field_swappable, implicit, legacy_addon, occupant, blocked }, ... } }
         //   parent and slot are absent on node 0; legacy_addon ("scope"/"silencer"/"launcher") and occupant (node number) when set
         // Stats table: { ergonomics, weight, cost, parts_weight, parts_cost, can_fire, suppressed, suppressor_worn, muzzle_condition,
-        //   barrel_wear_mul, sight_sway, jammed, jam_type, jam_node, stats = { <name> = { base, add, mul, value } } }
+        //   sight_sway, jammed, jam_type, jam_node, stats = { <name> = { base, add, mul, value } } }
         //   stat names: fire_dispersion, cam_dispersion, cam_dispersion_inc, cam_horz (degrees), hit_power, hit_impulse, bullet_speed,
         //   rpm (rounds per minute), pdm_base, pdm_accel, pdm_vel, crosshair_inertion, zoom_rotate_time, condition_shot_dec, ergonomics
         table gs_get_tree()
@@ -1212,7 +1212,7 @@
         bool gs_set_condition(number node, number condition) -- node 0 sets the weapon's condition
         table gs_get_stats()
         table gs_preview_stats(table changes) -- changes: array of { parent, slot, section ("none" empties the slot), condition = 1 }, applied in order to a copy, each replacing what's in the slot. Returns a stats table plus errors = { "<index>: <reason>" }
-        callbacks (see gunsmith_callbacks.script): on_gs_part_attached(weapon, node, section), on_gs_part_detached(weapon, section, item_id), on_gs_part_failed(weapon, node, failure_type)
+        callbacks (see gunsmith_callbacks.script): on_gs_part_attached(weapon, node, section), on_gs_part_detached(weapon, section, item_id), on_gs_part_failed(weapon, node, failure_type), weapon_on_shot(weapon, owner, t) (any weapon, before every shot: t.condition, rounds_left, magazine_size, ammo; set t.handled and t.wear, t.malfunction, t.node)
     }
 
     class CActorCondition : CEntityCondition {
