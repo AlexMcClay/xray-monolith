@@ -863,17 +863,185 @@ bool CWeapon::hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& 
 	return m_gs_visuals.fire_point(gunsmith::CVisuals::eHud, model, xform, pos);
 }
 
+void CWeapon::DeleteHudItemData()
+{
+	m_gs_visuals.clear(gunsmith::CVisuals::eHud); // the HUD model they mount on goes away
+	inherited::DeleteHudItemData();
+}
+
+// Hooks from Weapon.cpp.
+
+void CWeapon::gs_world_fire_point(const Fmatrix& parent)
+{
+	// Gunsmith: the last part on the muzzle chain moves the fire point.
+	IKinematics* K = m_gs_full_mode && Visual() ? Visual()->dcast_PKinematics() : nullptr;
+	if (K)
+	{
+		Fvector gs_fp;
+		m_gs_visuals.ensure(gunsmith::CVisuals::eWorld, K, m_gs_tree, cNameSect().c_str(), nullptr, true);
+		if (m_gs_visuals.fire_point(gunsmith::CVisuals::eWorld, K, parent, gs_fp))
+		{
+			m_current_firedeps.vLastFP = gs_fp;
+			m_current_firedeps.vLastFPSilencer = gs_fp;
+		}
+	}
+}
+
+bool CWeapon::gs_zoom_params(float zoom_multiple, u32& stepCount)
+{
+	gunsmith::SSightAim optic_aim; // a Gunsmith optic: its chosen sight and mode (a mode has its own zoom)
+	if (!(gs_optic() && gs_sight_aim(optic_aim)))
+		return false;
+
+	const gunsmith::SSightAim* optic = &optic_aim;
+	// Gunsmith optic: magnification relative to a fixed 1x FOV ([gunsmith_settings]
+	// optic_base_fov), so a 4x scope zooms the same whatever the player's FOV setting, and
+	// about as far as vanilla's scopes. Zoom factors are FOVs in degrees divided by 0.75.
+	auto mag_to_zoom = [](float mag) {
+		const float base = _min(float(g_fov), gunsmith::settings().optic_base_fov > 1.f ? gunsmith::settings().optic_base_fov : float(g_fov));
+		const float half = deg2rad(base) * 0.5f;
+		return rad2deg(2.f * atanf(tanf(half) / _max(mag, 0.01f))) / 0.75f;
+	};
+	m_zoom_params.m_fScopeZoomFactor = (optic->zoom_factor > 0.f ? optic->zoom_factor : mag_to_zoom(optic->magnification)) / zoom_multiple;
+	m_zoom_params.m_bUseDynamicZoom = optic->magnification_min > 0.f && optic->magnification_min < optic->magnification;
+	if (m_zoom_params.m_bUseDynamicZoom)
+	{
+		m_zoom_params.m_fMinBaseZoomFactor = mag_to_zoom(optic->magnification_min);
+		stepCount = optic->zoom_steps ? optic->zoom_steps : 4;
+	}
+	return true;
+}
+
+extern CUIXml* pWpnScopeXml;
+
+bool CWeapon::gs_scope_texture(shared_str& scope_tex_name)
+{
+	gunsmith::SSightAim gs_optic_aim;
+	if (!(gs_optic() && gs_sight_aim(gs_optic_aim)))
+		return false;
+
+	scope_tex_name = gs_optic_aim.scope_texture; // empty: none (3D scopes look through the model)
+	if (scope_tex_name.size() && pWpnScopeXml == nullptr)
+	{
+		pWpnScopeXml = new CUIXml();
+		pWpnScopeXml->Load(CONFIG_PATH, UI_PATH, "scopes.xml");
+	}
+	return true;
+}
+
+void CWeapon::gs_load(LPCSTR section)
+{
+	m_gs_base_mag_size = iMagazineSize;
+	if (gunsmith::is_full_mode(section))
+	{
+		// Full-mode guns take no old-style addons, whatever the section says: scopes, suppressors and
+		// launchers are parts there. Vanilla attach code then refuses them and hides their bones.
+		m_eScopeStatus = m_eSilencerStatus = m_eGrenadeLauncherStatus = ALife::eAddonDisabled;
+	}
+}
+
+void CWeapon::gs_on_spawn(CSE_ALifeItemWeapon* E)
+{
+	E->gs_ensure_tree();
+	m_gs_tree = E->m_gs_tree;
+	m_gs_full_mode = gunsmith::is_full_mode(cNameSect().c_str());
+	if (m_gs_full_mode)
+		m_flagsAddOnState = 0; // no old-style addons on full-mode guns (Load disabled them); loadout scripts may still set the flags
+}
+
+void CWeapon::gs_after_spawn()
+{
+	gs_match_scope_part();
+	gs_rebuild_stats(false); // InitAddons below picks the suppressed or plain effects
+	// A new gun is spawned with its section's rounds (ammo_elapsed), which can be more than its magazine part holds
+	// (the EFT mod's M870 has 8, the stock Gunsmith tube 5): the tube stayed "full", and no reload until three were
+	// fired (user, 31 Oct 2026). What doesn't fit is dropped
+	if (m_gs_applied_mag_size >= 0 && iAmmoElapsed > iMagazineSize)
+		iAmmoElapsed = iMagazineSize;
+}
+
+// A script may decide the shot (the weapon_on_shot callback; the Gunsmith Framework does Tarkov's malfunctions
+// there): its wear and whether, how and by which part it malfunctions. Otherwise CheckForMisfire uses the
+// receiver's own misfire curve (vanilla's misfire_* keys). Parts had their own jam curves until 2 Nov 2026
+// (Gunsmith Docs 25).
+BOOL CWeapon::gs_misfire(u8 failure, u8 node)
+{
+	if (failure == gunsmith::eFailNone)
+		return FALSE;
+
+	m_gs_jam_type = failure;
+	m_gs_jam_node = node < m_gs_tree.size() ? node : 0;
+	StopShooting();
+	bMisfire = true;
+	gs_callback_failed(m_gs_jam_node, m_gs_jam_type);
+	return TRUE;
+}
+
+bool CWeapon::gs_fire_blocked()
+{
+	// Gunsmith: a required part is missing (e.g. no bolt), the gun can't fire.
+	if (!IsMisfire() && !m_gs_stats.can_fire)
+	{
+		if (!m_gs_cant_fire_logged)
+		{
+			Msg("- [gunsmith] [%s] cannot fire: a required part is missing", cNameSect().c_str());
+			m_gs_cant_fire_logged = true;
+		}
+		OnEmptyClick();
+		return true;
+	}
+	return false;
+}
+
+// Magazine parts (CWeaponMagazined, CWeaponMagazinedWGrenade).
+
+void CWeaponMagazined::gs_apply_mag_size(int size, bool live)
+{
+	inherited::gs_apply_mag_size(size, live);
+	if (!live || iAmmoElapsed <= size)
+		return;
+
+	// A smaller magazine: the rounds that no longer fit go back to the inventory.
+	xr_map<shared_str, u32> back;
+	while (iAmmoElapsed > size && !m_magazine.empty())
+	{
+		back[m_magazine.back().m_ammoSect] += 1;
+		m_magazine.pop_back();
+		--iAmmoElapsed;
+	}
+	for (auto& it : back)
+		SpawnAmmo(it.second, it.first.c_str());
+	m_BriefInfo_CalcFrame = 0;
+}
+
+void CWeaponMagazinedWGrenade::gs_apply_mag_size(int size, bool live)
+{
+	iMagazineSize2 = size; // the rifle magazine's size, kept while the launcher is selected
+	if (!m_bGrenadeMode)
+		inherited::gs_apply_mag_size(size, live);
+}
+
 	// Gunsmith: aim through the fitted sight part. Its aim point is kept on the camera's axis
 	// (where the screen centre and a collimator's dot are): a correction to the aim offset.
 	// When a sight is first aimed through, the correction is computed for the pose the HUD
 	// is moving to (the aim offset and rotation), from where the sight sits in the hands now,
 	// so it is right on the first aim; then it is refined while aiming steadily. An optic with
 	// aim_eye_point also gets its eye relief (z).
-// Called from UpdateHudAdditional with its camera, last frame's camera and the aim offset it is about to apply
+// Called from UpdateHudAdditional with its camera, its aim offset index and the aim offset it is about to apply
 // (position, rotation, aim rotation); corrects the position and aim rotation (moved here 1 Nov 2026).
-void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const Fmatrix& gs_prev_cam, bool gs_prev_cam_ok,
+void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 idx,
 	Fvector& curr_offs, const Fvector& curr_rot, Fvector& curr_aim_rot)
 {
+	// Gunsmith: the camera m_item_transform was built with (it is updated after this call).
+	const Fmatrix gs_prev_cam = m_gs_prev_cam;
+	const bool gs_prev_cam_ok = m_gs_prev_cam_ok;
+	m_gs_prev_cam = trans;
+	m_gs_prev_cam_ok = true;
+
+	// Gunsmith: aim through the fitted sight part
+	if (!(idx == 1 && !m_modular_attachments && m_gs_full_mode))
+		return;
+
 	SCOPE_TIMER("gs.aim.update");
 	Fvector sight;
 	shared_str key;

@@ -163,7 +163,7 @@ void CWeaponMagazined::Load(LPCSTR section)
 	if (WeaponSoundExist(actor_sect("snd_holster_actor"), "snd_holster_actor"))
 		m_sounds.LoadSound(actor_sect("snd_holster_actor"), "snd_holster_actor", "sndHideActor", true, m_eSoundHide);
 
-	m_sSndShotCurrent = IsSuppressorFitted() ? "sndSilencerShot" : "sndShot";
+	m_sSndShotCurrent = IsSilencerAttached() ? "sndSilencerShot" : "sndShot";
 
 	//звуки и партиклы глушителя, еслит такой есть
 	// (also for guns without a silencer addon that may take a suppressor part)
@@ -246,18 +246,7 @@ void CWeaponMagazined::Load(LPCSTR section)
 
 void CWeaponMagazined::FireStart()
 {
-	// Gunsmith: a required part is missing (e.g. no bolt), the gun can't fire.
-	if (!IsMisfire() && !m_gs_stats.can_fire)
-	{
-		if (!m_gs_cant_fire_logged)
-		{
-			Msg("- [gunsmith] [%s] cannot fire: a required part is missing", cNameSect().c_str());
-			m_gs_cant_fire_logged = true;
-		}
-		OnEmptyClick();
-		return;
-	}
-
+	if (gs_fire_blocked()) return;
 	if (!IsMisfire())
 	{
 		if (IsValid())
@@ -1597,25 +1586,6 @@ void CWeaponMagazined::InitAddons()
 	inherited::InitAddons();
 }
 
-void CWeaponMagazined::gs_apply_mag_size(int size, bool live)
-{
-	inherited::gs_apply_mag_size(size, live);
-	if (!live || iAmmoElapsed <= size)
-		return;
-
-	// A smaller magazine: the rounds that no longer fit go back to the inventory.
-	xr_map<shared_str, u32> back;
-	while (iAmmoElapsed > size && !m_magazine.empty())
-	{
-		back[m_magazine.back().m_ammoSect] += 1;
-		m_magazine.pop_back();
-		--iAmmoElapsed;
-	}
-	for (auto& it : back)
-		SpawnAmmo(it.second, it.first.c_str());
-	m_BriefInfo_CalcFrame = 0;
-}
-
 void CWeaponMagazined::gs_on_suppression_changed()
 {
 	// A silencer addon or a suppressor part: suppressed shot sound, particles and lights.
@@ -1744,9 +1714,6 @@ void CWeaponMagazined::PlayAnimReload()
 {
 	VERIFY(GetState() == eReload);
 #ifdef NEW_ANIMS //AVO: use new animations
-	// Gunsmith: every jam type, a feed jam (worn magazine) included, is cleared by racking the bolt, as in
-	// Tarkov; the magazine keeps causing feed jams until it's replaced. (Until 30 Oct 2026 a feed jam needed a
-	// full reload.)
 	if (bMisfire && iAmmoElapsed != 0)
 	{
 		//Msg("AVO: ------ MISFIRE");

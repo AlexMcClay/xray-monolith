@@ -65,13 +65,6 @@ void CWeaponMagazinedWGrenade::Load(LPCSTR section)
 	iMagazineSize2 = iMagazineSize;
 }
 
-void CWeaponMagazinedWGrenade::gs_apply_mag_size(int size, bool live)
-{
-	iMagazineSize2 = size; // the rifle magazine's size, kept while the launcher is selected
-	if (!m_bGrenadeMode)
-		inherited::gs_apply_mag_size(size, live);
-}
-
 void CWeaponMagazinedWGrenade::net_Destroy()
 {
 	inherited::net_Destroy();
@@ -785,7 +778,6 @@ void CWeaponMagazinedWGrenade::PlayAnimReload()
 #ifdef NEW_ANIMS //AVO: use new animations
 	if (IsGrenadeLauncherAttached())
 	{
-		// Gunsmith: every jam type is cleared by racking the bolt (CWeaponMagazined::PlayAnimReload).
 		if (bMisfire)
 		{
 			if (HudAnimationExist("anm_reload_misfire_w_gl"))

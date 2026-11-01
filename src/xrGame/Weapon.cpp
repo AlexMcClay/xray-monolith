@@ -39,10 +39,6 @@
 #include "pch_script.h"
 #include "script_game_object.h"
 #include "ai/stalker/ai_stalker.h"
-#include "xrServer.h"
-#include "game_sv_base.h"
-#include "alife_simulator.h"
-#include "xrMessages.h"
 
 #define WEAPON_REMOVE_TIME		60000
 #define ROTATION_TIME			0.25f
@@ -284,19 +280,7 @@ void CWeapon::UpdateFireDependencies_internal()
 
 			m_current_firedeps.m_FireParticlesXForm.set(parent);
 			VERIFY(_valid(m_current_firedeps.m_FireParticlesXForm));
-
-			// Gunsmith: the last part on the muzzle chain moves the fire point.
-			IKinematics* K = m_gs_full_mode && Visual() ? Visual()->dcast_PKinematics() : nullptr;
-			if (K)
-			{
-				Fvector gs_fp;
-				m_gs_visuals.ensure(gunsmith::CVisuals::eWorld, K, m_gs_tree, cNameSect().c_str(), nullptr, true);
-				if (m_gs_visuals.fire_point(gunsmith::CVisuals::eWorld, K, parent, gs_fp))
-				{
-					m_current_firedeps.vLastFP = gs_fp;
-					m_current_firedeps.vLastFPSilencer = gs_fp;
-				}
-			}
+			gs_world_fire_point(parent);
 		}
 	}
 }
@@ -349,7 +333,6 @@ void CWeapon::UpdateZoomParams() {
 	{
 		m_zoom_params.m_bUseDynamicZoom = m_zoom_params.m_bUseDynamicZoom_Primary || READ_IF_EXISTS(pSettings, r_bool, cNameSect(), "scope_dynamic_zoom", false);
 		u32 stepCount = 0;
-		gunsmith::SSightAim optic_aim; // a Gunsmith optic: its chosen sight and mode (a mode has its own zoom)
 		if (g_player_hud->m_adjust_mode)
 		{
 			m_zoom_params.m_fScopeZoomFactor = g_player_hud->m_adjust_zoom_factor[0] / zoom_multiple;
@@ -361,25 +344,7 @@ void CWeapon::UpdateZoomParams() {
 				m_zoom_params.m_fMinBaseZoomFactor = READ_IF_EXISTS(pSettings, r_float, GetScopeName(), "min_scope_zoom_factor", 200.0f);
 				stepCount = READ_IF_EXISTS(pSettings, r_float, GetScopeName(), "zoom_step_count", 0);
 			}
-		} else if (gs_optic() && gs_sight_aim(optic_aim))
-		{
-			const gunsmith::SSightAim* optic = &optic_aim;
-			// Gunsmith optic: magnification relative to a fixed 1x FOV ([gunsmith_settings]
-			// optic_base_fov), so a 4x scope zooms the same whatever the player's FOV setting, and
-			// about as far as vanilla's scopes. Zoom factors are FOVs in degrees divided by 0.75.
-			auto mag_to_zoom = [](float mag) {
-				const float base = _min(float(g_fov), gunsmith::settings().optic_base_fov > 1.f ? gunsmith::settings().optic_base_fov : float(g_fov));
-				const float half = deg2rad(base) * 0.5f;
-				return rad2deg(2.f * atanf(tanf(half) / _max(mag, 0.01f))) / 0.75f;
-			};
-			m_zoom_params.m_fScopeZoomFactor = (optic->zoom_factor > 0.f ? optic->zoom_factor : mag_to_zoom(optic->magnification)) / zoom_multiple;
-			m_zoom_params.m_bUseDynamicZoom = optic->magnification_min > 0.f && optic->magnification_min < optic->magnification;
-			if (m_zoom_params.m_bUseDynamicZoom)
-			{
-				m_zoom_params.m_fMinBaseZoomFactor = mag_to_zoom(optic->magnification_min);
-				stepCount = optic->zoom_steps ? optic->zoom_steps : 4;
-			}
-		} else
+		} else if (!gs_zoom_params(zoom_multiple, stepCount))
 		{
 			m_zoom_params.m_fScopeZoomFactor = m_zoom_params.m_fBaseZoomFactor / zoom_multiple;
 		}
@@ -409,17 +374,7 @@ void CWeapon::UpdateUIScope()
 {
 	// Change or remove scope texture
 	shared_str scope_tex_name;
-	gunsmith::SSightAim gs_optic_aim;
-	if (m_zoomtype == 0 && gs_optic() && gs_sight_aim(gs_optic_aim))
-	{
-		scope_tex_name = gs_optic_aim.scope_texture; // empty: none (3D scopes look through the model)
-		if (scope_tex_name.size() && pWpnScopeXml == nullptr)
-		{
-			pWpnScopeXml = new CUIXml();
-			pWpnScopeXml->Load(CONFIG_PATH, UI_PATH, "scopes.xml");
-		}
-	}
-	else if (m_zoomtype == 0)
+	if (m_zoomtype == 0 && !gs_scope_texture(scope_tex_name))
 	{
 		if (0 != (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) && m_scopes.size())
 		{
@@ -654,7 +609,6 @@ void CWeapon::Load(LPCSTR section)
 
 	iAmmoElapsed = pSettings->r_s32(section, "ammo_elapsed");
 	iMagazineSize = pSettings->r_s32(section, "ammo_mag_size");
-	m_gs_base_mag_size = iMagazineSize;
 
 	////////////////////////////////////////////////////
 	// дисперсия стрельбы
@@ -812,12 +766,7 @@ void CWeapon::Load(LPCSTR section)
 	m_eScopeStatus = (ALife::EWeaponAddonStatus)pSettings->r_s32(section, "scope_status");
 	m_eSilencerStatus = (ALife::EWeaponAddonStatus)pSettings->r_s32(section, "silencer_status");
 	m_eGrenadeLauncherStatus = (ALife::EWeaponAddonStatus)pSettings->r_s32(section, "grenade_launcher_status");
-	if (gunsmith::is_full_mode(section))
-	{
-		// Full-mode guns take no old-style addons, whatever the section says: scopes, suppressors and
-		// launchers are parts there. Vanilla attach code then refuses them and hides their bones.
-		m_eScopeStatus = m_eSilencerStatus = m_eGrenadeLauncherStatus = ALife::eAddonDisabled;
-	}
+	gs_load(section);
 
 	m_altAimPos = READ_IF_EXISTS(pSettings, r_bool, section, "use_alt_aim_hud", false);
 
@@ -1064,13 +1013,9 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 	CSE_ALifeItemWeapon* E = smart_cast<CSE_ALifeItemWeapon*>(e);
 	
 	iAmmoElapsed = E->a_elapsed;
-	E->gs_ensure_tree();
-	m_gs_tree = E->m_gs_tree;
-	m_gs_full_mode = gunsmith::is_full_mode(cNameSect().c_str());
 	m_flagsAddOnState = E->m_addon_flags.get();
-	if (m_gs_full_mode)
-		m_flagsAddOnState = 0; // no old-style addons on full-mode guns (Load disabled them); loadout scripts may still set the flags
-
+	gs_on_spawn(E);
+	
 	if (m_modular_attachments && m_cur_scope == 0 && (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) != 0 && m_scopes.size() > 1)
 	{
 		m_cur_scope = ::Random.randI(1, m_scopes.size());
@@ -1083,14 +1028,7 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 		}
 	}
 
-	gs_match_scope_part();
-	gs_rebuild_stats(false); // InitAddons below picks the suppressed or plain effects
-	// A new gun is spawned with its section's rounds (ammo_elapsed), which can be more than its magazine part holds
-	// (the EFT mod's M870 has 8, the stock Gunsmith tube 5): the tube stayed "full", and no reload until three were
-	// fired (user, 31 Oct 2026). What doesn't fit is dropped
-	if (m_gs_applied_mag_size >= 0 && iAmmoElapsed > iMagazineSize)
-		iAmmoElapsed = iMagazineSize;
-
+	gs_after_spawn();
 	m_ammoType = E->ammo_type;
 	SetState(E->wpn_state);
 	SetNextState(E->wpn_state);
@@ -1172,12 +1110,7 @@ void CWeapon::net_Import(NET_Packet& P)
 	u8 NewAddonState;
 	P.r_u8(NewAddonState);
 
-	const bool addons_changed = NewAddonState != m_flagsAddOnState;
-	if (addons_changed)
-		m_gs_tree.sync_legacy_flags(NewAddonState); // remote copy only, multiplayer
 	m_flagsAddOnState = NewAddonState;
-	if (addons_changed)
-		gs_rebuild_stats(false);
 	UpdateAddonsVisibility();
 
 	u8 ammoType, wstate;
@@ -1253,8 +1186,6 @@ void CWeapon::OnEvent(NET_Packet& P, u16 type)
 	case GE_ADDON_CHANGE:
 		{
 			P.r_u8(m_flagsAddOnState);
-			m_gs_tree.sync_legacy_flags(m_flagsAddOnState); // multiplayer buy menu only
-			gs_rebuild_stats(false);
 			InitAddons();
 			UpdateAddonsVisibility();
 		}
@@ -1508,12 +1439,6 @@ void CWeapon::renderable_Render()
 	inherited::renderable_Render();
 }
 
-void CWeapon::DeleteHudItemData()
-{
-	m_gs_visuals.clear(gunsmith::CVisuals::eHud); // the HUD model they mount on goes away
-	inherited::DeleteHudItemData();
-}
-
 void CWeapon::signal_HideComplete()
 {
 	m_fLR_ShootingFactor = 0.f;
@@ -1530,8 +1455,7 @@ void CWeapon::SetDefaults()
 
 	m_flags.set(FUsingCondition, TRUE);
 	bMisfire = false;
-	m_gs_jam_type = gunsmith::eFailNone;
-	m_gs_jam_node = 0;
+	gs_set_jam(gunsmith::eFailNone, 0);
 	m_flagsAddOnState = 0;
 	m_zoom_params.m_bIsZoomModeNow = false;
 }
@@ -1888,25 +1812,25 @@ BOOL CWeapon::CheckForMisfire()
 {
 	if (OnClient()) return FALSE;
 
-	// A script may decide the shot (the weapon_on_shot callback; the Gunsmith Framework does Tarkov's malfunctions
-	// there): its wear and whether, how and by which part it malfunctions. Otherwise the receiver's own misfire
-	// curve (vanilla's misfire_* keys). Parts had their own jam curves until 2 Nov 2026 (Gunsmith Docs 25).
 	u8 failure = gunsmith::eFailNone, node = 0;
-	if (!gs_script_shot(failure, node))
-	{
-		const float chance = GetConditionMisfireProbability();
-		if (chance > 0.f && ::Random.randF(0.f, 1.f) < chance)
-			failure = gunsmith::eFailMisfire;
-	}
-	if (failure == gunsmith::eFailNone)
-		return FALSE;
+	if (gs_script_shot(failure, node))
+		return gs_misfire(failure, node);
 
-	m_gs_jam_type = failure;
-	m_gs_jam_node = node < m_gs_tree.size() ? node : 0;
-	StopShooting();
-	bMisfire = true;
-	gs_callback_failed(m_gs_jam_node, m_gs_jam_type);
-	return TRUE;
+	float rnd = ::Random.randF(0.f, 1.f);
+	float mp = GetConditionMisfireProbability();
+	if (rnd < mp)
+	{
+		gs_set_jam(gunsmith::eFailMisfire, 0);
+		StopShooting();
+		bMisfire = true;
+		gs_callback_failed(0, gunsmith::eFailMisfire);
+
+		return TRUE;
+	}
+	else
+	{
+		return FALSE;
+	}
 }
 
 bool CWeapon::IsMisfire() const
@@ -1917,8 +1841,7 @@ bool CWeapon::IsMisfire() const
 void CWeapon::SetMisfireScript(bool b)
 {
 	bMisfire = b;
-	m_gs_jam_type = b ? u8(gunsmith::eFailMisfire) : u8(gunsmith::eFailNone);
-	m_gs_jam_node = 0;
+	gs_set_jam(b ? u8(gunsmith::eFailMisfire) : u8(gunsmith::eFailNone), 0);
 }
 
 void CWeapon::Reload()
@@ -2558,12 +2481,6 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 
 	u8 idx = GetCurrentHudOffsetIdx();
 
-	// Gunsmith: the camera m_item_transform was built with (it is updated after this call).
-	Fmatrix gs_prev_cam = m_gs_prev_cam;
-	const bool gs_prev_cam_ok = m_gs_prev_cam_ok;
-	m_gs_prev_cam = trans;
-	m_gs_prev_cam_ok = true;
-
 	//============= Поворот ствола во время аима =============//
 	{
 		Fvector curr_offs, curr_rot, curr_aim_rot;
@@ -2620,11 +2537,8 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 				curr_rot = hi->hud_offset(1, idx); //rot,aim
 			}
 		}
+		gs_update_aim(hi, trans, idx, curr_offs, curr_rot, curr_aim_rot);
 		
-		// Gunsmith: aim through the fitted sight part (CWeapon::gs_update_aim, Weapon_gunsmith.cpp)
-		if (idx == 1 && !m_modular_attachments && m_gs_full_mode)
-			gs_update_aim(hi, trans, gs_prev_cam, gs_prev_cam_ok, curr_offs, curr_rot, curr_aim_rot);
-
 		float factor;
 		
 		if (idx == 4 || last_idx == 4)

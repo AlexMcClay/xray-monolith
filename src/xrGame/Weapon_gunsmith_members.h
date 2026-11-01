@@ -118,9 +118,28 @@ public:
 protected:
 	gunsmith::CTacticalDevices m_gs_devices;
 	void gs_update_devices();
-	// Aiming through a fitted sight part: corrects UpdateHudAdditional's aim offset (Weapon_gunsmith.cpp)
-	void gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const Fmatrix& gs_prev_cam, bool gs_prev_cam_ok,
+	// Aiming through a fitted sight part: corrects UpdateHudAdditional's aim offset (Weapon_gunsmith.cpp) for the
+	// aim offset index `idx`. Called every frame; it also keeps the camera of the last frame.
+	void gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 idx,
 		Fvector& curr_offs, const Fvector& curr_rot, Fvector& curr_aim_rot);
+
+	// Hooks from Weapon.cpp and WeaponMagazined.cpp (Weapon_gunsmith.cpp).
+	// Third-person fire point from the parts on the muzzle chain (`parent`: the weapon's XFORM).
+	void gs_world_fire_point(const Fmatrix& parent);
+	// Main sight zoom of a Gunsmith optic: true when it set the zoom parameters (and `step_count`).
+	bool gs_zoom_params(float zoom_multiple, u32& step_count);
+	// Main sight scope texture of a Gunsmith optic: true when it set `tex` (empty: none).
+	bool gs_scope_texture(shared_str& tex);
+	// Load: the weapon's own magazine size and, for full-mode guns, no old-style addons.
+	void gs_load(LPCSTR section);
+	// net_Spawn: the tree from the server entity (before the modular scope pick), then the stats (after it).
+	void gs_on_spawn(CSE_ALifeItemWeapon* E);
+	void gs_after_spawn();
+	// A malfunction a script decided for this shot (eFailNone: none): the jam recorded, the shooting stopped.
+	BOOL gs_misfire(u8 failure, u8 node);
+	void gs_set_jam(u8 type, u8 node) { m_gs_jam_type = type; m_gs_jam_node = node; }
+	// A required part is missing: the gun clicks instead of firing (FireStart).
+	bool gs_fire_blocked();
 
 	gunsmith::CVisuals m_gs_visuals;
 	bool m_gs_full_mode = false;
