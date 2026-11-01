@@ -90,11 +90,8 @@ void CWeapon::gs_set_legacy_addon(u8 legacy_addon, LPCSTR part)
 	}
 }
 
-void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out, bool with_addons) const
+void CWeapon::gs_extra_parts(const gunsmith::CTree& tree, xr_vector<gunsmith::SExtraPart>& extra) const
 {
-	// Attached old-style addons the tree has no slot for (e.g. made attachable by
-	// an upgrade) still count, as in vanilla.
-	xr_vector<gunsmith::SExtraPart> extra;
 	const u8 mask = tree.legacy_mask();
 	auto add_extra = [&](u8 addon, ALife::EWeaponAddonStatus status, const shared_str& section)
 	{
@@ -109,7 +106,12 @@ void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponSta
 	add_extra(gunsmith::eLegacyScope, m_eScopeStatus, m_cur_scope < m_scopes.size() ? GetScopeName() : shared_str());
 	add_extra(gunsmith::eLegacySilencer, m_eSilencerStatus, m_sSilencerName);
 	add_extra(gunsmith::eLegacyLauncher, m_eGrenadeLauncherStatus, m_sGrenadeLauncherName);
+}
 
+void CWeapon::gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out, bool with_addons) const
+{
+	xr_vector<gunsmith::SExtraPart> extra;
+	gs_extra_parts(tree, extra);
 	gunsmith::compute(tree, extra, out, with_addons);
 }
 
@@ -121,13 +123,15 @@ void CWeapon::gs_display_stats(gunsmith::SWeaponStats& out) const
 		out.script_add[s] = m_gs_stats.script_add[s];
 		out.script_mul[s] = m_gs_stats.script_mul[s];
 	}
+	out.ergonomics = m_gs_stats.ergonomics;
+	out.no_stock = m_gs_stats.no_stock;
 }
 
 void CWeapon::gs_rebuild_stats(bool notify)
 {
 	const bool was_suppressed = IsSuppressorFitted();
 	gs_compute_stats(m_gs_tree, m_gs_stats, false);
-	gs_script_stats(m_gs_stats, false);
+	gs_script_stats(m_gs_tree, m_gs_stats, false);
 
 	// Magazine parts set the magazine size; without one the weapon's own size comes back.
 	// Guns that never had one are left alone, so upgrades that change the size keep working.
@@ -149,7 +153,7 @@ void CWeapon::gs_rebuild_stats(bool notify)
 	gs_update_optic();
 }
 
-void CWeapon::gs_script_stats(gunsmith::SWeaponStats& stats, bool preview)
+void CWeapon::gs_script_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& stats, bool preview)
 {
 	::luabind::functor<void> funct;
 	if (!ai().script_engine().functor("_G.CWeapon_OnRecalcStats", funct))
@@ -158,17 +162,36 @@ void CWeapon::gs_script_stats(gunsmith::SWeaponStats& stats, bool preview)
 	::luabind::object t = ::luabind::newtable(L);
 	t["section"] = cNameSect().c_str();
 	t["preview"] = preview;
-	t["ergonomics"] = stats.ergonomics;
-	t["stock_ergonomics"] = stats.stock_ergonomics;
-	t["recoil"] = stats.recoil_sum;
-	t["stock_recoil"] = stats.stock_recoil_sum;
-	t["shoulder"] = stats.shoulder;
-	t["stock_shoulder"] = stats.stock_shoulder;
+	::luabind::object parts = ::luabind::newtable(L);
+	int n = 0;
+	for (u32 i = 1; i < tree.size(); ++i)
+		parts[++n] = tree.node(u8(i)).section.c_str();
+	xr_vector<gunsmith::SExtraPart> extra;
+	gs_extra_parts(tree, extra);
+	for (const gunsmith::SExtraPart& e : extra)
+		parts[++n] = e.section.c_str();
+	t["parts"] = parts;
+	::luabind::object stock = ::luabind::newtable(L);
+	n = 0;
+	for (const shared_str& s : gunsmith::stock_parts(cNameSect()))
+		stock[++n] = s.c_str();
+	t["stock_parts"] = stock;
 	t["mul"] = ::luabind::newtable(L);
 	t["add"] = ::luabind::newtable(L);
 	funct(lua_game_object(), t);
 
-	// What the handlers left in t.mul and t.add, by stat name; anything not a finite number is ignored.
+	// What the handlers left: display values, and t.mul and t.add by stat name; anything not a finite number is
+	// ignored.
+	::luabind::object ergo = t["ergonomics"];
+	if (ergo.type() == LUA_TNUMBER)
+	{
+		const float f = ::luabind::object_cast<float>(ergo);
+		if (_valid(f))
+			stats.ergonomics = f;
+	}
+	::luabind::object no_stock = t["no_stock"];
+	stats.no_stock = no_stock.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(no_stock);
+
 	::luabind::object mul = t["mul"], add = t["add"];
 	for (u32 s = 0; s < gunsmith::eStatCount; ++s)
 	{
@@ -658,7 +681,6 @@ void CWeapon::gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float
 	case gunsmith::eStatCrosshairInertion: b = m_crosshair_inertion; break;
 	case gunsmith::eStatZoomRotateTime: b = m_zoom_params.m_fZoomRotateTime; break;
 	case gunsmith::eStatConditionShotDec: b = conditionDecreasePerShot; break;
-	case gunsmith::eStatErgonomics: b = READ_IF_EXISTS(pSettings, r_float, cNameSect(), "ergonomics", gunsmith::settings().ergo_base); break;
 	case gunsmith::eStatCamRelax: b = cam_recoil.RelaxSpeed; angle = true; break;
 	default: break;
 	}
@@ -666,8 +688,6 @@ void CWeapon::gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float
 	float v;
 	if (stat == gunsmith::eStatCamHorz)
 		v = b * stats.horz_k(); // horizontal recoil only uses the multiplier
-	else if (stat == gunsmith::eStatErgonomics)
-		v = stats.ergonomics;
 	else
 		v = stats.apply(stat, b);
 	float a = stat < gunsmith::eStatCount ? stats.add[stat] + stats.script_add[stat] : 0.f;

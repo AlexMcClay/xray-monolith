@@ -93,7 +93,6 @@ namespace gunsmith
 		eStatCrosshairInertion,
 		eStatZoomRotateTime, // aim-in time
 		eStatConditionShotDec, // receiver wear per shot
-		eStatErgonomics,
 		eStatCamRelax, // camera recoil relax speed (cam_relax_speed, zoom_cam_relax_speed)
 		eStatCount
 	};
@@ -138,10 +137,6 @@ namespace gunsmith
 
 		xr_vector<shared_str> blocks_slots;
 
-		// Handling (Tarkov-style):
-		float recoil; // `recoil`: Tarkov's recoil percent (negative = less); a gun sums its parts' values
-		bool shoulder_contact; // `shoulder_contact = true`: a stock the shooter's shoulder rests on
-
 		// Need part_kind set:
 		bool suppressor; // `suppressor = true`: the gun is suppressed while this part is fitted, as with a silencer addon
 		int ammo_mag_size; // `ammo_mag_size`: the gun's magazine size while this part is fitted, -1 if unset
@@ -154,7 +149,6 @@ namespace gunsmith
 	// settings are the Framework's.
 	struct SSettings
 	{
-		float ergo_base; // receiver ergonomics when the weapon has no `ergonomics` key (50)
 		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
 		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
 		float optic_base_fov;

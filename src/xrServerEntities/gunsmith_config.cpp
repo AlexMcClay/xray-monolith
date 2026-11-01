@@ -279,7 +279,7 @@ namespace gunsmith
 			"fire_dispersion", "cam_dispersion", "cam_dispersion_inc", "cam_horz",
 			"hit_power", "hit_impulse", "bullet_speed", "rpm",
 			"pdm_base", "pdm_accel", "pdm_vel", "crosshair_inertion",
-			"zoom_rotate_time", "condition_shot_dec", "ergonomics", "cam_relax_speed",
+			"zoom_rotate_time", "condition_shot_dec", "cam_relax_speed",
 		};
 
 		// Old addon multiplier keys, read from silencer/scope/launcher sections by
@@ -288,7 +288,7 @@ namespace gunsmith
 			"fire_dispersion_base_k", "cam_dispersion_k", "cam_dispersion_inc_k", nullptr,
 			"bullet_hit_power_k", "bullet_hit_impulse_k", "bullet_speed_k", nullptr,
 			"PDM_disp_base_k", "PDM_disp_accel_k", "PDM_disp_vel_k", "crosshair_inertion_k",
-			"zoom_rotate_time_k", "condition_shot_dec_k", nullptr, nullptr,
+			"zoom_rotate_time_k", "condition_shot_dec_k", nullptr,
 		};
 
 		bool stat_add_in_degrees(u8 stat)
@@ -350,8 +350,6 @@ namespace gunsmith
 				read_list(section, "blocks_slots", d.blocks_slots);
 			}
 
-			d.recoil = exists ? READ_IF_EXISTS(pSettings, r_float, section, "recoil", 0.f) : 0.f;
-			d.shoulder_contact = exists && !!READ_IF_EXISTS(pSettings, r_bool, section, "shoulder_contact", FALSE);
 			d.suppressor = exists && d.declared && !!READ_IF_EXISTS(pSettings, r_bool, section, "suppressor", FALSE);
 			d.ammo_mag_size = exists && d.declared ? READ_IF_EXISTS(pSettings, r_s32, section, "ammo_mag_size", -1) : -1;
 		}
@@ -411,7 +409,6 @@ namespace gunsmith
 			if (!loaded)
 			{
 				LPCSTR sect = "gunsmith_settings";
-				s.ergo_base = READ_IF_EXISTS(pSettings, r_float, sect, "ergo_base", 50.f);
 				s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
 				s.aim_roll_min = READ_IF_EXISTS(pSettings, r_float, sect, "aim_roll_min", 1.f);
 				s.aim_turn_max = READ_IF_EXISTS(pSettings, r_float, sect, "aim_turn_max", 20.f);

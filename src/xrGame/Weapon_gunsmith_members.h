@@ -60,10 +60,13 @@ public:
 	void gs_compute_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& out, bool with_addons) const;
 	// The live stats with old-style addons counted, for display (gs_get_stats).
 	void gs_display_stats(gunsmith::SWeaponStats& out) const;
-	// The scripts' layer of `stats` (script_add, script_mul): the weapon_on_recalc_stats callback, through
-	// _G.CWeapon_OnRecalcStats (gunsmith_callbacks.script), given the parts' totals; `preview` for a build that
-	// isn't the weapon's (the builder). Runs on every full recompute and preview, not per shot.
-	void gs_script_stats(gunsmith::SWeaponStats& stats, bool preview);
+	// The scripts' layer of `stats` (script_add, script_mul, ergonomics, no_stock): the weapon_on_recalc_stats
+	// callback, through _G.CWeapon_OnRecalcStats (gunsmith_callbacks.script), given `tree`'s part sections and the
+	// stock build's; `preview` for a build that isn't the weapon's (the builder). Runs on every full recompute and
+	// preview, not per shot.
+	void gs_script_stats(const gunsmith::CTree& tree, gunsmith::SWeaponStats& stats, bool preview);
+	// Attached old-style addons the tree has no slot for (e.g. made attachable by an upgrade); they count as parts.
+	void gs_extra_parts(const gunsmith::CTree& tree, xr_vector<gunsmith::SExtraPart>& extra) const;
 	// One stat in display units (degrees for angles, rounds per minute for rpm):
 	// the weapon's own value, the parts' add, and the effective value.
 	void gs_stat_values(const gunsmith::SWeaponStats& stats, u8 stat, float& base, float& add, float& value) const;

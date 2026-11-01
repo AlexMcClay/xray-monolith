@@ -29,9 +29,8 @@ namespace gunsmith
 	// previews count them (compute's `with_addons`), so they show what the weapon gives.
 	//
 	// On top, a script layer (script_add, script_mul) that scripts set whenever the stats are recomputed
-	// (CWeapon::gs_script_stats, the weapon_on_recalc_stats callback). The parts' recoil percents and
-	// ergonomics are only summed here, with the stock build's; the Gunsmith Framework turns them into
-	// multipliers with Tarkov's formulas and the handling settings (gunsmith_handling.script).
+	// (CWeapon::gs_script_stats, the weapon_on_recalc_stats callback), given the part sections and the stock
+	// build's; the Gunsmith Framework turns the parts' Tarkov keys into multipliers there (gunsmith_handling.script).
 	struct SWeaponStats
 	{
 		float add[eStatCount];
@@ -40,12 +39,9 @@ namespace gunsmith
 		float script_add[eStatCount];
 		float script_mul[eStatCount];
 
-		float ergonomics; // 0..100, receiver `ergonomics` (default 50) plus parts
-		float recoil_sum; // parts' `recoil` percents, summed (Tarkov)
-		bool shoulder; // a fitted part has shoulder_contact
-		// The stock build's, for the relative effects:
-		float stock_ergonomics, stock_recoil_sum;
-		bool stock_shoulder;
+		// For display, as the scripts set them (t.ergonomics, t.no_stock): ergonomics < 0 when none did.
+		float ergonomics;
+		bool no_stock;
 		float weight_add; // parts' weight
 		float cost_add; // parts' cost
 		bool can_fire; // every required slot is filled
@@ -62,4 +58,6 @@ namespace gunsmith
 	};
 
 	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out, bool with_addons);
+	// The part sections of a receiver's stock build (its gs_default_build), cached per section.
+	const xr_vector<shared_str>& stock_parts(const shared_str& section);
 }

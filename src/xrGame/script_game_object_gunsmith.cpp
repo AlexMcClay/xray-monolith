@@ -40,13 +40,10 @@ namespace
 	{
 		::luabind::object t = ::luabind::newtable(L);
 
-		t["ergonomics"] = stats.ergonomics;
-		t["stock_ergonomics"] = stats.stock_ergonomics;
-		t["recoil"] = stats.recoil_sum; // Tarkov's summed recoil percent of the fitted parts
-		t["stock_recoil"] = stats.stock_recoil_sum;
+		if (stats.ergonomics >= 0.f)
+			t["ergonomics"] = stats.ergonomics; // as the scripts give it (gunsmith_handling)
 		t["recoil_k"] = stats.k(gunsmith::eStatCamDispersion); // the scripts' recoil multiplier (gunsmith_handling)
-		t["shoulder"] = stats.shoulder;
-		t["no_stock"] = stats.stock_shoulder && !stats.shoulder;
+		t["no_stock"] = stats.no_stock;
 		// The weapon's weight and price with these parts instead of its current ones.
 		t["weight"] = weapon->Weight() - live.weight_add + stats.weight_add;
 		t["cost"] = float(weapon->Cost()) - live.cost_add + stats.cost_add;
@@ -404,7 +401,7 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self)
 
 	gunsmith::SWeaponStats stats;
 	weapon->gs_compute_stats(tree, stats, true);
-	weapon->gs_script_stats(stats, true);
+	weapon->gs_script_stats(tree, stats, true);
 	const bool has_silencer = (tree.legacy_addon_flags() & gunsmith::eLegacySilencer) ||
 		(weapon->IsSilencerAttached() && !(tree.legacy_mask() & gunsmith::eLegacySilencer)) || stats.suppressor_part;
 	gunsmith::SWeaponStats live;

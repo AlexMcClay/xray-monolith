@@ -65,9 +65,6 @@ namespace gunsmith
 				out.cost_add += p.cost;
 			}
 
-			out.recoil_sum += p.recoil;
-			if (p.shoulder_contact)
-				out.shoulder = true;
 			if (p.suppressor)
 				out.suppressor_part = true;
 			if (p.ammo_mag_size >= 0)
@@ -82,9 +79,8 @@ namespace gunsmith
 			add[s] = script_add[s] = 0.f;
 			mul[s] = script_mul[s] = 1.f;
 		}
-		ergonomics = stock_ergonomics = 50.f;
-		recoil_sum = stock_recoil_sum = 0.f;
-		shoulder = stock_shoulder = false;
+		ergonomics = -1.f;
+		no_stock = false;
 		weight_add = cost_add = 0.f;
 		can_fire = true;
 		suppressor_part = false;
@@ -102,12 +98,6 @@ namespace gunsmith
 				take_part(tree.node(u8(i)).section.c_str(), tree.node_legacy_addon(u8(i)), with_addons, out);
 			for (const SExtraPart& e : extra)
 				take_part(e.section.c_str(), e.legacy_addon, with_addons, out);
-
-			const SSettings& cfg = settings();
-			const float base = tree.empty() ? cfg.ergo_base
-				: READ_IF_EXISTS(pSettings, r_float, tree.node(0).section.c_str(), "ergonomics", cfg.ergo_base);
-			out.ergonomics = (base + out.add[eStatErgonomics]) * out.mul[eStatErgonomics];
-			clamp(out.ergonomics, 0.f, 100.f);
 
 			out.can_fire = tree.empty() || tree.required_slots_filled();
 		}
@@ -137,14 +127,23 @@ namespace gunsmith
 		const SWeaponStats& st = stock_stats(tree.node(0).section);
 		for (u32 s = 0; s < eStatCount; ++s)
 		{
-			if (s == eStatErgonomics)
-				continue; // ergonomics stays absolute (the scripts relate it to stock_ergonomics)
 			out.add[s] -= st.add[s];
 			if (!fis_zero(st.mul[s]))
 				out.mul[s] /= st.mul[s];
 		}
-		out.stock_ergonomics = st.ergonomics;
-		out.stock_recoil_sum = st.recoil_sum;
-		out.stock_shoulder = st.shoulder;
+	}
+
+	const xr_vector<shared_str>& stock_parts(const shared_str& section)
+	{
+		static xr_map<shared_str, xr_vector<shared_str>> cache;
+		auto it = cache.find(section);
+		if (it != cache.end())
+			return it->second;
+		xr_vector<shared_str> parts;
+		CTree t;
+		t.build_default(section.c_str(), 0);
+		for (u32 i = 1; i < t.size(); ++i)
+			parts.push_back(t.node(u8(i)).section);
+		return cache.insert(mk_pair(section, parts)).first->second;
 	}
 }
