@@ -141,17 +141,4 @@ namespace gunsmith
 		out.stock_recoil_sum = st.recoil_sum;
 		out.stock_shoulder = st.shoulder;
 	}
-
-	void dump(const SWeaponStats& s)
-	{
-		Msg("- [gunsmith] stats: ergonomics=%.1f (stock %.1f) weight+%.3f cost+%.0f can_fire=%s", s.ergonomics, s.stock_ergonomics,
-		    s.weight_add, s.cost_add, s.can_fire ? "yes" : "NO");
-		Msg("-   recoil %+.1f%% (stock %+.1f%%) shoulder=%s (stock %s); scripts: recoil x%.3f, aim time x%.3f, sway x%.3f",
-		    s.recoil_sum, s.stock_recoil_sum, s.shoulder ? "yes" : "no", s.stock_shoulder ? "yes" : "no",
-		    s.script_mul[eStatCamDispersion], s.script_mul[eStatZoomRotateTime], s.script_mul[eStatPdmBase]);
-		for (u32 i = 0; i < eStatCount; ++i)
-			if (!fsimilar(s.mul[i], 1.f) || !fis_zero(s.add[i]) || !fsimilar(s.script_mul[i], 1.f) || !fis_zero(s.script_add[i]))
-				Msg("-   %s: add %+.5f mul x%.4f, scripts add %+.5f mul x%.4f", stat_name(u8(i)), s.add[i], s.mul[i],
-				    s.script_add[i], s.script_mul[i]);
-	}
 }

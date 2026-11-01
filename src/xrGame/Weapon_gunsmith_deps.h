@@ -9,6 +9,11 @@
 #include "gunsmith_visuals.h"
 #include "gunsmith_tactical.h"
 
-extern int g_gs_aim_debug;
-extern float g_gs_aim_speed;
-extern int g_gs_aim_rot;
+// Console gs_debug (Weapon_gunsmith.cpp): a bit mask of the logs to write.
+extern int g_gs_debug;
+enum
+{
+	eGsDebugPreview = 1, // the builder's preview and icons
+	eGsDebugGrip = 2, // the left hand's grip IK
+	eGsDebugAim = 4, // the sight calibration
+};

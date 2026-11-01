@@ -4,7 +4,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
-#include "scope_timers.h"
 #include "Weapon.h"
 #include "ParticlesObject.h"
 #include "entity_alive.h"
@@ -1887,7 +1886,6 @@ float CWeapon::GetConditionMisfireProbability() const
 
 BOOL CWeapon::CheckForMisfire()
 {
-	SCOPE_TIMER("weapon.check_misfire");
 	if (OnClient()) return FALSE;
 
 	// A script may decide the shot (the weapon_on_shot callback; the Gunsmith Framework does Tarkov's malfunctions

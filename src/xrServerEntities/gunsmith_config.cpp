@@ -420,6 +420,7 @@ namespace gunsmith
 				s.aim_still_turn = READ_IF_EXISTS(pSettings, r_float, sect, "aim_still_turn", 0.1f);
 				s.aim_still_move = READ_IF_EXISTS(pSettings, r_float, sect, "aim_still_move", 0.3f);
 				s.aim_still_time = READ_IF_EXISTS(pSettings, r_float, sect, "aim_still_time", 0.25f);
+				s.aim_speed = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "aim_speed", 6.f), 0.5f, 30.f);
 				loaded = true;
 			}
 			return s;

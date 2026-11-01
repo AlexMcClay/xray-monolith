@@ -109,8 +109,6 @@ namespace gunsmith
 		// Adds or removes legacy parts so the tree matches the old addon flags.
 		void sync_legacy_flags(u8 addon_flags);
 
-		void dump(LPCSTR label) const;
-
 		// True when a part already in the tree lists this slot section in its blocks_slots.
 		bool is_slot_blocked(const shared_str& slot_section) const;
 

@@ -426,35 +426,6 @@ namespace gunsmith
 		}
 	}
 
-	void CTree::dump(LPCSTR label) const
-	{
-		Msg("- [gunsmith] %s tree: %u node(s), legacy flags 0x%02x", label, u32(m_nodes.size()), u32(legacy_addon_flags()));
-		for (u32 i = 0; i < m_nodes.size(); ++i)
-		{
-			const SNode& n = m_nodes[i];
-			if (i == 0)
-				Msg("-   #0 [%s] receiver", n.section.c_str());
-			else
-				Msg("-   #%u [%s] parent=#%u slot=%u", i, n.section.c_str(), u32(n.parent), u32(n.slot));
-
-			const SLOTS& slots = node_slots(u8(i));
-			for (u32 s = 0; s < slots.size(); ++s)
-			{
-				const int occupant = find_in_slot(u8(i), u8(s));
-				string32 occ;
-				if (occupant >= 0)
-					xr_sprintf(occ, "#%d", occupant);
-				else
-					xr_strcpy(occ, "empty");
-				Msg("-       slot %u [%s]%s%s%s -> %s", s, slots[s].section.c_str(),
-				    slots[s].implicit ? " implicit" : "",
-				    slots[s].required ? " required" : "",
-				    slots[s].legacy_addon ? (slots[s].legacy_addon == eLegacyScope ? " legacy=scope" : slots[s].legacy_addon == eLegacySilencer ? " legacy=silencer" : " legacy=launcher") : "",
-				    occ);
-			}
-		}
-	}
-
 	bool CTree::is_slot_blocked(const shared_str& slot_section) const
 	{
 		for (u32 i = 1; i < m_nodes.size(); ++i)

@@ -15,8 +15,6 @@
 #include "../Include/xrRender/Kinematics.h"
 #include "../Include/xrRender/RenderVisual.h"
 
-int g_gs_preview_debug = 0;
-
 namespace gunsmith
 {
 	namespace
@@ -195,7 +193,7 @@ namespace gunsmith
 						index = int(i);
 			}
 			SCell& c = m_cells[index];
-			if (g_gs_preview_debug)
+			if (g_gs_debug & eGsDebugPreview)
 				Msg("- [gunsmith] preview: icon cell %d [%s] (was [%s])", index, key, c.key.size() ? c.key.c_str() : "");
 			c.key = key;
 			c.id = id;
@@ -384,7 +382,7 @@ namespace gunsmith
 			m_failed = true;
 			return;
 		}
-		if (g_gs_preview_debug)
+		if (g_gs_debug & eGsDebugPreview)
 			Msg("- [gunsmith] preview: drew icon %u [%s], %u models", index, c.key.c_str(), u32(visuals.size()));
 	}
 
@@ -472,7 +470,7 @@ namespace gunsmith
 			s.visible = s.visible && s.u >= 0.f && s.u <= 1.f && s.v >= 0.f && s.v <= 1.f;
 			out.push_back(s);
 		}
-		if (g_gs_preview_debug && !out.empty() && Device.dwFrame % 60 == 0)
+		if ((g_gs_debug & eGsDebugPreview) && !out.empty() && Device.dwFrame % 60 == 0)
 		{
 			Fvector c;
 			m_view_box.getcenter(c);

@@ -7,8 +7,6 @@
 
 int g_gs_grip_ik = 1;
 int g_gs_grip_type = -1; // -1: each part's grip_type; 0, 1: that Tarkov GripType on every part (for comparing)
-int g_gs_grip_debug = 0;
-Fvector g_gs_grip_offset = {0.f, 0.f, 0.f};
 
 namespace gunsmith
 {
@@ -104,7 +102,7 @@ namespace gunsmith
 			m_weight = _min(to, m_weight + RISE * Device.fTimeDelta);
 		m_weight_frame = Device.dwFrame;
 		const float weight = m_weight;
-		if (g_gs_grip_debug)
+		if (g_gs_debug & eGsDebugGrip)
 		{
 			static u32 last = 0;
 			if (Device.dwTimeGlobal > last + 500)
@@ -124,7 +122,6 @@ namespace gunsmith
 		corr.mul_43(idle_inv, target);
 		pose.hand.mul_43(ha0, corr);
 		pose.weight = weight;
-		pose.offset = g_gs_grip_offset;
 		// the fingers: the grip's, from the hand down (the hand arrives open, then closes)
 		Fmatrix fingers[CHudHandIK::eFingers];
 		for (int f = 0; f < CHudHandIK::eFingers; ++f)

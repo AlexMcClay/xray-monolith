@@ -47,10 +47,6 @@ public:
 	u8 gs_jam_type() const { return m_gs_jam_type; }
 	u8 gs_jam_node() const { return m_gs_jam_node; }
 
-	// Debug and test helpers for the gs_* console commands.
-	bool gs_debug_set_part(u8 parent, u8 slot, LPCSTR section);
-	void gs_dump_stats() const;
-
 	// Lua API support (script_game_object_gunsmith.cpp).
 	// Why `section` can't go into `slot` of node `parent` of `tree`, or "" when it can.
 	// In an addon slot only what this weapon's addon code accepts fits, unless

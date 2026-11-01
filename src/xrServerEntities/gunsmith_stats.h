@@ -60,6 +60,4 @@ namespace gunsmith
 	};
 
 	void compute(const CTree& tree, const xr_vector<SExtraPart>& extra, SWeaponStats& out);
-
-	void dump(const SWeaponStats& stats);
 }

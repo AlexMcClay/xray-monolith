@@ -48,14 +48,9 @@
 #include "cameralook.h"
 #include "character_hit_animations_params.h"
 #include "inventory_upgrade_manager.h"
-#include "Weapon.h"
 #include "gunsmith_grip_ik.h"
 #include "scope_timers.h"
-extern int g_gs_preview_debug; // gunsmith_preview.cpp
-#include "player_hud.h"
-#include "ActorEffector.h"
-#include "inventory.h"
-#include "xrServer_Objects_ALife_Items.h"
+extern int g_gs_debug; // Weapon_gunsmith.cpp
 
 #include "ai_debug_variables.h"
 #include "../xrphysics/console_vars.h"
@@ -415,102 +410,6 @@ static void full_memory_stats()
 	dump_file_mappings();
 #endif // DEBUG
 }
-
-// Gunsmith: prints the active weapon's part tree, client mirror and server copy.
-class CCC_GsDumpTree : public IConsole_Command
-{
-public:
-	CCC_GsDumpTree(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
-
-	virtual void Execute(LPCSTR args)
-	{
-		CActor* actor = Actor();
-		if (!actor)
-		{
-			Msg("! gs_dump_tree: no actor");
-			return;
-		}
-		CWeapon* wpn = smart_cast<CWeapon*>(actor->inventory().ActiveItem());
-		if (!wpn)
-		{
-			Msg("! gs_dump_tree: the active item is not a weapon");
-			return;
-		}
-		Msg("- gs_dump_tree: [%s] id=%u addon flags=0x%02x condition=%.4f", wpn->cNameSect().c_str(), u32(wpn->ID()), u32(wpn->GetAddonsState()), wpn->GetCondition());
-		wpn->gs_tree().dump("client");
-		wpn->gs_dump_stats();
-		if (CSE_ALifeItemWeapon* se = wpn->gs_server_entity())
-		{
-			Msg("- gs_dump_tree: server addon flags=0x%02x", u32(se->m_addon_flags.get()));
-			se->m_gs_tree.dump("server");
-		}
-	}
-};
-
-// Gunsmith: where the eye is, in the first-person model's space (following the HUD section's
-// gs_aim_bone), for tuning gs_aim_point. Run it while fully aimed with the plain receiver
-// (no sight part fitted); the printed line can go into the HUD section as it is.
-class CCC_GsAimEye : public IConsole_Command
-{
-public:
-	CCC_GsAimEye(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
-
-	virtual void Execute(LPCSTR args)
-	{
-		CActor* actor = Actor();
-		CWeapon* wpn = actor ? smart_cast<CWeapon*>(actor->inventory().ActiveItem()) : nullptr;
-		attachable_hud_item* hi = wpn && wpn->GetHUDmode() ? wpn->HudItemData() : nullptr;
-		if (!hi || !hi->m_model)
-		{
-			Msg("! gs_aim_eye: hold a weapon in first person");
-			return;
-		}
-		LPCSTR bone = READ_IF_EXISTS(pSettings, r_string, wpn->HudSection(), "gs_aim_bone", (LPCSTR)nullptr);
-		u16 id = bone ? hi->m_model->LL_BoneID(bone) : BI_NONE;
-		if (id == BI_NONE)
-			id = hi->m_model->LL_GetBoneRoot();
-		Fmatrix cam, model, inv;
-		actor->Cameras().hud_camera_Matrix(cam);
-		model.mul_43(hi->m_item_transform, hi->m_model->LL_GetTransform_R(id));
-		inv.invert(model);
-		Fvector eye;
-		inv.transform_tiny(eye, cam.c);
-		Msg("- gs_aim_eye: [%s] %s, eye in model space (bone %s):", wpn->HudSection().c_str(),
-			wpn->IsZoomed() ? "aimed" : "NOT aimed", hi->m_model->LL_BoneName_dbg(id));
-		Msg("gs_aim_point    = %.4f, %.4f, %.4f", eye.x, eye.y, eye.z);
-	}
-};
-
-static CWeapon* gs_active_weapon(LPCSTR command)
-{
-	CActor* actor = Actor();
-	CWeapon* wpn = actor ? smart_cast<CWeapon*>(actor->inventory().ActiveItem()) : nullptr;
-	if (!wpn)
-		Msg("! %s: hold a weapon first", command);
-	return wpn;
-}
-
-// Gunsmith test helper: gs_set_part <parent node> <slot> <part section | none>
-class CCC_GsSetPart : public IConsole_Command
-{
-public:
-	CCC_GsSetPart(LPCSTR N) : IConsole_Command(N) {}
-
-	virtual void Execute(LPCSTR args)
-	{
-		u32 parent = 0, slot = 0;
-		string256 section;
-		section[0] = 0;
-		if (sscanf_s(args, "%u %u %255s", &parent, &slot, section, (unsigned)sizeof(section)) != 3 || parent > 255 || slot > 255)
-		{
-			Msg("! usage: gs_set_part <parent node> <slot> <part section | none>");
-			return;
-		}
-		if (CWeapon* wpn = gs_active_weapon("gs_set_part"))
-			if (wpn->gs_debug_set_part(u8(parent), u8(slot), section))
-				Msg("- gs_set_part: node %u slot %u = %s", parent, slot, section);
-	}
-};
 
 class CCC_MemStats : public IConsole_Command
 {
@@ -2618,19 +2517,11 @@ void CCC_RegisterCommands()
 	//g_OptConCom.Init();
 
 	CMD1(CCC_MemStats, "stat_memory");
-	CMD1(CCC_GsDumpTree, "gs_dump_tree");
-	CMD1(CCC_GsAimEye, "gs_aim_eye");
-	CMD4(CCC_Integer, "gs_aim_debug", &g_gs_aim_debug, 0, 1);
 	CMD4(CCC_Integer, "scope_timers", &g_scope_timers, 0, 1);
 	CMD4(CCC_Integer, "scope_timers_period", &g_scope_timers_period, 1, 60);
-	CMD4(CCC_Float, "gs_aim_speed", &g_gs_aim_speed, 0.5f, 30.f);
-	CMD4(CCC_Integer, "gs_aim_rot", &g_gs_aim_rot, 0, 1);
 	CMD4(CCC_Integer, "gs_grip_ik", &g_gs_grip_ik, 0, 1);
 	CMD4(CCC_Integer, "gs_grip_type", &g_gs_grip_type, -1, 1);
-	CMD4(CCC_Integer, "gs_grip_debug", &g_gs_grip_debug, 0, 1);
-	CMD4(CCC_Vector3, "gs_grip_offset", &g_gs_grip_offset, Fvector().set(-0.1f, -0.1f, -0.1f), Fvector().set(0.1f, 0.1f, 0.1f));
-	CMD4(CCC_Integer, "gs_preview_debug", &g_gs_preview_debug, 0, 1);
-	CMD1(CCC_GsSetPart, "gs_set_part");
+	CMD4(CCC_Integer, "gs_debug", &g_gs_debug, 0, 7);
 #ifdef DEBUG
 	CMD1(CCC_MemCheckpoint, "stat_memory_checkpoint");
 #endif //#ifdef DEBUG

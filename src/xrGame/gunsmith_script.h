@@ -10,7 +10,7 @@
 
 namespace gunsmith
 {
-	// Node numbers are 0-based everywhere (node 0 is the receiver), as in gs_dump_tree.
+	// Node numbers are 0-based everywhere (node 0 is the receiver), as in gunsmith_debug.dump_tree.
 	// The returned array is 1-based, so element n + 1 is node n:
 	//   { index, section, parent, slot, kind, legacy_addon, slots = {
 	//       { index, section, accepts = {tag, ...}, required, field_swappable, implicit,

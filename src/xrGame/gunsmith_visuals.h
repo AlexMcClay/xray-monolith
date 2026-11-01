@@ -22,7 +22,7 @@ namespace gunsmith
 	//                                      last in the tree); e.g. optics 1 over iron sights 0
 	//   aim_dir                            the sight line: forward x,y,z, up x,y,z (model space; default the
 	//                                      part's bore, 0,0,-1 and 0,1,0). Aiming turns the gun so it lies
-	//                                      along the view (canted sights roll the gun; gs_aim_rot)
+	//                                      along the view (canted sights roll the gun)
 	//   fire_bone, fire_point              the part is on the muzzle chain: shots and flash start
 	//                                      there when it is the last such part in the tree
 	// A sight that magnifies (an optic; see Gunsmith Docs 13-optics-and-3dss.md):

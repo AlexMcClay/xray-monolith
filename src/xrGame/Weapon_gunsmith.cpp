@@ -386,73 +386,6 @@ bool CWeapon::gs_script_shot(u8& failure, u8& node)
 	return true;
 }
 
-bool CWeapon::gs_debug_set_part(u8 parent, u8 slot, LPCSTR section)
-{
-	if (parent >= m_gs_tree.size())
-	{
-		Msg("! gunsmith: node %u does not exist", u32(parent));
-		return false;
-	}
-	const gunsmith::SLOTS& slots = m_gs_tree.node_slots(parent);
-	if (slot >= slots.size())
-	{
-		Msg("! gunsmith: node %u has no slot %u (it has %u)", u32(parent), u32(slot), u32(slots.size()));
-		return false;
-	}
-	if (slots[slot].legacy_addon != gunsmith::eLegacyNone)
-	{
-		Msg("! gunsmith: slot %u is an addon slot (%s); attach and detach it in the inventory", u32(slot), gunsmith::legacy_addon_name(slots[slot].legacy_addon));
-		return false;
-	}
-
-	const bool remove = !section || !*section || !xr_strcmp(section, "none");
-	if (!remove)
-	{
-		if (!pSettings->section_exist(section))
-		{
-			Msg("! gunsmith: section [%s] does not exist", section);
-			return false;
-		}
-		if (!gunsmith::part_fits_slot(section, slots[slot], cNameSect().c_str(), true))
-		{
-			Msg("! gunsmith: [%s] does not fit slot [%s] (no matching tag)", section, slots[slot].section.c_str());
-			return false;
-		}
-		if (m_gs_tree.is_slot_blocked(slots[slot].section))
-		{
-			Msg("! gunsmith: slot [%s] is blocked by another part", slots[slot].section.c_str());
-			return false;
-		}
-	}
-
-	const int existing = m_gs_tree.find_in_slot(parent, slot);
-	if (existing >= 0)
-		m_gs_tree.remove_subtree(u8(existing));
-	if (!remove && m_gs_tree.add_node(section, parent, slot) < 0)
-	{
-		Msg("! gunsmith: could not add [%s] (tree full?)", section);
-		return false;
-	}
-
-	gs_commit_tree();
-	return true;
-}
-
-void CWeapon::gs_dump_stats() const
-{
-	gunsmith::dump(m_gs_stats);
-	Msg("-   effective: fire_dispersion %.4f deg (base %.4f), bullet_speed %.1f (base %.1f), hit_power[0] %.3f (base %.3f)",
-	    rad2deg(m_gs_stats.apply(gunsmith::eStatFireDispersion, fireDispersionBase)), rad2deg(fireDispersionBase),
-	    m_gs_stats.apply(gunsmith::eStatBulletSpeed, m_fStartBulletSpeed), m_fStartBulletSpeed,
-	    m_gs_stats.apply(gunsmith::eStatHitPower, fvHitPower[0]), fvHitPower[0]);
-	Msg("-   effective: zoom_rotate_time %.3f (base %.3f), cam_dispersion %.4f deg (base %.4f), rpm %.0f (base %.0f)",
-	    m_gs_stats.apply(gunsmith::eStatZoomRotateTime, m_zoom_params.m_fZoomRotateTime), m_zoom_params.m_fZoomRotateTime,
-	    rad2deg(m_gs_stats.apply(gunsmith::eStatCamDispersion, cam_recoil.Dispersion)), rad2deg(cam_recoil.Dispersion),
-	    fOneShotTime > 0.f ? 60.f / gs_shot_time(fOneShotTime) : 0.f, fOneShotTime > 0.f ? 60.f / fOneShotTime : 0.f);
-	Msg("-   suppressed=%s jammed=%s jam=%s node=%u", IsSuppressorFitted() ? "yes" : "no", IsMisfire() ? "yes" : "no",
-	    IsMisfire() ? gunsmith::failure_name(m_gs_jam_type) : "none", u32(m_gs_jam_node));
-}
-
 bool CWeapon::gs_legacy_accepts(u8 legacy_addon, LPCSTR section) const
 {
 	// Mirrors CWeaponMagazined::CanAttach for each addon type.
@@ -783,10 +716,9 @@ void CWeapon::gs_match_scope_part()
 	gs_sync_to_server();
 }
 
-// gs_aim_debug 1: log the sight calibration twice a second while aiming.
-int g_gs_aim_debug = 0;
-float g_gs_aim_speed = 6.f; // aim refinement gain, per second (gs_aim_speed)
-int g_gs_aim_rot = 1;       // gs_aim_rot 0: aim with the position correction only (no turn onto the sight line)
+// Console gs_debug, a bit mask (Weapon_gunsmith_deps.h): 1 preview log, 2 grip log, 4 aim log
+// (the sight calibration, twice a second while aiming).
+int g_gs_debug = 0;
 
 namespace
 {
@@ -984,7 +916,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const
 			Fmatrix aimed;
 			aimed.mul_43(offset_xform(curr_aim_rot, curr_rot, curr_offs), hands);
 			Fvector fwd, up;
-			if (g_gs_aim_rot && m_gs_visuals.sight_dir(hi->m_model, fwd, up))
+			if (m_gs_visuals.sight_dir(hi->m_model, fwd, up))
 			{
 				Fvector f, u;
 				aimed.transform_dir(f, fwd);
@@ -1001,7 +933,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const
 					turned.mul_43(line, base);
 					turned.getHPB(m_gs_aim_rot);
 				}
-				if (g_gs_aim_debug)
+				if (g_gs_debug & eGsDebugAim)
 					Msg("- gs_aim: sight [%s] line %.2f deg off the view, roll %.2f deg%s", key.c_str(),
 						rad2deg(turn), rad2deg(roll), turn < turn_max ? "" : " (too far: not turned)");
 			}
@@ -1025,7 +957,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const
 			Fmatrix a_inv;
 			a_inv.invert(a);
 			a_inv.transform_dir(m_gs_aim_corr, d);
-			if (g_gs_aim_debug)
+			if (g_gs_debug & eGsDebugAim)
 				Msg("- gs_aim: sight [%s] predicted off axis x=%.4f y=%.4f, eye z correction %.4f",
 					key.c_str(), s.x, s.y, d.z);
 		}
@@ -1055,7 +987,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const
 		m_gs_aim_still = still ? m_gs_aim_still + Device.fTimeDelta : 0.f;
 		if (aimed && idle && settled && m_gs_aim_still > gunsmith::settings().aim_still_time)
 		{
-			const float k = _min(1.f, Device.fTimeDelta * g_gs_aim_speed);
+			const float k = _min(1.f, Device.fTimeDelta * gunsmith::settings().aim_speed);
 			Fvector d = {-s.x * k, -s.y * k, 0.f}, dl;
 			Fmatrix a;
 			a.setHPB(m_gs_aim_rot.x, m_gs_aim_rot.y, m_gs_aim_rot.z);
@@ -1065,7 +997,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, const
 			m_gs_aim_corr.add(dl);
 		}
 		static u32 s_gs_aim_log = 0;
-		if (g_gs_aim_debug && Device.dwTimeGlobal > s_gs_aim_log + 500)
+		if ((g_gs_debug & eGsDebugAim) && Device.dwTimeGlobal > s_gs_aim_log + 500)
 		{
 			s_gs_aim_log = Device.dwTimeGlobal;
 			Msg("- gs_aim: sight [%s] off axis x=%.4f y=%.4f (dist %.3f), correction x=%.4f y=%.4f, aimed=%d idle=%d settled=%d still=%.2fs",
