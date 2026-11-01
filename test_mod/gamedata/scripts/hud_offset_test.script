@@ -1,0 +1,99 @@
+-- hud_offset_test.script: console checks for the per-object HUD offsets (game_object:set_hud_offset,
+-- engine branch feature/hud-offset). With a gun in hand: run_string hud_offset_test.<name>()
+-- (lowercase; the console lowercases what you type). See Gunsmith Docs 04, "HUD offset primitive".
+--   dump()          every slot of the item in hand: SET marks an override; values are the override or the HUD section's
+--   hip()           slot 5 (base_hud_offset): 4 cm right, 3 cm down, rolled; shows at the hip, in sprint and reload
+--   hands()         slot 0 (hands_position/orientation, Weapon Cover Tilt's slot): moves the hands and the gun at once
+--   aim()           slot 1 (aim offset): 1 cm up and rolled while aiming (a Gunsmith gun's sight alignment re-centres x/y)
+--   alt()           slot 3 (alt aim, 3DSS canted irons' slot)
+--   item()          slot 12 (item_position): the gun 3 cm forward in the hands
+--   fire()          slot 10 (fire point): the muzzle flash 10 cm above the barrel
+--   tilt()          slot 0 set every frame for 4 s (a tilt, as Weapon Cover Tilt would do it), then reset
+--   nudge(i, dx, dy, dz, rx, ry, rz)   any slot, relative to its current value
+--   reset(i)        one slot; reset() all of them
+
+local NAMES = { [0] = "hands", "aim", "gl", "alt_aim", "lowered", "base", "attach_base", "attach_mount",
+	"scope_aim", "scope_alt_aim", "fire", "fire2_shell", "item" }
+
+local function held()
+	local w = db.actor and db.actor:active_item()
+	if not w then
+		printf("! hud_offset_test: nothing in hand")
+		return
+	end
+	if not w.set_hud_offset then
+		printf("! hud_offset_test: this exe has no set_hud_offset")
+		return
+	end
+	return w
+end
+
+local function vstr(v)
+	return string.format("%.4f, %.4f, %.4f", v.x, v.y, v.z)
+end
+
+function dump()
+	local w = held()
+	if not w then return end
+	printf("- hud_offset_test: [%s] id %s", w:section(), w:id())
+	for i = 0, 12 do
+		printf("- %2d %-13s %s pos %s  rot %s", i, NAMES[i], w:has_hud_offset(i) and "SET" or "   ",
+			vstr(w:hud_offset_pos(i)), vstr(w:hud_offset_rot(i)))
+	end
+end
+
+function nudge(i, dx, dy, dz, rx, ry, rz)
+	local w = held()
+	if not w then return end
+	local p, r = w:hud_offset_pos(i), w:hud_offset_rot(i)
+	w:set_hud_offset(i,
+		vector():set(p.x + (dx or 0), p.y + (dy or 0), p.z + (dz or 0)),
+		vector():set(r.x + (rx or 0), r.y + (ry or 0), r.z + (rz or 0)))
+	printf("- hud_offset_test: [%s] slot %s (%s) pos %s  rot %s", w:section(), i, NAMES[i],
+		vstr(w:hud_offset_pos(i)), vstr(w:hud_offset_rot(i)))
+end
+
+-- Rotations are in the HUD section's units: radians for slots 1-7, degrees for slots 0 and 12
+function hip()   nudge(5, 0.04, -0.03, 0, 0, 0, 0.15) end
+function hands() nudge(0, 0.03, -0.02, 0, 0, 0, 10) end
+function aim()   nudge(1, 0, 0.01, 0, 0, 0, 0.05) end
+function alt()   nudge(3, 0, 0.01, 0, 0, 0, 0.3) end
+function item()  nudge(12, 0, 0, 0.03, 0, 0, 0) end
+function fire()  nudge(10, 0, 0.1, 0, 0, 0, 0) end
+
+function reset(i)
+	local w = held()
+	if not w then return end
+	if i then
+		w:reset_hud_offset(i)
+	else
+		w:reset_hud_offset()
+	end
+	printf("- hud_offset_test: [%s] reset %s", w:section(), i and ("slot " .. i) or "all slots")
+end
+
+local tilt_id, tilt_start, tilt_pos, tilt_rot
+
+local function tilt_update()
+	local w = tilt_id and level.object_by_id(tilt_id)
+	local t = (time_global() - tilt_start) / 1000
+	if not w or t > 4 then
+		if w then w:reset_hud_offset(0) end
+		tilt_id = nil
+		printf("- hud_offset_test: tilt done")
+		return true
+	end
+	local k = math.sin(t * math.pi * 0.5) -- out, back, the other way, back over 4 s
+	w:set_hud_offset(0,
+		vector():set(tilt_pos.x + 0.03 * k, tilt_pos.y, tilt_pos.z),
+		vector():set(tilt_rot.x, tilt_rot.y, tilt_rot.z + 20 * k))
+end
+
+function tilt()
+	local w = held()
+	if not w then return end
+	w:reset_hud_offset(0)
+	tilt_id, tilt_start = w:id(), time_global()
+	tilt_pos, tilt_rot = w:hud_offset_pos(0), w:hud_offset_rot(0)
+	AddUniqueCall(tilt_update)
+end
