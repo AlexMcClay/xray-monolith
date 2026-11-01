@@ -317,29 +317,6 @@ public:
 private:
 	SPickParam PP;
 
-	// Gunsmith: sounds timed to the HUD motion. The HUD section's gs_snd_<anm> lists "fraction of the motion,
-	// file[|another file]" pairs; when that motion starts on the actor's HUD, the item's own state sounds (snd_reload,
-	// snd_draw, ...) stop and these play in 2D at their times, scaled to the motion's actual length (so a faster
-	// reload keeps them in step). A motion with the key replaces the pending sounds of the last; leaving the HUD
-	// drops them.
-	struct SGsSndEvent
-	{
-		float at;
-		xr_vector<shared_str> files;
-	};
-	xr_vector<SGsSndEvent> m_gs_snd;
-	u32 m_gs_snd_start = 0;
-	u32 m_gs_snd_length = 0;
-	u32 m_gs_snd_next = 0;
-	xr_map<shared_str, ref_sound> m_gs_snd_cache;
-	void gs_snd_start(const shared_str& anm, u32 length);
-	void gs_snd_update();
-
-protected:
-	// the HUD section times its own sounds for this motion (gs_snd_<anm>), on the actor's HUD: the item's vanilla
-	// sound for it isn't started (a non-exclusive one can't be stopped once playing)
-	bool gs_snd_covers(LPCSTR anm) const;
-
 public:
 	virtual void OnFrame();
 	void net_Relcase(CObject* O);
