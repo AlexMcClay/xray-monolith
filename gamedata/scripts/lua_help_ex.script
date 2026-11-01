@@ -1207,6 +1207,8 @@
         bool gs_attach(game_object item, number parent, number slot) -- moves an inventory item into the tree; addon slots go through the weapon's own attach
         number gs_detach(number node, bool spawn) -- removes the part and its children; with spawn each becomes an inventory item. Returns the first item's id, -1 when no item was spawned, nil on failure. Fails with spawn when a part has no class key (not an item). A plain part item (II_ATTCH) with parts mounted on it comes off as one item carrying them; gs_attach of such an item puts them all back
         table gs_get_stats()
+        void set_fire_blocked(bool) -- weapons: the trigger only clicks (player and NPCs) until unset; not saved. The Gunsmith Framework blocks a gun with a required slot empty
+        bool fire_blocked()
         callbacks (see gunsmith_callbacks.script): on_gs_part_attached(weapon, node, section), on_gs_part_detached(weapon, section, item_id), on_gs_part_failed(weapon, node, failure_type), weapon_on_shot(weapon, owner, t) (any weapon, before every shot: t.condition, rounds_left, magazine_size, ammo; set t.handled and t.wear, t.malfunction, t.node)
     }
 
