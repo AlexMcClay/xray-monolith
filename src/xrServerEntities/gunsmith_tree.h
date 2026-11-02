@@ -125,7 +125,6 @@ namespace gunsmith
 				touch_layout();
 			}
 		}
-		bool is_part_root() const { return m_part_root; }
 
 		// Copies node `node` and everything mounted on it into `out`, re-rooted so
 		// that part is node 0 (a part-root tree).

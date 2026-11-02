@@ -55,7 +55,6 @@ private:
 
 	IKinematics* m_arm = nullptr;
 	bool m_ok = false;
-	bool m_left = false;
 	SBone m_upper, m_fore, m_hand;
 	SBone m_twist; // the forearm twist bone (optional)
 	SBone m_fingers[eFingers];

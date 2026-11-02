@@ -92,7 +92,6 @@ bool CHudHandIK::hook(SBone& b, LPCSTR name)
 void CHudHandIK::init(IKinematics* arm, bool left)
 {
 	m_arm = arm;
-	m_left = left;
 	m_ok = false;
 	m_any = false;
 	m_upper = m_fore = m_hand = m_twist = SBone();
