@@ -168,6 +168,9 @@ namespace gunsmith
 			}
 			d.beam[CVisuals::eWorld] = load_beam(zd.beam_visual, false);
 			d.beam[CVisuals::eHud] = load_beam(zd.beam_visual, true);
+			if (pv.laser_section.size() && pSettings->line_exist(pv.laser_section, "range"))
+				d.laser_range = pSettings->r_float(pv.laser_section, "range");
+			d.beam_hud_length = zd.beam_hud_length;
 		}
 	}
 
@@ -293,13 +296,9 @@ namespace gunsmith
 					Device.hud_to_world(wp, *hud_proj);
 					Device.hud_to_world_dir(wd, *hud_proj).normalize_safe();
 				}
-				SLightDesc zd;
-				zd.range = 300.f;
-				if (pv.laser_section.size() && pSettings->line_exist(pv.laser_section, "range"))
-					zd.range = pSettings->r_float(pv.laser_section, "range");
 				collide::rq_result R;
-				float dist = zd.range;
-				const bool hit = Level().ObjectSpace.RayPick(wp, wd, zd.range, collide::rqtBoth, R, ignore) && R.range > 0.f;
+				float dist = d.laser_range;
+				const bool hit = Level().ObjectSpace.RayPick(wp, wd, d.laser_range, collide::rqtBoth, R, ignore) && R.range > 0.f;
 				if (hit)
 				{
 					dist = R.range;
@@ -329,12 +328,7 @@ namespace gunsmith
 				{
 					float len = dist;
 					if (hud)
-					{
-						float hud_len = 4.f;
-						if (pv.laser_section.size() && pSettings->line_exist(pv.laser_section, "beam_hud_length"))
-							hud_len = pSettings->r_float(pv.laser_section, "beam_hud_length");
-						len = _min(len, hud_len);
-					}
+						len = _min(len, d.beam_hud_length);
 					Fmatrix at = M;
 					at.c = p;
 					const float k = _max(M.k.magnitude(), 0.0001f); // the part's own scale along the bore

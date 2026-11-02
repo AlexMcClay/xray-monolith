@@ -73,6 +73,8 @@ namespace gunsmith
 			ref_light dot;
 			ref_glow dot_glow;
 			IRenderVisual* beam[2] = { nullptr, nullptr }; // world, HUD
+			float laser_range = 300.f; // the laser section's range (not light range's r2 variant)
+			float beam_hud_length = 4.f;
 			Fmatrix beam_xform;
 			int beam_ctx = -1; // the context the beam was placed for this frame, -1 none
 		};
