@@ -202,7 +202,6 @@ namespace gunsmith
 		a.magnification_min = 0.f;
 		a.has_eye = false;
 		a.eye.set(0.f, 0.f, 0.f);
-		a.eye_offset = 0.f;
 		if (s == 0)
 		{
 			a.point = pv.aim_point;
@@ -223,7 +222,6 @@ namespace gunsmith
 			// reticle is sized for (Shader 3D Scopes' reticle size depends on the eye's distance to the lens)
 			a.has_eye = pv.has_eye && (a.optic() || pv.is_optic());
 			a.eye = pv.eye_point;
-			a.eye_offset = pv.eye_offset;
 		}
 		else
 		{
@@ -283,14 +281,6 @@ namespace gunsmith
 			if (bone == BI_NONE)
 				bone = K->LL_GetBoneRoot();
 		}
-	}
-
-	bool mount_resolves(IKinematics* model, LPCSTR name, LPCSTR section, LPCSTR section2)
-	{
-		Fmatrix m;
-		if (model && model->LL_BoneID(name) != BI_NONE)
-			return true;
-		return read_virtual_mount(section, name, m) || read_virtual_mount(section2, name, m);
 	}
 
 	void CVisuals::clear()
@@ -669,7 +659,7 @@ namespace gunsmith
 		return !sight || (sight->pv->aim_priority <= 0 && !aim_of(*sight).optic());
 	}
 
-	bool CVisuals::sight_point(IKinematics* root, Fvector& point, shared_str& key)
+	bool CVisuals::sight_point(IKinematics* root, Fvector& point, SSightKey& key)
 	{
 		SContext& c = m_ctx[eHud];
 		if (c.children.empty() || c.root != root)
@@ -679,7 +669,8 @@ namespace gunsmith
 		{
 			// the receiver's own sight line (a shotgun's bead over its receiver, the UMP's and AK-12's irons)
 			root->LL_GetTransform_R(c.root_aim_bone).transform_tiny(point, c.root_aim);
-			key = "receiver";
+			key = SSightKey();
+			key.node = 0;
 			return true;
 		}
 		if (!sight)
@@ -688,10 +679,9 @@ namespace gunsmith
 		const SSightAim aim = aim_of(*sight);
 		sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(point, aim.point);
 		sight->local.transform_tiny(point);
-		string256 k;
-		xr_sprintf(k, "%u:%s:%u", u32(sight->node), c.sig[sight->node].section.c_str(),
-				   u32(sight->node == m_sight_node ? m_sight_mode : 0));
-		key = k;
+		key.node = sight->node;
+		key.section = c.sig[sight->node].section;
+		key.mode = sight->node == m_sight_node ? m_sight_mode : 0;
 		return true;
 	}
 
@@ -758,23 +748,5 @@ namespace gunsmith
 			has_eye = true;
 		}
 		return sight->pv;
-	}
-
-	bool CVisuals::aim_delta(IKinematics* root, Fvector& delta)
-	{
-		SContext& c = m_ctx[eHud];
-		if (!c.has_root_aim || c.children.empty() || c.root != root)
-			return false;
-		const SChild* sight = pick_sight(c);
-		if (!sight)
-			return false;
-		update_local(c, root);
-
-		Fvector receiver_aim, sight_aim;
-		root->LL_GetTransform_R(c.root_aim_bone).transform_tiny(receiver_aim, c.root_aim);
-		sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(sight_aim, sight->pv->aim_point);
-		sight->local.transform_tiny(sight_aim);
-		delta.sub(receiver_aim, sight_aim);
-		return true;
 	}
 }

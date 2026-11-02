@@ -6,40 +6,18 @@
 
 #include "stdafx.h"
 #include "Weapon.h"
-#include "ParticlesObject.h"
-#include "entity_alive.h"
-#include "inventory_item_impl.h"
 #include "inventory.h"
 #include "xrserver_objects_alife_items.h"
 #include "actor.h"
-#include "../xrEngine/CameraBase.h"
-#include "actoreffector.h"
 #include "level.h"
-#include "xr_level_controller.h"
-#include "game_cl_base.h"
 #include "../Include/xrRender/Kinematics.h"
 #include "ai_object_location.h"
-#include "../xrphysics/mathutils.h"
-#include "object_broker.h"
 #include "player_hud.h"
 #include "gamepersistent.h"
-#include "effectorFall.h"
-#include "debug_renderer.h"
-#include "static_cast_checked.hpp"
 #include "clsid_game.h"
-#include "weaponBinocularsVision.h"
-#include "ui/UIWindow.h"
-#include "ui/UIXmlInit.h"
-#include "Torch.h"
-#include "../xrCore/vector.h"
-#include "ActorNightVision.h"
-#include "HUDManager.h"
 #include "WeaponMagazinedWGrenade.h"
-#include "../xrEngine/GameMtlLib.h"
-#include "../Layers/xrRender/xrRender_console.h"
 #include "pch_script.h"
 #include "script_game_object.h"
-#include "ai/stalker/ai_stalker.h"
 #include "xrServer.h"
 #include "game_sv_base.h"
 #include "alife_simulator.h"
@@ -1053,7 +1031,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 		return;
 
 	Fvector sight;
-	shared_str key;
+	gunsmith::CVisuals::SSightKey key;
 	if (m_gs_visuals.sight_point(hi->m_model, sight, key))
 	{
 		Fmatrix cam_inv;
@@ -1111,7 +1089,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 					turned.getHPB(m_gs_aim_rot);
 				}
 				if (g_gs_debug & eGsDebugAim)
-					Msg("- gs_aim: sight [%s] line %.2f deg off the view, roll %.2f deg%s", key.c_str(),
+					Msg("- gs_aim: sight [%s] line %.2f deg off the view, roll %.2f deg%s", key.name(),
 						rad2deg(turn), rad2deg(roll), turn < turn_max ? "" : " (too far: not turned)");
 			}
 			// Where the sight lands with that rotation and no position correction (camera space).
@@ -1136,7 +1114,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 			a_inv.transform_dir(m_gs_aim_corr, d);
 			if (g_gs_debug & eGsDebugAim)
 				Msg("- gs_aim: sight [%s] predicted off axis x=%.4f y=%.4f, eye z correction %.4f",
-					key.c_str(), s.x, s.y, d.z);
+					key.name(), s.x, s.y, d.z);
 		}
 		curr_aim_rot.set(m_gs_aim_rot);
 		curr_offs.x += m_gs_aim_corr.x;
@@ -1177,7 +1155,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 		{
 			s_gs_aim_log = Device.dwTimeGlobal;
 			Msg("- gs_aim: sight [%s] off axis x=%.4f y=%.4f (dist %.3f), correction x=%.4f y=%.4f, aimed=%d idle=%d settled=%d still=%.2fs",
-				key.c_str(), s.x, s.y, s.z, m_gs_aim_corr.x, m_gs_aim_corr.y, aimed, idle, settled, m_gs_aim_still);
+				key.name(), s.x, s.y, s.z, m_gs_aim_corr.x, m_gs_aim_corr.y, aimed, idle, settled, m_gs_aim_still);
 		}
 	}
 }

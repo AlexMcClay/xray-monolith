@@ -151,7 +151,7 @@ protected:
 	// right on the first aim), then refined while aiming steadily.
 	Fvector m_gs_aim_corr = { 0.f, 0.f, 0.f };
 	float m_gs_aim_still = 0.f; // seconds the camera has been still (aim refinement waits for it)
-	shared_str m_gs_aim_sight;
+	gunsmith::CVisuals::SSightKey m_gs_aim_sight;
 	// The aim rotation (H, P, B) that lays the sight's line along the view: the sight's pitch and yaw
 	// off the camera axis and, from aim_roll_min degrees, its roll (a canted sight). Predicted with m_gs_aim_corr.
 	Fvector m_gs_aim_rot = { 0.f, 0.f, 0.f };

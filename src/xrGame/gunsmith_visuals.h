@@ -82,7 +82,6 @@ namespace gunsmith
 		Fvector point, fwd, up;
 		bool has_eye;
 		Fvector eye;
-		float eye_offset;
 		float magnification, magnification_min, zoom_factor;
 		u32 zoom_steps;
 		shared_str scope_texture;
@@ -104,10 +103,6 @@ namespace gunsmith
 	// not at true scale). Keys: see the Gunsmith config reference.
 	// False when the section has neither pos nor rot.
 	bool read_virtual_mount(LPCSTR section, LPCSTR name, Fmatrix& out, shared_str* bone = nullptr);
-
-	// Whether a slot's mount resolves on a model: a real bone, or a virtual mount on one of
-	// the sections (either may be null).
-	bool mount_resolves(IKinematics* model, LPCSTR name, LPCSTR section, LPCSTR section2);
 
 	// The child models of one weapon. Two contexts: the world model and the HUD model.
 	// A context is rebuilt when the tree's layout (sections, parents, slots) or the root
@@ -138,13 +133,18 @@ namespace gunsmith
 		// Where shots leave the gun: the fire point of the last muzzle-chain part, if any.
 		bool fire_point(int ctx, IKinematics* root, const Fmatrix& root_xform, Fvector& pos);
 
-		// HUD: the receiver's aim point minus the fitted sight's aim point, in the receiver
-		// model's space. False without a receiver aim point or a sight part.
-		bool aim_delta(IKinematics* root, Fvector& delta);
-
+		// Which sight sight_point measured: its node (0 for the receiver's own sight line), section and mode.
+		struct SSightKey
+		{
+			u8 node = 0xff;
+			shared_str section;
+			u8 mode = 0;
+			bool operator!=(const SSightKey& o) const { return node != o.node || section != o.section || mode != o.mode; }
+			LPCSTR name() const { return node == 0 ? "receiver" : section.c_str(); } // for logs
+		};
 		// HUD: the fitted sight's aim point in the receiver model's space, and a key that changes
 		// when a different sight (or the same sight elsewhere) is fitted.
-		bool sight_point(IKinematics* root, Fvector& point, shared_str& key);
+		bool sight_point(IKinematics* root, Fvector& point, SSightKey& key);
 
 		// HUD: the fitted sight's line (aim_dir: forward and up, unit) in the receiver model's space.
 		bool sight_dir(IKinematics* root, Fvector& fwd, Fvector& up);
@@ -172,8 +172,6 @@ namespace gunsmith
 		};
 		void slot_points(int ctx, IKinematics* root, const CTree& tree, LPCSTR receiver, LPCSTR hud_sect,
 						 xr_vector<SSlotPoint>& out);
-
-		bool has_children(int ctx) const { return !m_ctx[ctx].children.empty(); }
 
 	private:
 		struct SChild
