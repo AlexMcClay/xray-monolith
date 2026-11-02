@@ -111,6 +111,16 @@ namespace gunsmith
 		// True when a part already in the tree lists this slot section in its blocks_slots.
 		bool is_slot_blocked(const shared_str& slot_section) const;
 
+		// The section of a fitted part that can't share the gun with `part` (`conflicts`, checked both ways), or
+		// nullptr. Parts in the subtree of node `ignore` (a part being replaced) don't count; -1: none.
+		LPCSTR conflict_for(LPCSTR part, int ignore = -1) const;
+
+		// True when `part` lists in its blocks_slots a slot that is filled (outside node `ignore`'s subtree).
+		bool blocks_filled_slot(LPCSTR part, int ignore = -1) const;
+
+		// Node `index` is `root` or one of its descendants.
+		bool in_subtree(u32 index, u32 root) const;
+
 		// Every required slot of every node is filled.
 		bool required_slots_filled() const;
 

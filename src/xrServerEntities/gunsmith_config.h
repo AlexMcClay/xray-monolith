@@ -136,6 +136,11 @@ namespace gunsmith
 		float legacy_weight, legacy_cost; // item inv_weight / cost
 
 		xr_vector<shared_str> blocks_slots;
+		// `conflicts`: tags of parts that can't be on the same gun as this one (any tag: a part's own section is
+		// one, as are a pack's tags). Checked both ways: either part listing the other is enough.
+		xr_vector<shared_str> conflicts;
+		xr_vector<shared_str> tags; // `tags`, read once (the conflict check compares them)
+		shared_str parent_section; // `parent_section` (a weapon variant's base gun): a conflict naming the base gun covers it
 
 		// Need part_kind set:
 		bool suppressor; // `suppressor = true`: the gun is suppressed while this part is fitted, as with a silencer addon

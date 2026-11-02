@@ -435,6 +435,12 @@ LPCSTR CWeapon::gs_check_place(const gunsmith::CTree& tree, LPCSTR section, u8 p
 		return "slot_taken";
 	if (tree.is_slot_blocked(slots[slot].section))
 		return "slot_blocked";
+	// both ways: a fitted part blocking this slot (above), or this part blocking a slot that is in use
+	if (tree.blocks_filled_slot(section))
+		return "blocks_filled_slot";
+	// `conflicts`: either part naming a tag of the other
+	if (tree.conflict_for(section))
+		return "conflict";
 
 	LPCSTR receiver = tree.node(0).section.c_str();
 	const u8 legacy = slots[slot].legacy_addon;

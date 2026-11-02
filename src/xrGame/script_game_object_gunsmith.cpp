@@ -196,12 +196,13 @@ int gs_fit_verdict_script(CScriptGameObject* self, LPCSTR section)
 			if (slot.legacy_addon != gunsmith::eLegacyNone || !gunsmith::part_fits_slot(section, slot, receiver, true))
 				continue;
 			bool ok;
+			const int occupant = tree->find_in_slot(u8(i), u8(s));
 			if (tree->is_slot_blocked(slot.section))
 				ok = false;
-			else if (weapon && tree->find_in_slot(u8(i), u8(s)) < 0)
+			else if (weapon && occupant < 0)
 				ok = !*weapon->gs_check_place(*tree, section, u8(i), u8(s), false); // the rules gs_can_attach applies
-			else
-				ok = true;
+			else // in place of the part there: no conflict or blocked slot with what stays on the gun
+				ok = !tree->conflict_for(section, occupant) && !tree->blocks_filled_slot(section, occupant);
 			if (ok)
 				return 2;
 			best = 1;

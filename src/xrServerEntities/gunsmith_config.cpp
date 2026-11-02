@@ -348,6 +348,9 @@ namespace gunsmith
 				d.legacy_weight = READ_IF_EXISTS(pSettings, r_float, section, "inv_weight", 0.f);
 				d.legacy_cost = READ_IF_EXISTS(pSettings, r_float, section, "cost", 0.f);
 				read_list(section, "blocks_slots", d.blocks_slots);
+				read_list(section, "conflicts", d.conflicts);
+				read_list(section, "tags", d.tags);
+				d.parent_section = READ_IF_EXISTS(pSettings, r_string, section, "parent_section", "");
 			}
 
 			d.suppressor = exists && d.declared && !!READ_IF_EXISTS(pSettings, r_bool, section, "suppressor", FALSE);

@@ -184,8 +184,44 @@ namespace gunsmith
 		return false;
 	}
 
+	namespace
+	{
+		bool lists_any(const xr_vector<shared_str>& list, const xr_vector<shared_str>& tags)
+		{
+			for (const shared_str& l : list)
+				for (const shared_str& t : tags)
+					if (l == t)
+						return true;
+			return false;
+		}
+
+		bool lists(const xr_vector<shared_str>& list, const shared_str& name)
+		{
+			for (const shared_str& l : list)
+				if (l == name)
+					return true;
+			return false;
+		}
+
+		// `conflicts` names a part when it names one of its tags, its section, or (a weapon variant) its
+		// parent_section: a conflict with a gun covers the gun's variants too.
+		bool names_part(const xr_vector<shared_str>& conflicts, const shared_str& section, const SPartData& d)
+		{
+			return !conflicts.empty() && (lists_any(conflicts, d.tags) || lists(conflicts, section) ||
+				(d.parent_section.size() && lists(conflicts, d.parent_section)));
+		}
+
+		// Two parts (or a part and the gun, node 0) conflict when either one's `conflicts` names the other.
+		bool parts_conflict(const shared_str& sa, const SPartData& a, const shared_str& sb, const SPartData& b)
+		{
+			return names_part(a.conflicts, sb, b) || names_part(b.conflicts, sa, a);
+		}
+	}
+
 	int CTree::place_in_free_slot(LPCSTR part)
 	{
+		if (conflict_for(part) || blocks_filled_slot(part))
+			return -1;
 		for (u32 i = 0; i < m_nodes.size(); ++i)
 		{
 			const SLOTS& slots = node_slots(u8(i));
@@ -248,7 +284,8 @@ namespace gunsmith
 							if (!xr_strcmp(slots[s].mount_bone.c_str(), slot_str))
 								slot = int(s);
 					if (pSettings->section_exist(part) && slot >= 0 && slot < int(slots.size()) &&
-						find_in_slot(u8(parent), u8(slot)) < 0 && part_fits_slot(part, slots[slot], receiver, false))
+						find_in_slot(u8(parent), u8(slot)) < 0 && !is_slot_blocked(slots[slot].section) &&
+						part_fits_slot(part, slots[slot], receiver, false) && !conflict_for(part) && !blocks_filled_slot(part))
 						added = add_node(part, u8(parent), u8(slot));
 				}
 				else if (pSettings->section_exist(part))
@@ -307,6 +344,33 @@ namespace gunsmith
 				}
 				else if (find_in_slot(n.parent, n.slot) != int(i))
 					reason = "its slot is already taken";
+			}
+
+			// A part that conflicts with one fitted before it, or sits in a slot an earlier part blocks, goes (the
+			// earlier part wins, as when attaching): an old save, or carried parts grafted onto a gun.
+			string256 why;
+			if (!reason)
+			{
+				const SPartData& p = part_data(n.section);
+				const SLOTS& slots = node_slots(n.parent);
+				const shared_str slot_sec = n.slot < slots.size() ? slots[n.slot].section : shared_str();
+				for (u32 j = 0; j < i && !reason; ++j) // node 0 too: the gun itself
+				{
+					const SPartData& q = part_data(m_nodes[j].section);
+					if (parts_conflict(n.section, p, m_nodes[j].section, q))
+					{
+						xr_sprintf(why, "it conflicts with [%s]", m_nodes[j].section.c_str());
+						reason = why;
+					}
+					else if (slot_sec.size())
+						for (const shared_str& b : q.blocks_slots)
+							if (b == slot_sec)
+							{
+								xr_sprintf(why, "[%s] blocks its slot", m_nodes[j].section.c_str());
+								reason = why;
+								break;
+							}
+				}
 			}
 
 			if (reason)
@@ -427,6 +491,49 @@ namespace gunsmith
 			for (const shared_str& blocked : part_data(m_nodes[i].section).blocks_slots)
 				if (blocked == slot_section)
 					return true;
+		return false;
+	}
+
+	bool CTree::in_subtree(u32 index, u32 root) const
+	{
+		// Parents always come before their children.
+		while (index > root && index < m_nodes.size())
+			index = m_nodes[index].parent;
+		return index == root;
+	}
+
+	LPCSTR CTree::conflict_for(LPCSTR part, int ignore) const
+	{
+		const shared_str sec(part);
+		const SPartData& p = part_data(sec);
+		for (u32 i = 0; i < m_nodes.size(); ++i) // node 0 too: a part can conflict with the gun itself
+		{
+			if (ignore >= 0 && in_subtree(i, u32(ignore)))
+				continue;
+			if (parts_conflict(sec, p, m_nodes[i].section, part_data(m_nodes[i].section)))
+				return m_nodes[i].section.c_str();
+		}
+		return nullptr;
+	}
+
+	bool CTree::blocks_filled_slot(LPCSTR part, int ignore) const
+	{
+		const SPartData& p = part_data(part);
+		if (p.blocks_slots.empty())
+			return false;
+		for (u32 i = 0; i < m_nodes.size(); ++i)
+		{
+			const SLOTS& slots = node_slots(u8(i));
+			for (u32 s = 0; s < slots.size(); ++s)
+			{
+				const int occ = find_in_slot(u8(i), u8(s));
+				if (occ < 0 || (ignore >= 0 && in_subtree(u32(occ), u32(ignore))))
+					continue;
+				for (const shared_str& b : p.blocks_slots)
+					if (b == slots[s].section)
+						return true;
+			}
+		}
 		return false;
 	}
 
