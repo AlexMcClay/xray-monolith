@@ -415,10 +415,7 @@ namespace gunsmith
 				s.optic_base_fov = READ_IF_EXISTS(pSettings, r_float, sect, "optic_base_fov", 45.f);
 				s.aim_roll_min = READ_IF_EXISTS(pSettings, r_float, sect, "aim_roll_min", 1.f);
 				s.aim_turn_max = READ_IF_EXISTS(pSettings, r_float, sect, "aim_turn_max", 20.f);
-				s.aim_still_turn = READ_IF_EXISTS(pSettings, r_float, sect, "aim_still_turn", 0.1f);
-				s.aim_still_move = READ_IF_EXISTS(pSettings, r_float, sect, "aim_still_move", 0.3f);
-				s.aim_still_time = READ_IF_EXISTS(pSettings, r_float, sect, "aim_still_time", 0.25f);
-				s.aim_speed = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "aim_speed", 6.f), 0.5f, 30.f);
+				s.aim_speed = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "aim_speed", 20.f), 0.5f, 60.f);
 				loaded = true;
 			}
 			return s;

@@ -157,12 +157,11 @@ namespace gunsmith
 		// The camera FOV (degrees) that counts as 1x for optic parts' `magnification` (45: a 4x scope
 		// zooms about as far as vanilla's PSO). The player's own FOV when that is narrower.
 		float optic_base_fov;
-		// Aiming through a part's sight: the sight's roll is corrected from
-		// aim_roll_min degrees (1), and its line turned onto the view only when it is less than aim_turn_max
-		// degrees off (20; more is bad data). The correction is refined while the camera turns slower than
-		// aim_still_turn rad/s (0.1) and moves slower than aim_still_move m/s (0.3) for aim_still_time s (0.25),
-		// by aim_speed of the remaining error per second (6).
-		float aim_roll_min, aim_turn_max, aim_still_turn, aim_still_move, aim_still_time, aim_speed;
+		// Aiming through a part's sight: the sight's roll is corrected from aim_roll_min degrees (1), and its
+		// line turned onto the view only when it is less than aim_turn_max degrees off (20; further, the gun isn't
+		// in an aiming pose, or the data is bad). The correction follows its target by aim_speed of the remaining
+		// difference per second while the gun is idle (20).
+		float aim_roll_min, aim_turn_max, aim_speed;
 	};
 
 	const SSettings& settings();

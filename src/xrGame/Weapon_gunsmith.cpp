@@ -1019,149 +1019,138 @@ void CWeaponMagazinedWGrenade::gs_apply_mag_size(int size, bool live)
 
 // Aiming through the fitted sight part. Called from UpdateHudAdditional with its camera, its aim offset index
 // and the aim offset it is about to apply (position, rotation, aim rotation); corrects the position and aim
-// rotation so the sight's aim point stays on the camera's axis (where the screen centre and a collimator's dot
-// are). When a sight is first aimed through, the correction is computed for the pose the HUD is moving to, from
-// where the sight sits in the hands now, so it is right on the first aim; then it is refined while aiming
-// steadily. An optic with aim_eye_point also gets its eye relief (z).
+// rotation so the sight's aim point sits on the camera's axis (where the screen centre and a collimator's dot
+// are) with its line along the view. The target is worked out every frame for the gun as the hands' animation
+// holds it, without what the HUD adds on top (shooting shake, strafe, inertia, near-wall, movement and script
+// layers), which move the sight off the axis on purpose. A new sight takes its target at once; then the
+// correction follows the target at aim_speed while the gun is idle and in an aiming pose, and holds while it
+// fires, reloads or is lowered. An optic with aim_eye_point also gets its eye relief (z).
 void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 idx,
 	Fvector& curr_offs, const Fvector& curr_rot, Fvector& curr_aim_rot)
 {
-	// The camera m_item_transform was built with (it is updated after this call).
-	const Fmatrix gs_prev_cam = m_gs_prev_cam;
-	const bool gs_prev_cam_ok = m_gs_prev_cam_ok;
-	m_gs_prev_cam = trans;
-	m_gs_prev_cam_ok = true;
+	const bool placed = m_gs_hud_placed;
+	m_gs_hud_placed = true;
 
-	// Only aiming (offset index 1) a full-mode gun without modular attachments.
-	if (!(idx == 1 && !m_modular_attachments && m_gs_full_mode))
+	// Only aiming (offset index 1) a full-mode gun without modular attachments, in the main hand.
+	if (!(idx == 1 && !m_modular_attachments && m_gs_full_mode) || !placed || hi != g_player_hud->attached_item(0))
 		return;
 
 	Fvector sight;
 	gunsmith::CVisuals::SSightKey key;
-	if (m_gs_visuals.sight_point(hi->m_model, sight, key))
+	if (!m_gs_visuals.sight_point(hi->m_model, sight, key))
+		return;
+
+	// The receiver in the aim offset's frame as the animation holds it (last frame's pose): the hands' offset
+	// times the animated anchor bone and the item's offset. player_hud's m_transform is the camera with all the
+	// HUD's offsets (this one, shake, strafe, inertia, near-wall), the hands' offset and the movement and script
+	// layers; m_item_transform is m_transform times the anchor and the item's offset.
+	Fmatrix hands;
 	{
+		Fmatrix t_inv;
+		t_inv.invert(g_player_hud->m_transform);
+		hands.mul_43(g_player_hud->m_attach_offset, t_inv);
+		hands.mulB_43(hi->m_item_transform);
+	}
+
+	// The aim offset as UpdateHudAdditional applies it: aim_rot, then (pos, rot Z*Y*X).
+	auto offset_xform = [](const Fvector& aim_rot, const Fvector& rot, const Fvector& pos) {
+		Fmatrix a, r, t;
+		a.identity();
+		a.setHPB(aim_rot.x, aim_rot.y, aim_rot.z);
+		r.identity();
+		r.rotateX(rot.x);
+		t.identity();
+		t.rotateY(rot.y);
+		r.mulA_43(t);
+		t.identity();
+		t.rotateZ(rot.z);
+		r.mulA_43(t);
+		r.translate_over(pos);
+		Fmatrix m;
+		m.mul_43(a, r);
+		return m;
+	};
+
+	const bool new_sight = key != m_gs_aim_sight;
+	// The target aim rotation: the sight line at the aim offset turned onto the view (pitch, yaw; roll from
+	// aim_roll_min), applied first in camera space. A line further off than aim_turn_max: the gun isn't in an
+	// aiming pose (lowered, reloading) or the data is bad, so nothing follows it.
+	Fvector rot_t = new_sight ? curr_aim_rot : m_gs_aim_rot;
+	bool aiming_pose = true;
+	float turn = 0.f, roll = 0.f;
+	Fmatrix aimed;
+	aimed.mul_43(offset_xform(curr_aim_rot, curr_rot, curr_offs), hands);
+	Fvector fwd, up;
+	if (m_gs_visuals.sight_dir(hi->m_model, fwd, up))
+	{
+		Fvector f, u;
+		aimed.transform_dir(f, fwd);
+		aimed.transform_dir(u, up);
+		f.normalize_safe();
+		u.normalize_safe();
+		Fmatrix line, base, turned;
+		gs_sight_line_rotation(f, u, line, turn, roll);
+		aiming_pose = turn < deg2rad(gunsmith::settings().aim_turn_max);
+		if (aiming_pose)
+		{
+			base.setHPB(curr_aim_rot.x, curr_aim_rot.y, curr_aim_rot.z);
+			turned.mul_43(line, base);
+			turned.getHPB(rot_t);
+		}
+	}
+
+	// The target position correction: where the sight lands with that rotation and no correction (camera space),
+	// moved onto the axis, and an optic's eye to its eye relief; expressed inside the aim rotation, where the
+	// offset's position is applied.
+	aimed.mul_43(offset_xform(rot_t, curr_rot, curr_offs), hands);
+	Fvector s;
+	aimed.transform_tiny(s, sight);
+	Fvector d = {-s.x, -s.y, 0.f};
+	Fvector eye;
+	bool has_eye;
+	const gunsmith::SPartVisual* pv = m_gs_visuals.sight_eye(hi->m_model, eye, has_eye);
+	if (pv && pv->is_optic() && has_eye)
+	{
+		aimed.transform_tiny(eye);
+		d.z = pv->eye_offset - eye.z;
+	}
+	Fmatrix a, a_inv;
+	a.setHPB(rot_t.x, rot_t.y, rot_t.z);
+	a_inv.invert(a);
+	Fvector corr_t;
+	a_inv.transform_dir(corr_t, d);
+
+	if (new_sight)
+	{
+		m_gs_aim_sight = key;
+		m_gs_aim_rot.set(rot_t);
+		m_gs_aim_corr.set(corr_t);
+	}
+	else if (aiming_pose && GetState() == eIdle)
+	{
+		const float k = _min(1.f, Device.fTimeDelta * gunsmith::settings().aim_speed);
+		m_gs_aim_corr.lerp(m_gs_aim_corr, corr_t, k);
+		m_gs_aim_rot.x += angle_normalize_signed(rot_t.x - m_gs_aim_rot.x) * k;
+		m_gs_aim_rot.y += angle_normalize_signed(rot_t.y - m_gs_aim_rot.y) * k;
+		m_gs_aim_rot.z += angle_normalize_signed(rot_t.z - m_gs_aim_rot.z) * k;
+	}
+	curr_aim_rot.set(m_gs_aim_rot);
+	curr_offs.add(m_gs_aim_corr);
+
+	static u32 s_gs_aim_log = 0;
+	if ((g_gs_debug & eGsDebugAim) && (new_sight || Device.dwTimeGlobal > s_gs_aim_log + 500))
+	{
+		s_gs_aim_log = Device.dwTimeGlobal;
+		// where the sight is now, with everything the HUD adds (camera space: x right, y up, z forward)
 		Fmatrix cam_inv;
 		cam_inv.invert(trans);
-		if (key != m_gs_aim_sight && gs_prev_cam_ok)
-		{
-			m_gs_aim_sight = key;
-			m_gs_aim_corr.set(0.f, 0.f, 0.f);
-			m_gs_aim_rot.set(curr_aim_rot);
-
-			// The HUD offset as this function applies it: aim_rot, then (pos, rot Z*Y*X).
-			auto offset_xform = [](const Fvector& aim_rot, const Fvector& rot, const Fvector& pos) {
-				Fmatrix a, r, t;
-				a.identity();
-				a.setHPB(aim_rot.x, aim_rot.y, aim_rot.z);
-				r.identity();
-				r.rotateX(rot.x);
-				t.identity();
-				t.rotateY(rot.y);
-				r.mulA_43(t);
-				t.identity();
-				t.rotateZ(rot.z);
-				r.mulA_43(t);
-				r.translate_over(pos);
-				Fmatrix m;
-				m.mul_43(a, r);
-				return m;
-			};
-			// The receiver in the hands' frame, from last frame's pose: (cam * offset)^-1 * item.
-			Fmatrix prev_inv, off_inv, hands;
-			prev_inv.invert(gs_prev_cam);
-			off_inv.invert(offset_xform(m_hud_aim_rot, m_hud_offset[1], m_hud_offset[0]));
-			hands.mul_43(prev_inv, hi->m_item_transform);
-			hands.mulA_43(off_inv);
-			// The sight line at the aim offset: turned onto the view (pitch, yaw; roll from aim_roll_min)
-			// by an aim rotation, applied first in camera space.
-			Fmatrix aimed;
-			aimed.mul_43(offset_xform(curr_aim_rot, curr_rot, curr_offs), hands);
-			Fvector fwd, up;
-			if (m_gs_visuals.sight_dir(hi->m_model, fwd, up))
-			{
-				Fvector f, u;
-				aimed.transform_dir(f, fwd);
-				aimed.transform_dir(u, up);
-				f.normalize_safe();
-				u.normalize_safe();
-				Fmatrix line, base, turned;
-				float turn, roll;
-				gs_sight_line_rotation(f, u, line, turn, roll);
-				const float turn_max = deg2rad(gunsmith::settings().aim_turn_max);
-				if (turn < turn_max) // larger: bad data, not a sight line worth turning the gun to
-				{
-					base.setHPB(curr_aim_rot.x, curr_aim_rot.y, curr_aim_rot.z);
-					turned.mul_43(line, base);
-					turned.getHPB(m_gs_aim_rot);
-				}
-				if (g_gs_debug & eGsDebugAim)
-					Msg("- gs_aim: sight [%s] line %.2f deg off the view, roll %.2f deg%s", key.name(),
-						rad2deg(turn), rad2deg(roll), turn < turn_max ? "" : " (too far: not turned)");
-			}
-			// Where the sight lands with that rotation and no position correction (camera space).
-			aimed.mul_43(offset_xform(m_gs_aim_rot, curr_rot, curr_offs), hands);
-			Fvector s;
-			aimed.transform_tiny(s, sight);
-			Fvector d = {-s.x, -s.y, 0.f};
-
-			Fvector eye;
-			bool has_eye;
-			const gunsmith::SPartVisual* pv = m_gs_visuals.sight_eye(hi->m_model, eye, has_eye);
-			if (pv && pv->is_optic() && has_eye)
-			{
-				aimed.transform_tiny(eye);
-				d.z = pv->eye_offset - eye.z;
-			}
-			// The offset's position is applied inside the aim rotation: the camera-space move d, there.
-			Fmatrix a;
-			a.setHPB(m_gs_aim_rot.x, m_gs_aim_rot.y, m_gs_aim_rot.z);
-			Fmatrix a_inv;
-			a_inv.invert(a);
-			a_inv.transform_dir(m_gs_aim_corr, d);
-			if (g_gs_debug & eGsDebugAim)
-				Msg("- gs_aim: sight [%s] predicted off axis x=%.4f y=%.4f, eye z correction %.4f",
-					key.name(), s.x, s.y, d.z);
-		}
-		curr_aim_rot.set(m_gs_aim_rot);
-		curr_offs.x += m_gs_aim_corr.x;
-		curr_offs.y += m_gs_aim_corr.y;
-		curr_offs.z += m_gs_aim_corr.z;
-
-		// Refine once fully aimed and settled, not while firing, and only once the camera has
-		// been still for a moment: while turning or moving, the HUD's inertia and bob push the
-		// sight off axis on purpose, and learning that offset would leave the sight off afterwards.
-		Fvector s;
-		hi->m_item_transform.transform_tiny(s, sight);
-		cam_inv.transform_tiny(s); // camera space: x right, y up, z forward
-		const bool aimed = m_zoom_params.m_fZoomRotationFactor >= 0.99f;
-		const bool idle = GetState() == eIdle;
-		const bool settled = m_hud_offset[0].similar(curr_offs, 0.01f);
-		const float dt = _max(Device.fTimeDelta, EPS_S);
-		bool still = gs_prev_cam_ok;
-		if (still)
-		{
-			const float turn = acosf(_min(1.f, gs_prev_cam.k.dotproduct(trans.k))) / dt; // rad/s
-			const float move = gs_prev_cam.c.distance_to(trans.c) / dt; // m/s
-			still = turn < gunsmith::settings().aim_still_turn && move < gunsmith::settings().aim_still_move;
-		}
-		m_gs_aim_still = still ? m_gs_aim_still + Device.fTimeDelta : 0.f;
-		if (aimed && idle && settled && m_gs_aim_still > gunsmith::settings().aim_still_time)
-		{
-			const float k = _min(1.f, Device.fTimeDelta * gunsmith::settings().aim_speed);
-			Fvector d = {-s.x * k, -s.y * k, 0.f}, dl;
-			Fmatrix a;
-			a.setHPB(m_gs_aim_rot.x, m_gs_aim_rot.y, m_gs_aim_rot.z);
-			Fmatrix a_inv;
-			a_inv.invert(a);
-			a_inv.transform_dir(dl, d); // (in the offset's frame, inside the aim rotation)
-			m_gs_aim_corr.add(dl);
-		}
-		static u32 s_gs_aim_log = 0;
-		if ((g_gs_debug & eGsDebugAim) && Device.dwTimeGlobal > s_gs_aim_log + 500)
-		{
-			s_gs_aim_log = Device.dwTimeGlobal;
-			Msg("- gs_aim: sight [%s] off axis x=%.4f y=%.4f (dist %.3f), correction x=%.4f y=%.4f, aimed=%d idle=%d settled=%d still=%.2fs",
-				key.name(), s.x, s.y, s.z, m_gs_aim_corr.x, m_gs_aim_corr.y, aimed, idle, settled, m_gs_aim_still);
-		}
+		Fvector now;
+		hi->m_item_transform.transform_tiny(now, sight);
+		cam_inv.transform_tiny(now);
+		Msg("- gs_aim: sight [%s]%s line %.2f deg off, roll %.2f deg%s; target %.4f, %.4f, %.4f, correction %.4f, %.4f, %.4f; "
+			"now off axis %.4f, %.4f (dist %.3f); zoom %.2f, state %u",
+			key.name(), new_sight ? " (new)" : "", rad2deg(turn), rad2deg(roll), aiming_pose ? "" : " (not an aiming pose: held)",
+			corr_t.x, corr_t.y, corr_t.z, m_gs_aim_corr.x, m_gs_aim_corr.y, m_gs_aim_corr.z,
+			now.x, now.y, now.z, m_zoom_params.m_fZoomRotationFactor, GetState());
 	}
 }

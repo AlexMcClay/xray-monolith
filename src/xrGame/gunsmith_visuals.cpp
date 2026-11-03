@@ -106,6 +106,7 @@ namespace gunsmith
 		v.has_eye = section && pSettings->line_exist(section, "aim_eye_point");
 		v.eye_point = read_vec(section, "aim_eye_point");
 		v.eye_offset = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_eye_offset", 0.f) : 0.f;
+		v.eye_shift = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_eye_shift", 0.f) : 0.f;
 		// "light | light, laser | laser": one entry per mode, each a comma list of what is on
 		if (section && pSettings->line_exist(section, "tactical_modes"))
 		{
@@ -385,6 +386,11 @@ namespace gunsmith
 				c.root_fwd = f.normalize();
 				c.root_up = u.normalize();
 			}
+		}
+		if (ctx == eHud && hud_sect && pSettings->line_exist(hud_sect, "gs_aim_eye_far"))
+		{
+			c.has_eye_far = true;
+			c.eye_far = pSettings->r_float(hud_sect, "gs_aim_eye_far");
 		}
 
 		int child_of[GS_MAX_NODES];
@@ -739,14 +745,54 @@ namespace gunsmith
 		const SChild* sight = pick_sight(c);
 		if (!sight || use_root_line(c, sight))
 			return nullptr;
-		const SSightAim aim = aim_of(*sight); // (a 1x mode of a scope, or its second sight: no eye relief)
+		const SSightAim aim = aim_of(*sight); // (a second sight, a red dot's: no eye relief)
 		if (aim.has_eye)
 		{
 			update_local(c, root);
-			sight->K->LL_GetTransform_R(sight->aim_bone).transform_tiny(eye, aim.eye);
-			sight->local.transform_tiny(eye);
+			optic_eye(c, *sight, aim, eye);
+			// how far forward the head goes, as Tarkov (Gunsmith Docs 29): not past another fitted optic's
+			// eyepiece, nor past the gun's limit
+			for (const SChild& ch : c.children)
+			{
+				if (&ch == sight || !ch.pv->is_optic())
+					continue;
+				const SSightAim other = aim_of(ch);
+				Fvector e;
+				if (!other.has_eye)
+					continue;
+				optic_eye(c, ch, other, e);
+				if (e.z < eye.z)
+					eye.z = e.z;
+			}
+			if (c.has_eye_far && eye.z > c.eye_far)
+				eye.z = c.eye_far;
 			has_eye = true;
 		}
 		return sight->pv;
+	}
+
+	void CVisuals::optic_eye(const SContext& c, const SChild& optic, const SSightAim& aim, Fvector& eye) const
+	{
+		const Fmatrix& bone = optic.K->LL_GetTransform_R(optic.aim_bone);
+		bone.transform_tiny(eye, aim.eye);
+		optic.local.transform_tiny(eye);
+		const int self = int(&optic - c.children.data());
+		for (u32 j = u32(self) + 1; j < c.children.size(); ++j) // children follow their parents
+		{
+			const float shift = c.children[j].pv->eye_shift;
+			if (shift <= 0.f)
+				continue;
+			int p = c.children[j].parent;
+			while (p >= 0 && p != self)
+				p = c.children[p].parent;
+			if (p != self)
+				continue;
+			Fvector f;
+			bone.transform_dir(f, aim.fwd);
+			optic.local.transform_dir(f);
+			f.normalize_safe();
+			eye.mad(f, -shift);
+			return;
+		}
 	}
 }

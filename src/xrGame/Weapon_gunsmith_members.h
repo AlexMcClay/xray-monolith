@@ -146,18 +146,15 @@ protected:
 
 	gunsmith::CVisuals m_gs_visuals;
 	bool m_gs_full_mode = false;
-	// Aim correction (camera space) that keeps the fitted sight on the camera axis, and the sight
-	// it was made for. Predicted for the aimed pose when a sight is first aimed through (so it is
-	// right on the first aim), then refined while aiming steadily.
+	// Aim correction (in the aim offset's frame) that keeps the fitted sight on the camera axis, and the sight it
+	// is for: set at once for a new sight, then following its target (gs_update_aim) while the gun is idle.
 	Fvector m_gs_aim_corr = { 0.f, 0.f, 0.f };
-	float m_gs_aim_still = 0.f; // seconds the camera has been still (aim refinement waits for it)
 	gunsmith::CVisuals::SSightKey m_gs_aim_sight;
 	// The aim rotation (H, P, B) that lays the sight's line along the view: the sight's pitch and yaw
-	// off the camera axis and, from aim_roll_min degrees, its roll (a canted sight). Predicted with m_gs_aim_corr.
+	// off the camera axis and, from aim_roll_min degrees, its roll (a canted sight). Follows with m_gs_aim_corr.
 	Fvector m_gs_aim_rot = { 0.f, 0.f, 0.f };
-	// The camera the HUD was placed with last frame (m_item_transform is last frame's).
-	Fmatrix m_gs_prev_cam;
-	bool m_gs_prev_cam_ok = false;
+	// The HUD has been placed once (m_item_transform holds a pose: last frame's).
+	bool m_gs_hud_placed = false;
 	// The magnifying sight the zoom was set up for; gs_update_optic() follows tree changes.
 	shared_str m_gs_optic_sect;
 	void gs_update_optic();

@@ -37,6 +37,7 @@ namespace gunsmith
 		bool has_eye;
 		Fvector eye_point;
 		float eye_offset;
+		float eye_shift; // aim_eye_shift: an eyecup moves the eye of the optic it is fitted on back by this (metres)
 		bool is_optic() const { return has_aim && (magnification > 1.f || zoom_factor > 0.f); }
 		xr_vector<float> mode_zooms; // per mode of the first sight (empty: one mode)
 		xr_vector<shared_str> mode_bones;
@@ -153,8 +154,10 @@ namespace gunsmith
 		// on the part (light_point, ...) map through it. False when that node isn't drawn.
 		bool part_frame(int ctx, IKinematics* root, u8 node, Fmatrix& out);
 
-		// HUD: the fitted sight's part data and, when it has aim_eye_point, that point in the
-		// receiver model's space. Null without a sight.
+		// HUD: the fitted sight's part data and, when it is an optic with aim_eye_point, where the eye goes in
+		// the receiver model's space (z is the gun's forward axis): the eye point, moved back by a fitted
+		// eyecup's aim_eye_shift, and no further forward than another fitted optic's eye point (the head stops
+		// at its eyepiece) or the HUD section's gs_aim_eye_far. Null without a sight.
 		const SPartVisual* sight_eye(IKinematics* root, Fvector& eye, bool& has_eye);
 
 		// Appends each child's model and transform in the root model's space, children's bones
@@ -212,6 +215,9 @@ namespace gunsmith
 			// the receiver's own sight line (gs_aim_dir: forward, up), aimed through when no part is a sight
 			bool has_root_dir = false;
 			Fvector root_fwd, root_up;
+			// gs_aim_eye_far: the furthest forward (receiver model z) the eye goes behind an optic
+			bool has_eye_far = false;
+			float eye_far = 0.f;
 		};
 
 		SContext m_ctx[2];
@@ -227,5 +233,8 @@ namespace gunsmith
 		// the receiver's own sight line (gs_aim_point + gs_aim_dir) is aimed along when no part is a sight, or the
 		// part is an iron sight (aim_priority 0, no magnification): the AK-12's rear sight onto its front post
 		bool use_root_line(const SContext& c, const SChild* sight) const;
+		// An optic's eye point in the root model's space, moved back along its sight line by the aim_eye_shift of
+		// the first part below it in the tree that has one (its eyecup). The context's local transforms are current.
+		void optic_eye(const SContext& c, const SChild& optic, const SSightAim& aim, Fvector& eye) const;
 	};
 }
