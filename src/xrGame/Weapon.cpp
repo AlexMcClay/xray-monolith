@@ -3349,6 +3349,20 @@ void CWeapon::ZoomDec()
 
 u32 CWeapon::Cost() const
 {
+	// Gunsmith parts: each fitted part's part_cost, less what the section's cost already counts (stock_parts_cost),
+	// so a gun with its stock parts costs its section's price; better parts add, cheaper or missing ones take off
+	// (at most nine tenths of the section's price).
+	const u32 res = GetVanillaCost();
+	const float parts = m_gs_stats.cost_add - m_gs_stock_parts_cost;
+	if (parts == 0.f)
+		return res;
+	const float floor_price = float(res) - float(CInventoryItem::Cost()) * 0.9f;
+	return u32(_max(float(res) + parts, floor_price) + 0.5f);
+}
+
+// The price an unmodded exe gives: the section's, old-style addons and the loaded rounds.
+u32 CWeapon::GetVanillaCost() const
+{
 	u32 res = CInventoryItem::Cost();
 	if (IsGrenadeLauncherAttached() && GetGrenadeLauncherName().size())
 	{
@@ -3362,8 +3376,6 @@ u32 CWeapon::Cost() const
 	{
 		res += pSettings->r_u32(GetSilencerName(), "cost");
 	}
-	if (m_gs_stats.cost_add > 0.f)
-		res += u32(m_gs_stats.cost_add + 0.5f);
 
 	if (iAmmoElapsed)
 	{

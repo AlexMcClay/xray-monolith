@@ -986,6 +986,7 @@ bool CWeapon::gs_scope_texture(shared_str& scope_tex_name)
 void CWeapon::gs_load(LPCSTR section)
 {
 	m_gs_base_mag_size = iMagazineSize;
+	m_gs_stock_parts_cost = READ_IF_EXISTS(pSettings, r_float, section, "stock_parts_cost", 0.f);
 	if (gunsmith::is_full_mode(section))
 	{
 		// Full-mode guns take no old-style addons, whatever the section says: scopes, suppressors and

@@ -32,7 +32,7 @@ public:
 	// Vanilla readings for scripts. Weight() and Cost() count the fitted parts; these leave them out, as an
 	// unmodded exe's would (old-style addons counted).
 	float GetVanillaWeight() const { return Weight() - m_gs_stats.weight_add; }
-	u32 GetVanillaCost() const { return Cost() - (m_gs_stats.cost_add > 0.f ? u32(m_gs_stats.cost_add + 0.5f) : 0); }
+	u32 GetVanillaCost() const;
 
 	float gs_pdm_base() const;
 	float gs_pdm_vel() const;
@@ -186,6 +186,7 @@ protected:
 protected:
 	gunsmith::CTree m_gs_tree;
 	gunsmith::SWeaponStats m_gs_stats;
+	float m_gs_stock_parts_cost = 0.f; // stock_parts_cost: the parts' price the section's cost already counts (Cost)
 	u8 m_gs_jam_type = 0;
 	u8 m_gs_jam_node = 0;
 	bool m_fire_blocked = false;
