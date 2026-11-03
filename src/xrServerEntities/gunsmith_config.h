@@ -169,6 +169,11 @@ namespace gunsmith
 		u32 device_shadows;
 		float device_shadow_near;
 		bool device_hide_actor_shadow;
+		// Infrared lights and lasers show only while ir_visible (false; the Framework sets it while the player's night
+		// vision is on). Tuning scales (1): device lights' range and brightness, lasers' brightness, dot size and beam width.
+		bool ir_visible;
+		float device_light_range_k, device_light_bright_k;
+		float laser_bright_k, laser_dot_size_k, laser_beam_width_k;
 	};
 
 	const SSettings& settings();

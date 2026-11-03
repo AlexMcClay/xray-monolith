@@ -121,6 +121,7 @@ public:
 protected:
 	gunsmith::CTacticalDevices m_gs_devices;
 	void gs_update_devices();
+	void gs_render_world();
 	// Aiming through a fitted sight part: corrects UpdateHudAdditional's aim offset (Weapon_gunsmith.cpp) for the
 	// aim offset index `idx`. Called every frame; it also keeps the camera of the last frame.
 	void gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 idx,

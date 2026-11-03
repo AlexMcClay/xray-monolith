@@ -778,7 +778,15 @@ void CWeapon::RenderAttachments()
 		return;
 	m_gs_visuals.ensure(gunsmith::CVisuals::eWorld, K, m_gs_tree, cNameSect().c_str(), nullptr, true);
 	m_gs_visuals.render(gunsmith::CVisuals::eWorld, K, XFORM());
-	m_gs_devices.render_beams(gunsmith::CVisuals::eWorld);
+	m_gs_devices.render(gunsmith::CVisuals::eWorld);
+}
+
+// Laser beams and dots are in the world in first person too (CWeapon::renderable_Render runs then, without the
+// world model); main pass only.
+void CWeapon::gs_render_world()
+{
+	if (m_gs_full_mode && ::Render->active_phase() == 0)
+		m_gs_devices.render_world();
 }
 
 void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
@@ -787,7 +795,7 @@ void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
 		return;
 	m_gs_visuals.ensure(gunsmith::CVisuals::eHud, model, m_gs_tree, cNameSect().c_str(), HudSection().c_str(), true);
 	m_gs_visuals.render(gunsmith::CVisuals::eHud, model, xform);
-	m_gs_devices.render_beams(gunsmith::CVisuals::eHud);
+	m_gs_devices.render(gunsmith::CVisuals::eHud);
 }
 
 bool CWeapon::gs_has_devices() const

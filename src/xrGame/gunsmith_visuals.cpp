@@ -107,32 +107,52 @@ namespace gunsmith
 		v.eye_point = read_vec(section, "aim_eye_point");
 		v.eye_offset = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_eye_offset", 0.f) : 0.f;
 		v.eye_shift = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_eye_shift", 0.f) : 0.f;
-		// "light | light, laser | laser": one entry per mode, each a comma list of what is on
+		// "light | light, laser | laser": one entry per mode, each a comma list of what is on: light, laser,
+		// ir light, ir laser, each maybe followed by a word of its own (high, low) that only names it
 		if (section && pSettings->line_exist(section, "tactical_modes"))
 		{
 			LPCSTR modes = pSettings->r_string(section, "tactical_modes");
 			const int count = _GetItemCount(modes, '|');
-			string256 mode, what;
+			const Fvector light_point = read_vec(section, "light_point"), laser_point = read_vec(section, "laser_point");
+			const shared_str light_section = read_str(section, "light_section"), laser_section = read_str(section, "laser_section");
+			string256 mode, what, key;
 			for (int m = 0; m < count; ++m)
 			{
-				_GetItem(modes, m, mode, '|');
+				_Trim(_GetItem(modes, m, mode, '|'));
 				u8 flags = 0;
 				for (int w = 0, wc = _GetItemCount(mode, ','); w < wc; ++w)
 				{
 					_Trim(_GetItem(mode, w, what, ','));
-					if (!xr_strcmp(what, "light"))
+					if (strstr(what, "ir light") == what)
+						flags |= SPartVisual::eTacIrLight;
+					else if (strstr(what, "ir laser") == what)
+						flags |= SPartVisual::eTacIrLaser;
+					else if (strstr(what, "light") == what)
 						flags |= SPartVisual::eTacLight;
-					else if (!xr_strcmp(what, "laser"))
+					else if (strstr(what, "laser") == what)
 						flags |= SPartVisual::eTacLaser;
 				}
-				if (flags)
-					v.tac_modes.push_back(flags);
+				if (!flags)
+					continue;
+				const int n = int(v.tac_modes.size());
+				SPartVisual::STacMode md;
+				md.text = mode;
+				xr_sprintf(key, "tactical_mode_%d_light", n);
+				md.light = pSettings->line_exist(section, key) ? read_str(section, key) : light_section;
+				xr_sprintf(key, "tactical_mode_%d_laser", n);
+				md.laser = pSettings->line_exist(section, key) ? read_str(section, key) : laser_section;
+				xr_sprintf(key, "tactical_mode_%d_light_point", n);
+				md.light_point = pSettings->line_exist(section, key) ? read_vec(section, key) : light_point;
+				xr_sprintf(key, "tactical_mode_%d_laser_point", n);
+				md.laser_point = pSettings->line_exist(section, key) ? read_vec(section, key) : laser_point;
+				xr_sprintf(key, "tactical_mode_%d_light_lens", n);
+				md.light_lens = pSettings->line_exist(section, key) ? read_vec(section, key) : md.light_point;
+				xr_sprintf(key, "tactical_mode_%d_laser_lens", n);
+				md.laser_lens = pSettings->line_exist(section, key) ? read_vec(section, key) : md.laser_point;
+				v.tac_modes.push_back(flags);
+				v.tac_mode_data.push_back(md);
 			}
 		}
-		v.light_point = read_vec(section, "light_point");
-		v.laser_point = read_vec(section, "laser_point");
-		v.light_section = read_str(section, "light_section");
-		v.laser_section = read_str(section, "laser_section");
 		v.grip_priority = section ? READ_IF_EXISTS(pSettings, r_s32, section, "grip_priority", 1) : 1;
 		v.grip_type = section ? READ_IF_EXISTS(pSettings, r_s32, section, "grip_type", 0) : 0;
 		clamp(v.grip_type, 0, 1);

@@ -419,6 +419,12 @@ namespace gunsmith
 				s.device_shadows = READ_IF_EXISTS(pSettings, r_u32, sect, "device_shadows", 1);
 				s.device_shadow_near = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "device_shadow_near", 0.5f), 0.05f, 3.f);
 				s.device_hide_actor_shadow = !!READ_IF_EXISTS(pSettings, r_bool, sect, "device_hide_actor_shadow", true);
+				s.ir_visible = false;
+				s.device_light_range_k = READ_IF_EXISTS(pSettings, r_float, sect, "device_light_range_k", 1.f);
+				s.device_light_bright_k = READ_IF_EXISTS(pSettings, r_float, sect, "device_light_bright_k", 1.f);
+				s.laser_bright_k = READ_IF_EXISTS(pSettings, r_float, sect, "laser_bright_k", 1.f);
+				s.laser_dot_size_k = READ_IF_EXISTS(pSettings, r_float, sect, "laser_dot_size_k", 1.f);
+				s.laser_beam_width_k = READ_IF_EXISTS(pSettings, r_float, sect, "laser_beam_width_k", 1.f);
 				loaded = true;
 			}
 			return s;
@@ -438,6 +444,18 @@ namespace gunsmith
 			s.device_hide_actor_shadow = value != 0.f;
 		else if (!xr_strcmp(name, "aim_speed"))
 			s.aim_speed = clampr(value, 0.5f, 60.f);
+		else if (!xr_strcmp(name, "ir_visible"))
+			s.ir_visible = value != 0.f;
+		else if (!xr_strcmp(name, "device_light_range_k"))
+			s.device_light_range_k = clampr(value, 0.1f, 5.f);
+		else if (!xr_strcmp(name, "device_light_bright_k"))
+			s.device_light_bright_k = clampr(value, 0.f, 10.f);
+		else if (!xr_strcmp(name, "laser_bright_k"))
+			s.laser_bright_k = clampr(value, 0.f, 20.f);
+		else if (!xr_strcmp(name, "laser_dot_size_k"))
+			s.laser_dot_size_k = clampr(value, 0.1f, 10.f);
+		else if (!xr_strcmp(name, "laser_beam_width_k"))
+			s.laser_beam_width_k = clampr(value, 0.1f, 10.f);
 		else
 			return false;
 		return true;
@@ -454,6 +472,18 @@ namespace gunsmith
 			value = s.device_hide_actor_shadow ? 1.f : 0.f;
 		else if (!xr_strcmp(name, "aim_speed"))
 			value = s.aim_speed;
+		else if (!xr_strcmp(name, "ir_visible"))
+			value = s.ir_visible ? 1.f : 0.f;
+		else if (!xr_strcmp(name, "device_light_range_k"))
+			value = s.device_light_range_k;
+		else if (!xr_strcmp(name, "device_light_bright_k"))
+			value = s.device_light_bright_k;
+		else if (!xr_strcmp(name, "laser_bright_k"))
+			value = s.laser_bright_k;
+		else if (!xr_strcmp(name, "laser_dot_size_k"))
+			value = s.laser_dot_size_k;
+		else if (!xr_strcmp(name, "laser_beam_width_k"))
+			value = s.laser_beam_width_k;
 		else
 			return false;
 		return true;

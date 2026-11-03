@@ -17,10 +17,13 @@ namespace gunsmith
 {
 	class CVisuals;
 
-	// A light definition section, with CTorch's key names where they overlap; lasers read a few more.
-	// Keys: see the Gunsmith tactical devices doc. A beam_visual's first-person copy is <path's folder>\hud\<name>.
+	// A light or laser definition section (light_desc caches them by name). Lights use CTorch's key names where
+	// they overlap. Keys: see the Gunsmith tactical devices doc. Visuals are models; a visual drawn with the HUD
+	// is loaded from <path's folder>\hud\<name>.
 	struct SLightDesc
 	{
+		bool ir = false; // infrared: shown only while ir_visible (the player's night vision is on)
+		// light
 		u32 type = 2;
 		float range = 30.f;
 		Fcolor color;
@@ -28,12 +31,24 @@ namespace gunsmith
 		shared_str texture;
 		bool volumetric = false;
 		float vol_quality = 1.f, vol_intensity = 0.15f, vol_distance = 0.4f;
-		float dot_range = 0.25f;
-		shared_str beam_visual;
-		float beam_hud_length = 4.f;
+		// laser: the ray, the beam (a ribbon from the device to the hit), the dot where it hits and its light
+		float laser_range = 100.f;
+		shared_str beam_visual, dot_visual;
+		float beam_width = 0.004f, beam_intensity = 1.f;
+		float dot_size_close = 0.017f, dot_size_far = 0.2f; // the dot's half-size, near and at laser_range
+		float dot_view_scale = 1.5f; // the dot grows up to this with the viewer's distance (to laser_range)
+		float dot_intensity = 1.f;
+		float dot_light_range = 0.2f, dot_light_intensity = 3.1f;
+		float dot_cone_close = deg2rad(15.f), dot_cone_far = deg2rad(119.f);
+		// the lens while lit: a glow facing the camera, brighter as the device points at it
+		shared_str lens_visual;
+		float lens_size = 0.f, lens_intensity = 1.f;
+		float lens_angle_min = 0.6f; // cosine: the flare shows from this angle to the device's axis
 
 		void load(LPCSTR section);
 	};
+
+	const SLightDesc& light_desc(const shared_str& section);
 
 	// The tactical devices fitted to one weapon. The weapon's tree holds the state: bit 0 of node 0's mode
 	// is the devices-on flag, each device node's mode is its selected mode.
@@ -49,7 +64,7 @@ namespace gunsmith
 
 		// Places and lights every device in its current mode. ctx/root/root_xform: the model the
 		// devices are drawn on (CVisuals::eHud with the HUD item's transform, or eWorld with the
-		// weapon's). hud_proj: the HUD projection when ctx is the HUD (laser rays are cast in the
+		// weapon's). hud_proj: the HUD projection when ctx is the HUD (laser rays, beams and dots are in the
 		// world), else null. ignore: skipped by the laser's ray (the holder). player: the lights are the
 		// player's own (renderers treat them as the head torch, e.g. less volumetric fog).
 		// The strongest device_shadows lights (gunsmith_settings) cast shadows.
@@ -57,25 +72,32 @@ namespace gunsmith
 					const Fmatrix* hud_proj, CObject* ignore, bool player);
 		// Switches everything off.
 		void off();
-		// Draws the laser beams placed for `ctx` (from that model's render pass).
-		void render_beams(int ctx);
+		// Draws the lit lenses placed for `ctx` (from that model's render pass).
+		void render(int ctx);
+		// Draws the laser beams and dots (world pass, in first person too).
+		void render_world();
 		// A light (not just a laser) is shining.
 		bool lit() const { return m_lit; }
 
 	private:
+		enum { eLensLight, eLensLaser, eLensCount };
 		struct SDevice
 		{
 			u8 node = 0;
 			shared_str section;
+			int mode = -1; // the mode the light and laser are set up for
+			const SLightDesc* light_def = nullptr; // this mode's, or null
+			const SLightDesc* laser_def = nullptr;
 			ref_light light;
 			float light_score = 0.f; // brightness x range x cone: who gets the shadows
 			bool shadow = false;
 			ref_light dot;
-			IRenderVisual* beam[2] = { nullptr, nullptr }; // world, HUD
-			float laser_range = 300.f; // the laser section's range (not light range's r2 variant)
-			float beam_hud_length = 4.f;
-			Fmatrix beam_xform;
-			int beam_ctx = -1; // the context the beam was placed for this frame, -1 none
+			IRenderVisual* beam = nullptr;
+			IRenderVisual* dot_vis = nullptr;
+			IRenderVisual* lens[eLensCount][2] = {}; // [light, laser][world, HUD]
+			Fmatrix beam_xform, dot_xform, lens_xform[eLensCount];
+			bool beam_on = false, dot_on = false;
+			int lens_ctx[eLensCount] = { -1, -1 }; // the context each lens was placed for this frame, -1 none
 		};
 
 		xr_vector<SDevice> m_devices;
@@ -84,7 +106,7 @@ namespace gunsmith
 		bool m_rev_valid = false;
 		bool m_lit = false;
 
-		void build(SDevice& d);
+		void setup_mode(SDevice& d, u8 mode);
 		void free_device(SDevice& d);
 		void device_off(SDevice& d);
 	};

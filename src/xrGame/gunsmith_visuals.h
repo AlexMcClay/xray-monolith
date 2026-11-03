@@ -50,10 +50,19 @@ namespace gunsmith
 		u8 sight_count() const { return u8(1 + extra_sights.size()); }
 		u8 mode_count() const { return mode_zooms.empty() ? u8(1) : u8(mode_zooms.size()); }
 
-		enum { eTacLight = 1, eTacLaser = 2 };
-		xr_vector<u8> tac_modes; // per mode: eTacLight | eTacLaser
-		Fvector light_point, laser_point;
-		shared_str light_section, laser_section;
+		// Tactical devices: per mode what shines (infrared ones only show to night vision) and, from
+		// tactical_mode_<n>_light / _laser / _light_point / _laser_point (else light_section, light_point...),
+		// the light and laser definitions and where they come out, in the model's space.
+		enum { eTacLight = 1, eTacLaser = 2, eTacIrLight = 4, eTacIrLaser = 8, eTacAnyLight = 5, eTacAnyLaser = 10 };
+		struct STacMode
+		{
+			shared_str text; // the mode as written in tactical_modes ("light, laser", "ir light", "light high")
+			shared_str light, laser;
+			Fvector light_point, laser_point;
+			Fvector light_lens, laser_lens; // where each lens glows (tactical_mode_<n>_light_lens...; else the point)
+		};
+		xr_vector<u8> tac_modes; // per mode: eTac* flags
+		xr_vector<STacMode> tac_mode_data; // per mode
 		bool is_tactical() const { return !tac_modes.empty(); }
 
 		// The left hand on the part (grip IK, gunsmith_grip_ik.h), per Tarkov GripType 0 and 1: the left hand
@@ -66,6 +75,7 @@ namespace gunsmith
 		int grip_type;
 		// The flags of mode `mode` (clamped to the last mode).
 		u8 tac_flags(u8 mode) const { return tac_modes.empty() ? 0 : tac_modes[_min(u32(mode), u32(tac_modes.size() - 1))]; }
+		const STacMode& tac_mode(u8 mode) const { return tac_mode_data[_min(u32(mode), u32(tac_mode_data.size() - 1))]; }
 	};
 
 	const SPartVisual& part_visual(const shared_str& section);

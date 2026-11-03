@@ -302,6 +302,7 @@ bool fire_blocked_script(CScriptGameObject* self)
 }
 
 // Tactical devices: { on = bool, devices = { { node, section, mode, modes = { "light", "light, laser", ... } }, ... } }
+// (each mode's text as its tactical_modes writes it, e.g. "ir light, ir laser" or "light high")
 ::luabind::object gs_tactical_state_script(lua_State* L, CScriptGameObject* self)
 {
 	CWeapon* weapon = gs_weapon(self, "gs_tactical_state");
@@ -323,12 +324,8 @@ bool fire_blocked_script(CScriptGameObject* self)
 		d["section"] = n.section.c_str();
 		d["mode"] = int(_min(u32(n.mode), u32(pv.tac_modes.size() - 1)));
 		::luabind::object modes = ::luabind::newtable(L);
-		for (u32 m = 0; m < pv.tac_modes.size(); ++m)
-		{
-			const u8 f = pv.tac_modes[m];
-			modes[m + 1] = (f & gunsmith::SPartVisual::eTacLight) && (f & gunsmith::SPartVisual::eTacLaser) ? "light, laser"
-				: (f & gunsmith::SPartVisual::eTacLight) ? "light" : "laser";
-		}
+		for (u32 m = 0; m < pv.tac_mode_data.size(); ++m)
+			modes[m + 1] = pv.tac_mode_data[m].text.c_str();
 		d["modes"] = modes;
 		list[++count] = d;
 	}

@@ -1429,6 +1429,7 @@ void CWeapon::renderable_Render()
 
 	//íàðèñîâàòü ïîäñâåòêó
 	RenderLight();
+	gs_render_world();
 
 	//åñëè ìû â ðåæèìå ñíàéïåðêè, òî ñàì HUD ðèñîâàòü íå íàäî
 	if (IsZoomed() && !IsRotatingToZoom() && ZoomTexture())
