@@ -433,6 +433,16 @@ namespace gunsmith
 				s.icon_cache = !!READ_IF_EXISTS(pSettings, r_bool, sect, "icon_cache", true);
 				s.icon_cache_mb = clampr(READ_IF_EXISTS(pSettings, r_u32, sect, "icon_cache_mb", 256), u32(16), u32(8192));
 				s.icon_cache_version = READ_IF_EXISTS(pSettings, r_u32, sect, "icon_cache_version", 0);
+				LPCSTR pose = READ_IF_EXISTS(pSettings, r_string, sect, "icon_pose", "tarkov");
+				s.icon_tarkov_pose = xr_strcmp(pose, "side") != 0;
+				s.icon_yaw = READ_IF_EXISTS(pSettings, r_float, sect, "icon_yaw", s.icon_tarkov_pose ? 25.f : 0.f);
+				s.icon_scale = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_scale", 0.9f), 0.2f, 1.5f);
+				s.icon_halo = !!READ_IF_EXISTS(pSettings, r_bool, sect, "icon_halo", true);
+				s.icon_exposure = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_exposure", 1.25f), 0.1f, 4.f);
+				s.icon_ambient = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_ambient", 1.4f), 0.f, 4.f);
+				s.icon_contrast = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_contrast", 1.1f), 0.5f, 2.f);
+				s.icon_saturation = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_saturation", 1.15f), 0.f, 2.f);
+				s.icon_specular = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_specular", 1.f), 0.f, 4.f);
 				loaded = true;
 			}
 			return s;
@@ -504,6 +514,8 @@ namespace gunsmith
 			value = s.npc_devices_distance;
 		else if (!xr_strcmp(name, "npc_laser_distance"))
 			value = s.npc_laser_distance;
+		else if (!xr_strcmp(name, "icon_tarkov_pose"))
+			value = s.icon_tarkov_pose ? 1.f : 0.f;
 		else
 			return false;
 		return true;

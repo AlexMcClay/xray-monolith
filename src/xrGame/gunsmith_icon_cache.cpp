@@ -16,7 +16,7 @@ namespace gunsmith
 		namespace
 		{
 			const u32 MAGIC = 0x31495347; // "GSI1"
-			const u32 FORMAT = 1; // a change to the file layout or to how icons are drawn: new names
+			const u32 FORMAT = 2; // a change to the file layout or to how icons are drawn: new names (2: Tarkov's look)
 			const u64 FNV_START = 14695981039346656037ull;
 
 			struct SHeader

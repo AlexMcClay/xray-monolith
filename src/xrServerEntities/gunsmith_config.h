@@ -187,6 +187,14 @@ namespace gunsmith
 		// icon_cache_version (0) is part of every file name, so a new number starts afresh (e.g. after textures change).
 		bool icon_cache;
 		u32 icon_cache_mb, icon_cache_version;
+		// Icons' look (gunsmith_preview): icon_pose = tarkov (Tarkov's: the gun's left side, the muzzle to the
+		// left, turned icon_yaw degrees, 25, the muzzle towards the camera) or side (vanilla's: the right side, the
+		// muzzle to the right, turned icon_yaw, 0); icon_scale of the cell filled (Tarkov's boundsScale, 0.9; a
+		// section's gs_icon_scale, gs_icon_yaw, gs_icon_pitch, gs_icon_roll and gs_icon_offset override); the
+		// halo (icon_halo, true); the preview shader's icon_exposure (1.25), icon_ambient (1.4), icon_specular (1), and
+		// after lighting icon_contrast (1.1) and icon_saturation (1.15).
+		bool icon_tarkov_pose, icon_halo;
+		float icon_yaw, icon_scale, icon_exposure, icon_ambient, icon_specular, icon_contrast, icon_saturation;
 	};
 
 	const SSettings& settings();

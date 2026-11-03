@@ -9,11 +9,18 @@
 #include "../xrRender/FHierrarhyVisual.h"
 #include "../xrRender/ResourceManager.h"
 #include "../xrRender/dxRenderDeviceRender.h"
+#include "dx10TextureUtils.h"
 
 namespace
 {
 	// The forward shader every mesh is drawn with: shaders\r3\models_gs_preview.s (Gunsmith Framework).
 	LPCSTR PREVIEW_SHADER = "models\\gs_preview";
+	// The supersampled draw's resolve pass, without and with the halo: shaders\r3\gs_preview_post(_halo).s.
+	LPCSTR POST_SHADER = "gs_preview_post";
+	LPCSTR POST_HALO_SHADER = "gs_preview_post_halo";
+	LPCSTR RESOLVED_RT = "$user$gs_preview_resolved";
+	const u32 SUPERSAMPLE_MAX = 4096; // a supersampled draw's largest side
+	const u32 MSAA_PIXEL_BUDGET = 8u << 20; // pixels x samples of the MSAA target (32 MB of colour): fewer samples when larger
 
 	// A rect copied to a CPU-readable texture, waiting for the GPU (PreviewReadBegin / PreviewReadEnd).
 	struct SReadback
@@ -26,6 +33,12 @@ namespace
 	{
 		xr_map<shared_str, ref_rt> targets;
 		ref_rt scratch, scratch_zb; // each draw goes here first, then is copied into its rect
+		// a supersampled draw: at twice the size with MSAA, resolved, then brought down into its rect
+		ref_rt ms, ms_zb, resolved;
+		ref_shader post, post_halo;
+		ref_geom quad; // the resolve pass's quad (FVF::TL, clip-space positions)
+		u32 samples = 0; // MSAA samples the card takes (1: none), found on first use
+		u32 ms_samples = 0; // the samples `ms` was made with
 		xr_map<shared_str, ref_shader> shaders; // per texture and skinning
 		bool checked = false, has_shader = false;
 		xr_map<u32, SReadback> readbacks;
@@ -58,7 +71,14 @@ namespace
 			const bool prev_hud = ::Render->hud_loading;
 			::Render->m_skinning = skinning;
 			::Render->hud_loading = false;
-			sh.create(PREVIEW_SHADER, texture);
+			// the texture's bump map (its .thm / texture descriptor) as the second texture: normal and gloss
+			const shared_str bump = dxRenderDeviceRender::Instance().Resources->m_textures_description.GetBumpName(texture);
+			string512 textures;
+			if (bump.size())
+				xr_sprintf(textures, "%s,%s", texture, bump.c_str());
+			else
+				xr_strcpy(textures, texture);
+			sh.create(PREVIEW_SHADER, textures);
 			::Render->m_skinning = prev_skinning;
 			::Render->hud_loading = prev_hud;
 		}
@@ -67,14 +87,14 @@ namespace
 
 	// `world` is set again for every mesh: a rigid skinned mesh (RM_SINGLE) multiplies its bone into
 	// the world matrix and leaves it there, which would move the model's later meshes.
-	void draw_visual(SPreview& P, dxRender_Visual* V, const Fmatrix& world)
+	void draw_visual(SPreview& P, dxRender_Visual* V, const Fmatrix& world, const Fvector4& params, const Fvector4& grade)
 	{
 		if (!V)
 			return;
 		if (FHierrarhyVisual* H = dynamic_cast<FHierrarhyVisual*>(V))
 		{
 			for (IRenderVisual* child : H->children)
-				draw_visual(P, static_cast<dxRender_Visual*>(child), world);
+				draw_visual(P, static_cast<dxRender_Visual*>(child), world, params, grade);
 			return;
 		}
 		LPCSTR shader = V->dbg_shader.size() ? V->dbg_shader.c_str() : V->dbg_shader_def.c_str();
@@ -85,6 +105,8 @@ namespace
 		if (shader && (strstr(shader, "lfo_") || strstr(shader, "scope_")))
 			return;
 		RCache.set_Shader(mesh_shader(P, texture, V->skinning));
+		RCache.set_c("gs_preview_params", params);
+		RCache.set_c("gs_preview_grade", grade);
 		RCache.set_CullMode(CULL_CCW);
 		RCache.set_xform_world(world);
 		V->Render(1.f);
@@ -129,6 +151,46 @@ namespace
 	typedef D3D10_BOX SBox;
 #endif
 
+	// The most MSAA samples (8, 4 or 2) both the colour and the depth format take, else 1.
+	u32 msaa_samples()
+	{
+		const DXGI_FORMAT color = dx10TextureUtils::ConvertTextureFormat(D3DFMT_A8R8G8B8);
+		for (u32 n : { 8u, 4u, 2u })
+		{
+			UINT qc = 0, qd = 0;
+			if (SUCCEEDED(HW.pDevice->CheckMultisampleQualityLevels(color, n, &qc)) && qc &&
+				SUCCEEDED(HW.pDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_D24_UNORM_S8_UINT, n, &qd)) && qd)
+				return n;
+		}
+		return 1;
+	}
+
+	void set_viewport(u32 x, u32 y, u32 w, u32 h)
+	{
+		D3D_VIEWPORT vp;
+		vp.TopLeftX = float(x);
+		vp.TopLeftY = float(y);
+		vp.Width = float(w);
+		vp.Height = float(h);
+		vp.MinDepth = 0.f;
+		vp.MaxDepth = 1.f;
+		HW.pContext->RSSetViewports(1, &vp);
+	}
+
+	void draw_meshes(SPreview& P, const Fmatrix& view, const Fmatrix& proj, IRenderVisual* const* visuals,
+					 const Fmatrix* xforms, u32 count, const Fvector4& params, const Fvector4& grade)
+	{
+		// The scene's camera is set before the frame renders (CRenderDevice::UpdateCamera); keep it.
+		const Fmatrix saved_w = RCache.xforms.m_w, saved_v = RCache.xforms.m_v, saved_p = RCache.xforms.m_p;
+		RCache.set_xform_view(view);
+		RCache.set_xform_project(proj);
+		for (u32 i = 0; i < count; ++i)
+			draw_visual(P, static_cast<dxRender_Visual*>(visuals[i]), xforms[i], params, grade);
+		RCache.set_xform_world(saved_w);
+		RCache.set_xform_view(saved_v);
+		RCache.set_xform_project(saved_p);
+	}
+
 	void rect_box(SBox& box, u32 x, u32 y, u32 w, u32 h)
 	{
 		box.left = x;
@@ -141,13 +203,92 @@ namespace
 }
 
 bool CRender::PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const Fmatrix& view,
-							const Fmatrix& proj, IRenderVisual* const* visuals, const Fmatrix* xforms, u32 count)
+							const Fmatrix& proj, IRenderVisual* const* visuals, const Fmatrix* xforms, u32 count,
+							u32 flags, const Fvector4* params, const Fvector4* grade)
 {
 	SPreview& P = preview();
 	if (!check_shader(P) || !target || !w || !h || x + w > tw || y + h > th)
 		return false;
 
 	ref_rt& rt = target_rt(P, target, tw, th);
+	const Fvector4 shading = params ? *params : Fvector4().set(1.f, 1.f, 1.f, 0.f);
+	const Fvector4 grading = grade ? *grade : Fvector4().set(1.f, 1.f, 0.f, 0.f);
+	const float clear[4] = { 0.f, 0.f, 0.f, 0.f };
+
+	if ((flags & ePreviewSupersample) && 2 * w <= SUPERSAMPLE_MAX && 2 * h <= SUPERSAMPLE_MAX)
+	{
+		// Twice the size with MSAA into `ms`, resolved into `resolved`, then gs_preview_post brings each 2x2
+		// block down into the rect (and draws the halo).
+		if (!P.samples)
+			P.samples = msaa_samples();
+		const u32 sw = 2 * w, sh = 2 * h;
+		const u32 mw = P.ms ? _max(P.ms->dwWidth, sw) : sw;
+		const u32 mh = P.ms ? _max(P.ms->dwHeight, sh) : sh;
+		u32 samples = P.samples;
+		while (samples > 1 && mw * mh * samples > MSAA_PIXEL_BUDGET)
+			samples /= 2;
+		if (!P.ms || P.ms->dwWidth != mw || P.ms->dwHeight != mh || P.ms_samples != samples)
+		{
+			P.ms = ref_rt();
+			P.ms_zb = ref_rt();
+			P.resolved = ref_rt();
+			P.ms.create("$user$gs_preview_ms", mw, mh, D3DFMT_A8R8G8B8, samples);
+			P.ms_zb.create("$user$gs_preview_ms_zb", mw, mh, D3DFMT_D24S8, samples);
+			P.resolved.create(RESOLVED_RT, mw, mh, D3DFMT_A8R8G8B8);
+			P.ms_samples = samples;
+		}
+		if (!P.quad)
+			P.quad.create(FVF::F_TL, RCache.Vertex.Buffer(), RCache.QuadIB);
+		ref_shader& post = (flags & ePreviewHalo) ? P.post_halo : P.post;
+		if (!post)
+			post.create((flags & ePreviewHalo) ? POST_HALO_SHADER : POST_SHADER);
+		if (P.ms && P.ms->pRT && P.ms_zb && P.ms_zb->pZRT && P.resolved && P.resolved->pRT && post && P.quad)
+		{
+			RCache.set_RT(P.ms->pRT);
+			RCache.set_RT(nullptr, 1);
+			RCache.set_RT(nullptr, 2);
+			RCache.set_ZB(P.ms_zb->pZRT);
+			HW.pContext->ClearRenderTargetView(P.ms->pRT, clear);
+			HW.pContext->ClearDepthStencilView(P.ms_zb->pZRT, D3D_CLEAR_DEPTH | D3D_CLEAR_STENCIL, 1.f, 0);
+			set_viewport(0, 0, sw, sh);
+			draw_meshes(P, view, proj, visuals, xforms, count, shading, grading);
+
+			D3D_TEXTURE2D_DESC desc;
+			P.resolved->pSurface->GetDesc(&desc);
+			if (P.ms_samples > 1)
+				HW.pContext->ResolveSubresource(P.resolved->pSurface, 0, P.ms->pSurface, 0, desc.Format);
+			else
+				HW.pContext->CopyResource(P.resolved->pSurface, P.ms->pSurface);
+
+			// The rect, every pixel written: a quad in clip space over the viewport, its texture coordinates
+			// over the 2w x 2h corner of `resolved`.
+			RCache.set_RT(rt->pRT);
+			RCache.set_ZB(nullptr);
+			set_viewport(x, y, w, h);
+			const float u1 = float(sw) / float(mw), v1 = float(sh) / float(mh);
+			u32 offset;
+			FVF::TL* pv = (FVF::TL*)RCache.Vertex.Lock(4, P.quad->vb_stride, offset);
+			pv->set(-1.f, 1.f, 0.f, 1.f, 0, 0.f, 0.f);
+			pv++;
+			pv->set(-1.f, -1.f, 0.f, 1.f, 0, 0.f, v1);
+			pv++;
+			pv->set(1.f, 1.f, 0.f, 1.f, 0, u1, 0.f);
+			pv++;
+			pv->set(1.f, -1.f, 0.f, 1.f, 0, u1, v1);
+			pv++;
+			RCache.Vertex.Unlock(4, P.quad->vb_stride);
+			RCache.set_Shader(post);
+			RCache.set_c("gs_preview_params", shading);
+			RCache.set_CullMode(CULL_NONE);
+			RCache.set_Geometry(P.quad);
+			RCache.Render(D3DPT_TRIANGLELIST, offset, 0, 4, 0, 2);
+
+			RCache.set_RT(HW.pBaseRT);
+			RCache.set_ZB(HW.pBaseZB);
+			set_viewport(0, 0, Device.dwWidth, Device.dwHeight);
+			return true;
+		}
+	}
 
 	// The scratch target grows to the largest rect asked for.
 	const u32 sw = P.scratch ? _max(P.scratch->dwWidth, w) : w;
@@ -159,7 +300,6 @@ bool CRender::PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, 
 	RCache.set_RT(nullptr, 1);
 	RCache.set_RT(nullptr, 2);
 	RCache.set_ZB(P.scratch_zb->pZRT);
-	const float clear[4] = { 0.f, 0.f, 0.f, 0.f };
 	HW.pContext->ClearRenderTargetView(P.scratch->pRT, clear);
 	HW.pContext->ClearDepthStencilView(P.scratch_zb->pZRT, D3D_CLEAR_DEPTH | D3D_CLEAR_STENCIL, 1.f, 0);
 
@@ -172,20 +312,12 @@ bool CRender::PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, 
 	vp.MaxDepth = 1.f;
 	HW.pContext->RSSetViewports(1, &vp);
 
-	// The scene's camera is set before the frame renders (CRenderDevice::UpdateCamera); keep it.
-	const Fmatrix saved_w = RCache.xforms.m_w, saved_v = RCache.xforms.m_v, saved_p = RCache.xforms.m_p;
-	RCache.set_xform_view(view);
-	RCache.set_xform_project(proj);
-	for (u32 i = 0; i < count; ++i)
-		draw_visual(P, static_cast<dxRender_Visual*>(visuals[i]), xforms[i]);
+	draw_meshes(P, view, proj, visuals, xforms, count, shading, grading);
 
 	SBox box;
 	rect_box(box, 0, 0, w, h);
 	HW.pContext->CopySubresourceRegion(rt->pSurface, 0, x, y, 0, P.scratch->pSurface, 0, &box);
 
-	RCache.set_xform_world(saved_w);
-	RCache.set_xform_view(saved_v);
-	RCache.set_xform_project(saved_p);
 	RCache.set_RT(HW.pBaseRT);
 	RCache.set_ZB(HW.pBaseZB);
 	vp.Width = float(Device.dwWidth);

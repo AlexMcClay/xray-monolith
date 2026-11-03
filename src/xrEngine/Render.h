@@ -384,8 +384,18 @@ public:
 	// Model previews (DX10/11; the others return false). Draws visuals[i] at xforms[i] with
 	// `view` and `proj` into the rect (x, y, w, h) of the named $user$ texture, created or resized
 	// to tw x th on demand. The rect is cleared to transparent first; UI shows it by that name.
+	// Flags: ePreviewSupersample draws at twice the size with MSAA and brings it down with clean
+	// edges (when 2w x 2h fits); ePreviewHalo adds a soft dark halo under the model (with
+	// supersampling only). `params` reaches the preview shaders as gs_preview_params (null: 1, 1, 1, 0) and
+	// `grade` as gs_preview_grade (null: 1, 1, 0, 0).
+	enum
+	{
+		ePreviewSupersample = 1 << 0,
+		ePreviewHalo = 1 << 1,
+	};
 	virtual bool PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const Fmatrix& view,
-							   const Fmatrix& proj, IRenderVisual* const* visuals, const Fmatrix* xforms, u32 count)
+							   const Fmatrix& proj, IRenderVisual* const* visuals, const Fmatrix* xforms, u32 count,
+							   u32 flags = 0, const Fvector4* params = nullptr, const Fvector4* grade = nullptr)
 	{
 		return false;
 	}

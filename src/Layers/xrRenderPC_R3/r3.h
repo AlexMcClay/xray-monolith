@@ -418,7 +418,8 @@ public:
 	virtual u32 active_phase() { return phase; }; //Swatz: actor shadow
 	void RenderToTarget(RRT target) override;
 	bool PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const Fmatrix& view,
-					   const Fmatrix& proj, IRenderVisual* const* visuals, const Fmatrix* xforms, u32 count) override;
+					   const Fmatrix& proj, IRenderVisual* const* visuals, const Fmatrix* xforms, u32 count,
+					   u32 flags = 0, const Fvector4* params = nullptr, const Fvector4* grade = nullptr) override;
 	u32 PreviewReadBegin(LPCSTR target, u32 x, u32 y, u32 w, u32 h) override;
 	int PreviewReadEnd(u32 ticket, void* out) override;
 	bool PreviewWriteRect(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const void* pixels) override;

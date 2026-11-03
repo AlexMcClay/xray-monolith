@@ -37,6 +37,11 @@ namespace gunsmith
 			PAGE_COLS = ATLAS_W / ICON_W,
 			PAGE_CELLS = PAGE_COLS * (ATLAS_H / ICON_H),
 			MAX_PAGES = 8,
+			BAKE_CELL = 50, // a static icon's pixels a cell (Anomaly's inventory grid)
+			BAKE_W = 2048, // the bake's target: slots of BAKE_SLOT x BAKE_SLOT, a picture in each
+			BAKE_H = 1024,
+			BAKE_SLOT = 512,
+			BAKE_SLOTS = (BAKE_W / BAKE_SLOT) * (BAKE_H / BAKE_SLOT),
 			VIEW_W = 1024, // default view texture size; view_resolution() changes it
 			VIEW_H = 512,
 			VIEW_MAX = 2048,
@@ -83,6 +88,13 @@ namespace gunsmith
 		// models), so neither their icons nor their first sight in the world wait for files. For a loading screen.
 		// Returns how many objects.
 		u32 preload();
+
+		// Bakes the static icons: every section whose icons_texture is in ui\gunsmith\ (guns with their default
+		// build, parts on their own), drawn as the live icons are, at the static icon's size (BAKE_CELL a cell),
+		// into appdata\gunsmith_bake\<section>.tga with bake.txt (section, kind, icons_texture, x, y, w, h in cells,
+		// the model files), a few a frame (console gs_icon_bake [filter]). Tarkov Extract Data\tools\gs_icon_bake.py
+		// puts them into the shipped sheets. `filter`: only sections whose name contains it.
+		void bake_start(LPCSTR filter);
 
 		// Workbench view: what it shows, its camera, and view_tick() every frame it is shown.
 		void view_object(u16 id);
@@ -159,6 +171,10 @@ namespace gunsmith
 		const SBuild& object_build(u16 id, const CTree& tree, const shared_str& section, bool part);
 		const SDefault& default_build(const shared_str& section);
 		bool draw_source(const SCell& c, u16& id);
+		// Draws a build into the rect (x, y, w, h) of `target` (tw x th), posed and lit as an icon.
+		bool render_build(const DRAW_LIST& list, LPCSTR section, bool part, u32 w, u32 h, LPCSTR target, u32 tw, u32 th,
+		                  u32 x, u32 y);
+		void bake_step();
 		bool load_icon(u32 index);
 		void save_icons();
 		void cell_origin(u32 index, u32& page, u32& x, u32& y) const;
@@ -175,6 +191,24 @@ namespace gunsmith
 		xr_unordered_map<shared_str, SDefault> m_defaults;
 		xr_vector<SSave> m_saves;
 		xr_vector<u8> m_pixels; // scratch for loading and saving icons
+
+		struct SBakeSlot
+		{
+			u32 ticket = 0;
+			shared_str section, line; // its bake.txt line (without the file's own fields)
+			u32 w = 0, h = 0;
+			bool new_scene = false; // its scene was made for the bake: freed once read back
+		};
+		struct SBake
+		{
+			bool active = false;
+			xr_vector<shared_str> sections;
+			u32 next = 0, done = 0, failed = 0;
+			SBakeSlot slots[BAKE_SLOTS];
+			string_path dir;
+			xr_string manifest;
+		};
+		SBake m_bake;
 		xr_map<shared_str, SScene*> m_scenes;
 		bool m_failed = false;
 

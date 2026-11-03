@@ -24,6 +24,7 @@ namespace gunsmith
 			"$user$gs_icons4", "$user$gs_icons5", "$user$gs_icons6", "$user$gs_icons7",
 		};
 		LPCSTR VIEW_TEXTURE = "$user$gs_view";
+		LPCSTR BAKE_TARGET = "$user$gs_bake";
 		const float VIEW_FOV = deg2rad(30.f);
 		// A cell asked for this frame or the last is in use: it is never given to another build.
 		const u32 CELL_HOLD_FRAMES = 1;
@@ -99,10 +100,18 @@ namespace gunsmith
 		}
 
 		// A tree's build from node `index` down as text: the same for the same parts in the same slots, whatever
-		// order the nodes were added in.
+		// order the nodes were added in. A part's mode is in it when not 0 (a sight's mode can show other meshes,
+		// e.g. a magnifier flipped aside); a weapon's own node 0 mode isn't (the selected sight, devices on).
 		void signature(const CTree& tree, u8 index, xr_string& out)
 		{
 			out += tree.node(index).section.c_str();
+			const u8 mode = tree.node(index).mode;
+			if (mode && (index > 0 || tree.size() == 0 || !is_full_mode(tree.node(0).section.c_str())))
+			{
+				string16 m;
+				xr_sprintf(m, "#%u", u32(mode));
+				out += m;
+			}
 			xr_vector<std::pair<u8, u8>> children; // slot, node
 			for (u8 i = index + 1; i < tree.size(); ++i)
 				if (tree.node(i).parent == index)
@@ -120,6 +129,85 @@ namespace gunsmith
 				out += ';';
 			}
 			out += ')';
+		}
+
+		// An icon's pose ([gunsmith_settings] icon_pose, icon_yaw, icon_scale; a section's gs_icon_* override).
+		struct SPose
+		{
+			bool tarkov;
+			float yaw, pitch, roll, scale;
+			Fvector2 offset; // of the cell: the build moved right and up
+		};
+
+		SPose icon_pose(LPCSTR section)
+		{
+			const SSettings& s = settings();
+			SPose p;
+			p.tarkov = s.icon_tarkov_pose;
+			p.yaw = READ_IF_EXISTS(pSettings, r_float, section, "gs_icon_yaw", s.icon_yaw);
+			p.pitch = READ_IF_EXISTS(pSettings, r_float, section, "gs_icon_pitch", 0.f);
+			p.roll = READ_IF_EXISTS(pSettings, r_float, section, "gs_icon_roll", 0.f);
+			p.scale = clampr(READ_IF_EXISTS(pSettings, r_float, section, "gs_icon_scale", s.icon_scale), 0.2f, 1.5f);
+			p.offset = READ_IF_EXISTS(pSettings, r_fvector2, section, "gs_icon_offset", Fvector2().set(0.f, 0.f));
+			return p;
+		}
+
+		// Everything besides the build that changes an icon's picture, for its icon cache name.
+		xr_string icon_look(LPCSTR section)
+		{
+			const SSettings& s = settings();
+			const SPose p = icon_pose(section);
+			string256 look;
+			xr_sprintf(look, "|pose %d %.2f %.2f %.2f %.3f %.3f %.3f|look %d %.3f %.3f %.3f %.3f %.3f", int(p.tarkov), p.yaw,
+				p.pitch, p.roll, p.scale, p.offset.x, p.offset.y, int(s.icon_halo), s.icon_exposure, s.icon_ambient,
+				s.icon_specular, s.icon_contrast, s.icon_saturation);
+			return xr_string(look);
+		}
+
+		// The preview shaders' gs_preview_params: exposure, ambient, specular, and the halo's radius in source pixels
+		// for a picture `h` pixels high (4.5% of it: 9 for a 200 px icon cell; 0: the shader's default).
+		Fvector4 shading_params(u32 h = 0)
+		{
+			const SSettings& s = settings();
+			return Fvector4().set(s.icon_exposure, s.icon_ambient, s.icon_specular, float(h) * 0.045f);
+		}
+
+		// The preview shader's gs_preview_grade: contrast and saturation after lighting.
+		Fvector4 grade_params()
+		{
+			const SSettings& s = settings();
+			return Fvector4().set(s.icon_contrast, s.icon_saturation, 0.f, 0.f);
+		}
+
+		// A TGA (32-bit, top-down) of w x h pixels in the targets' byte order (RGBA).
+		bool write_tga(LPCSTR path, u32 w, u32 h, const u8* rgba)
+		{
+			FILE* f = fopen(path, "wb");
+			if (!f)
+				return false;
+			u8 head[18] = {};
+			head[2] = 2; // uncompressed true colour
+			head[12] = u8(w & 0xff);
+			head[13] = u8(w >> 8);
+			head[14] = u8(h & 0xff);
+			head[15] = u8(h >> 8);
+			head[16] = 32;
+			head[17] = 0x28; // 8 alpha bits, top-left origin
+			bool ok = fwrite(head, sizeof(head), 1, f) == 1;
+			xr_vector<u8> row(w * 4);
+			for (u32 y = 0; y < h && ok; ++y)
+			{
+				const u8* src = rgba + y * w * 4;
+				for (u32 x = 0; x < w; ++x)
+				{
+					row[x * 4 + 0] = src[x * 4 + 2];
+					row[x * 4 + 1] = src[x * 4 + 1];
+					row[x * 4 + 2] = src[x * 4 + 0];
+					row[x * 4 + 3] = src[x * 4 + 3];
+				}
+				ok = fwrite(row.data(), 1, row.size(), f) == row.size();
+			}
+			return fclose(f) == 0 && ok;
 		}
 
 		void bounds(const xr_vector<std::pair<IRenderVisual*, Fmatrix>>& list, Fbox& box)
@@ -242,7 +330,7 @@ namespace gunsmith
 			c.dirty = true;
 			icon_size(section, c.w, c.h);
 			if (icon_cache::enabled())
-				c.file = icon_cache::file_name(sig, tree, c.w, c.h, part);
+				c.file = icon_cache::file_name(sig + icon_look(section), tree, c.w, c.h, part);
 			m_index[key] = u32(index);
 		}
 
@@ -305,10 +393,10 @@ namespace gunsmith
 	const CPreview::SBuild& CPreview::object_build(u16 id, const CTree& tree, const shared_str& section, bool part)
 	{
 		SBuild& b = m_builds[id];
-		if (!b.valid || b.revision != tree.layout_revision() || b.section != section || b.part != part)
+		if (!b.valid || b.revision != tree.state_revision() || b.section != section || b.part != part)
 		{
 			b.valid = true;
-			b.revision = tree.layout_revision();
+			b.revision = tree.state_revision();
 			b.section = section;
 			b.part = part;
 			b.sig.clear();
@@ -482,10 +570,11 @@ namespace gunsmith
 		{
 			s = xr_new<SScene>();
 			s->root = root;
-			s->tree.build_default(section, 0);
-			s->visuals.ensure(CVisuals::eWorld, K, s->tree, section, nullptr, is_full_mode(section));
+			// a gun with its default build; anything else (a part) is its model alone
 			if (is_full_mode(section))
 			{
+				s->tree.build_default(section, 0);
+				s->visuals.ensure(CVisuals::eWorld, K, s->tree, section, nullptr, true);
 				// As on a live full-mode gun (CWeapon::UpdateAddonsVisibility, addons disabled): the
 				// receiver model's old addon meshes stay hidden, e.g. the AK-12's GP-25.
 				for (LPCSTR bone : { "wpn_scope", "wpn_silencer", "wpn_launcher" })
@@ -546,37 +635,9 @@ namespace gunsmith
 		DRAW_LIST list;
 		if (!draw_list(id, c.section.c_str(), list))
 			return;
-
-		Fbox box;
-		bounds(list, box);
-		Fvector centre, size;
-		box.getcenter(centre);
-		box.getsize(size);
-
-		// Orthographic, from the gun's right (+X), up +Y: the muzzle (+Z) points right. A part
-		// faces -Z, so it is seen from -X to point the same way.
-		const float aspect = float(c.w) / float(c.h);
-		const float width = _max(size.z, size.y * aspect) * 1.04f;
-		const float height = width / aspect;
-		Fvector from, dir, up;
-		dir.set(c.part ? 1.f : -1.f, 0.f, 0.f);
-		up.set(0.f, 1.f, 0.f);
-		from.mad(centre, dir, -(size.x * 0.5f + 1.f));
-		Fmatrix view, proj;
-		view.build_camera_dir(from, dir, up);
-		proj.build_projection_ortho(width, height, 0.05f, size.x + 2.f);
-
-		xr_vector<IRenderVisual*> visuals;
-		xr_vector<Fmatrix> xforms;
-		for (const auto& item : list)
-		{
-			visuals.push_back(item.first);
-			xforms.push_back(item.second);
-		}
 		u32 page, x, y;
 		cell_origin(index, page, x, y);
-		if (!::Render->PreviewRender(page_texture(page), ATLAS_W, ATLAS_H, x, y, c.w, c.h, view, proj, visuals.data(),
-		                             xforms.data(), u32(visuals.size())))
+		if (!render_build(list, c.section.c_str(), c.part, c.w, c.h, page_texture(page), ATLAS_W, ATLAS_H, x, y))
 		{
 			m_failed = true;
 			return;
@@ -593,7 +654,250 @@ namespace gunsmith
 				m_saves.push_back(save);
 		}
 		if (g_gs_debug & eGsDebugPreview)
-			Msg("- [gunsmith] preview: drew icon %u [%s], %u models", index, c.key.c_str(), u32(visuals.size()));
+			Msg("- [gunsmith] preview: drew icon %u [%s], %u models", index, c.key.c_str(), u32(list.size()));
+	}
+
+	bool CPreview::render_build(const DRAW_LIST& list, LPCSTR section, bool part, u32 w, u32 h, LPCSTR target, u32 tw,
+	                            u32 th, u32 x, u32 y)
+	{
+		Fbox box;
+		bounds(list, box);
+		Fvector centre;
+		box.getcenter(centre);
+		const float radius = _max(box.getradius(), 0.05f);
+
+		// Orthographic. Tarkov's pose (its icon camera looks along +Z at every gun turned -115 degrees): the gun's
+		// left side from -X, the muzzle (+Z) to the left, turned `yaw` degrees with the muzzle towards the camera.
+		// The side pose: the right side from +X, the muzzle to the right, as vanilla icons. A part faces -Z, so it
+		// is seen from the other side to point the same way. Then pitch (from above) and roll.
+		const SPose pose = icon_pose(section);
+		const bool from_left = pose.tarkov != part;
+		Fvector dir, up, right;
+		dir.set(from_left ? 1.f : -1.f, 0.f, 0.f);
+		Fmatrix turn;
+		turn.rotateY(deg2rad(pose.tarkov ? pose.yaw : -pose.yaw));
+		turn.transform_dir(dir);
+		up.set(0.f, 1.f, 0.f);
+		if (!fis_zero(pose.pitch))
+		{
+			const float p = deg2rad(pose.pitch);
+			Fvector d = dir;
+			dir.mul(d, _cos(p)).mad(up, -_sin(p));
+			up.mul(_cos(p)).mad(d, _sin(p));
+		}
+		dir.normalize();
+		right.crossproduct(up, dir).normalize();
+		if (!fis_zero(pose.roll))
+		{
+			const float r = deg2rad(pose.roll);
+			Fvector u = up;
+			up.mul(u, _cos(r)).mad(right, _sin(r));
+		}
+		up.crossproduct(dir, right).normalize();
+		right.crossproduct(up, dir).normalize();
+
+		// The build's box as the camera sees it, from every model's own box (tighter than the world box once turned).
+		Fvector from;
+		from.mad(centre, dir, -(radius + 1.f));
+		Fmatrix view, proj;
+		view.build_camera_dir(from, dir, up);
+		Fbox seen;
+		seen.invalidate();
+		for (const auto& item : list)
+		{
+			const Fbox& b = item.first->getVisData().box;
+			for (u32 i = 0; i < 8; ++i)
+			{
+				Fvector p;
+				b.getpoint(i, p);
+				item.second.transform_tiny(p);
+				view.transform_tiny(p);
+				seen.modify(p);
+			}
+		}
+
+		// Tarkov's fit (CenterByBounds): the box's wider side fills `scale` of the cell, centred, then the offset.
+		const float aspect = float(w) / float(h);
+		const float width = _max(seen.x2 - seen.x1, (seen.y2 - seen.y1) * aspect) / pose.scale;
+		const float height = width / aspect;
+		const float cx = (seen.x1 + seen.x2) * 0.5f - pose.offset.x * width;
+		const float cy = (seen.y1 + seen.y2) * 0.5f - pose.offset.y * height;
+		from.mad(right, cx).mad(up, cy);
+		view.build_camera_dir(from, dir, up);
+		proj.build_projection_ortho(width, height, _max(seen.z1 - 0.5f, 0.01f), seen.z2 + 0.5f);
+
+		xr_vector<IRenderVisual*> visuals;
+		xr_vector<Fmatrix> xforms;
+		for (const auto& item : list)
+		{
+			visuals.push_back(item.first);
+			xforms.push_back(item.second);
+		}
+		const Fvector4 shading = shading_params(h), grade = grade_params();
+		const u32 flags = IRender_interface::ePreviewSupersample | (settings().icon_halo ? IRender_interface::ePreviewHalo : 0);
+		return ::Render->PreviewRender(target, tw, th, x, y, w, h, view, proj, visuals.data(), xforms.data(),
+		                               u32(visuals.size()), flags, &shading, &grade);
+	}
+
+	void CPreview::bake_start(LPCSTR filter)
+	{
+		if (!available())
+		{
+			Msg("! [gunsmith] icon bake: previews aren't available (DX10/11 and the Framework's preview shaders)");
+			return;
+		}
+		if (m_bake.active)
+		{
+			Msg("! [gunsmith] icon bake: already running (%u of %u)", m_bake.next, u32(m_bake.sections.size()));
+			return;
+		}
+		m_bake = SBake();
+		for (const CInifile::Sect& sect : pSettings->sections())
+		{
+			LPCSTR name = sect.Name.c_str();
+			if (filter && filter[0] && !strstr(name, filter))
+				continue;
+			LPCSTR tex = nullptr;
+			if (!pSettings->line_exist(name, "icons_texture") || !(tex = pSettings->r_string(name, "icons_texture")))
+				continue;
+			string_path t;
+			xr_strcpy(t, tex);
+			for (char* p = t; *p; ++p)
+				*p = *p == '/' ? '\\' : char(tolower(*p));
+			if (strncmp(t, "ui\\gunsmith\\", 12) != 0 || strstr(t, "ui_gunsmith_tarkov"))
+				continue;
+			const bool gun = is_full_mode(name);
+			if (!gun && !(pSettings->line_exist(name, "visual") && pSettings->line_exist(name, "tags")))
+				continue;
+			m_bake.sections.push_back(sect.Name);
+		}
+		FS.update_path(m_bake.dir, "$app_data_root$", "gunsmith_bake\\");
+		VerifyPath(m_bake.dir);
+		m_bake.active = !m_bake.sections.empty();
+		Msg("- [gunsmith] icon bake: %u icons into %s%s", u32(m_bake.sections.size()), m_bake.dir,
+			m_bake.active ? "" : " (nothing to bake)");
+	}
+
+	void CPreview::bake_step()
+	{
+		// read back: the files
+		for (SBakeSlot& slot : m_bake.slots)
+		{
+			if (!slot.ticket)
+				continue;
+			m_pixels.resize(slot.w * slot.h * 4);
+			const int r = ::Render->PreviewReadEnd(slot.ticket, m_pixels.data());
+			if (r == 0)
+				continue;
+			string_path path;
+			xr_sprintf(path, "%s%s.tga", m_bake.dir, slot.section.c_str());
+			if (r > 0 && write_tga(path, slot.w, slot.h, m_pixels.data()))
+			{
+				m_bake.manifest += slot.line.c_str();
+				m_bake.manifest += "\n";
+				++m_bake.done;
+			}
+			else
+			{
+				Msg("! [gunsmith] icon bake: [%s] could not be read back or written", slot.section.c_str());
+				++m_bake.failed;
+			}
+			if (slot.new_scene)
+			{
+				auto it = m_scenes.find(slot.section);
+				if (it != m_scenes.end())
+				{
+					xr_delete(it->second);
+					m_scenes.erase(it);
+				}
+			}
+			slot = SBakeSlot();
+		}
+
+		// new pictures into the free slots, within the frame's budget
+		const float budget = settings().icon_budget_ms;
+		CTimer timer;
+		timer.Start();
+		for (u32 i = 0; i < BAKE_SLOTS && m_bake.next < m_bake.sections.size(); ++i)
+		{
+			SBakeSlot& slot = m_bake.slots[i];
+			if (slot.ticket)
+				continue;
+			if (timer.GetElapsed_sec() * 1000.f >= budget)
+				break;
+			const shared_str section = m_bake.sections[m_bake.next++];
+			LPCSTR name = section.c_str();
+			const u32 gw = READ_IF_EXISTS(pSettings, r_u32, name, "inv_grid_width", 1);
+			const u32 gh = READ_IF_EXISTS(pSettings, r_u32, name, "inv_grid_height", 1);
+			const u32 w = gw * BAKE_CELL, h = gh * BAKE_CELL;
+			if (!w || !h || w > BAKE_SLOT || h > BAKE_SLOT)
+			{
+				Msg("! [gunsmith] icon bake: [%s] is %ux%u cells, more than a slot", name, gw, gh);
+				++m_bake.failed;
+				continue;
+			}
+			const bool gun = is_full_mode(name);
+			const bool had_scene = m_scenes.find(section) != m_scenes.end();
+			DRAW_LIST list;
+			const u32 sx = (i % (BAKE_W / BAKE_SLOT)) * BAKE_SLOT, sy = (i / (BAKE_W / BAKE_SLOT)) * BAKE_SLOT;
+			if (!draw_list(u16(-1), name, list) || !render_build(list, name, !gun, w, h, BAKE_TARGET, BAKE_W, BAKE_H, sx, sy))
+			{
+				Msg("! [gunsmith] icon bake: [%s] could not be drawn", name);
+				++m_bake.failed;
+				continue;
+			}
+			slot.ticket = ::Render->PreviewReadBegin(BAKE_TARGET, sx, sy, w, h);
+			if (!slot.ticket)
+			{
+				++m_bake.failed;
+				continue;
+			}
+			// the line: section, kind, icons_texture, x, y, w, h (cells), the model files it was drawn from
+			xr_string models;
+			auto add_model = [&](const shared_str& sec) {
+				LPCSTR v = READ_IF_EXISTS(pSettings, r_string, sec.c_str(), "visual", (LPCSTR)nullptr);
+				if (v && v[0])
+				{
+					if (models.size())
+						models += ";";
+					models += v;
+				}
+			};
+			auto it = m_scenes.find(section);
+			if (gun && it != m_scenes.end() && it->second && !it->second->tree.empty())
+				for (const SNode& n : it->second->tree.nodes())
+					add_model(n.section);
+			else
+				add_model(section);
+			string1024 line;
+			xr_sprintf(line, "%s\t%s\t%s\t%u\t%u\t%u\t%u\t%s", name, gun ? "gun" : "part",
+				pSettings->r_string(name, "icons_texture"), READ_IF_EXISTS(pSettings, r_u32, name, "inv_grid_x", 0),
+				READ_IF_EXISTS(pSettings, r_u32, name, "inv_grid_y", 0), gw, gh, models.c_str());
+			slot.section = section;
+			slot.line = line;
+			slot.w = w;
+			slot.h = h;
+			slot.new_scene = !had_scene && !gun;
+		}
+
+		bool pending = false;
+		for (const SBakeSlot& slot : m_bake.slots)
+			pending = pending || slot.ticket != 0;
+		if (m_bake.next % 100 == 0 && m_bake.next && !pending)
+			Msg("- [gunsmith] icon bake: %u of %u", m_bake.next, u32(m_bake.sections.size()));
+		if (m_bake.next >= m_bake.sections.size() && !pending)
+		{
+			string_path path;
+			xr_sprintf(path, "%sbake.txt", m_bake.dir);
+			if (FILE* f = fopen(path, "wb"))
+			{
+				fwrite(m_bake.manifest.data(), 1, m_bake.manifest.size(), f);
+				fclose(f);
+			}
+			Msg("- [gunsmith] icon bake: done, %u icons in %s (%u failed); run Tarkov Extract Data\\tools\\gs_icon_bake.py",
+				m_bake.done, m_bake.dir, m_bake.failed);
+			m_bake.active = false;
+		}
 	}
 
 	void CPreview::draw_view()
@@ -613,8 +917,9 @@ namespace gunsmith
 			visuals.push_back(item.first);
 			xforms.push_back(item.second);
 		}
+		const Fvector4 shading = shading_params(m_view_h), grade = grade_params();
 		if (!::Render->PreviewRender(VIEW_TEXTURE, m_view_w, m_view_h, 0, 0, m_view_w, m_view_h, view, proj, visuals.data(),
-									 xforms.data(), u32(visuals.size())))
+									 xforms.data(), u32(visuals.size()), IRender_interface::ePreviewSupersample, &shading, &grade))
 		{
 			m_failed = true;
 			return;
@@ -697,6 +1002,8 @@ namespace gunsmith
 		if (!available() || !g_pGameLevel)
 			return;
 		save_icons();
+		if (m_bake.active && !m_failed)
+			bake_step();
 
 		// New icons in use, from the icon cache or drawn, until the frame's budget is spent (at least one a frame).
 		// A cell nobody shows waits until it is asked for again; one with nothing to draw it from waits for one.
