@@ -6,6 +6,7 @@
 #include "pch_script.h"
 #include "gunsmith_script.h"
 #include "gunsmith_preview.h"
+#include "gunsmith_icon_cache.h"
 #include "inventory_item_object.h"
 #include "Level.h"
 #include "Weapon.h"
@@ -199,18 +200,67 @@ namespace
 	}
 }
 
-::luabind::object gs_icon_rect_script(lua_State* L, u16 id)
+namespace
 {
-	Frect r;
-	const bool ok = gunsmith::CPreview::instance().icon_rect(id, r);
-	return rect_to_lua(L, ok, r);
+	int icon_token(const gunsmith::CPreview::SIcon& icon)
+	{
+		using gunsmith::CPreview;
+		if (icon.state == CPreview::eIconPending)
+			return -int(icon.cell + 1);
+		if (icon.state == CPreview::eIconReady)
+			return int(icon.cell + 1);
+		return 0;
+	}
+
+	::luabind::object icon_to_lua(lua_State* L, const gunsmith::CPreview::SIcon& icon)
+	{
+		using gunsmith::CPreview;
+		if (icon.state == CPreview::eIconNone)
+			return ::luabind::object();
+		::luabind::object t = ::luabind::newtable(L);
+		t["stock"] = icon.state == CPreview::eIconStock;
+		t["ready"] = icon.state == CPreview::eIconReady;
+		if (icon.state == CPreview::eIconStock)
+			return t;
+		t["token"] = icon_token(icon);
+		t["tex"] = icon.texture;
+		t["x1"] = icon.rect.x1;
+		t["y1"] = icon.rect.y1;
+		t["x2"] = icon.rect.x2;
+		t["y2"] = icon.rect.y2;
+		return t;
+	}
 }
 
-::luabind::object gs_icon_rect_section_script(lua_State* L, LPCSTR section)
+::luabind::object gs_icon_script(lua_State* L, u16 id, bool stock_static)
 {
-	Frect r;
-	const bool ok = gunsmith::CPreview::instance().icon_rect(section, r);
-	return rect_to_lua(L, ok, r);
+	gunsmith::CPreview::SIcon icon;
+	gunsmith::CPreview::instance().icon(id, stock_static, icon);
+	return icon_to_lua(L, icon);
+}
+
+int gs_icon_token(u16 id, bool stock_static)
+{
+	gunsmith::CPreview::SIcon icon;
+	gunsmith::CPreview::instance().icon(id, stock_static, icon);
+	return icon_token(icon);
+}
+
+u32 gs_preload_models()
+{
+	return gunsmith::CPreview::instance().preload();
+}
+
+u32 gs_icon_cache_clear()
+{
+	return gunsmith::icon_cache::clear();
+}
+
+::luabind::object gs_icon_section_script(lua_State* L, LPCSTR section)
+{
+	gunsmith::CPreview::SIcon icon;
+	gunsmith::CPreview::instance().icon(section, icon);
+	return icon_to_lua(L, icon);
 }
 
 ::luabind::object gs_preview_size_script(lua_State* L)
@@ -221,7 +271,6 @@ namespace
 	return t;
 }
 
-LPCSTR gs_icon_texture() { return "$user$gs_icons"; }
 LPCSTR gs_preview_texture() { return "$user$gs_view"; }
 bool gs_preview_available() { return gunsmith::CPreview::instance().available(); }
 void gs_preview_object(u16 id) { gunsmith::CPreview::instance().view_object(id); }
@@ -347,9 +396,11 @@ void gunsmith_script_register(lua_State* L)
 	module(L, "gunsmith")
 		[
 		def("model_bones", &gs_model_bones_script, raw<1>()),
-		def("icon_rect", &gs_icon_rect_script, raw<1>()),
-		def("icon_rect_section", &gs_icon_rect_section_script, raw<1>()),
-		def("icon_texture", &gs_icon_texture),
+		def("icon", &gs_icon_script, raw<1>()),
+		def("icon_token", &gs_icon_token),
+		def("icon_section", &gs_icon_section_script, raw<1>()),
+		def("preload_models", &gs_preload_models),
+		def("icon_cache_clear", &gs_icon_cache_clear),
 		def("preview_texture", &gs_preview_texture),
 		def("preview_size", &gs_preview_size_script, raw<1>()),
 		def("preview_available", &gs_preview_available),

@@ -54,17 +54,26 @@ LPCSTR gs_jam_type_script(CScriptGameObject* self);
 ::luabind::object gs_model_bones_script(lua_State* L, LPCSTR path);
 
 // Previews (gunsmith_preview.h): inventory icons and the workbench view.
-//   gunsmith.icon_rect(id) / icon_rect_section(section)  {x1, y1, x2, y2} in icon_texture(), or nil
+//   gunsmith.icon(id, stock_static) / icon_section(section): nil (nothing to draw, or every cell in use), or
+//     {stock = true} (with stock_static, a gun with its section's default build), or
+//     {ready, token, tex, x1, y1, x2, y2}: the cell's page texture and rect; not ready: keep the static icon
+//   gunsmith.icon_token(id, stock_static): the same without a table, for a check every frame: 0 (nil or stock),
+//     the cell + 1 when ready, -(cell + 1) while pending. Ask every frame an icon is shown, or its cell can be
+//     given to another build (gunsmith_preview.h)
+//   gunsmith.preload_models(): loads the part models of every Gunsmith gun and part item on the level (for a
+//     loading screen); returns how many objects. gunsmith.icon_cache_clear(): deletes the icon cache's files
 //   gunsmith.preview_object(id) / preview_clear()
 //   gunsmith.preview_camera(yaw, pitch, zoom, pan_x, pan_y, aspect), preview_tick() every frame shown
 //   gunsmith.preview_slots()  { {node, slot, u, v, visible}, ... } with the current camera
 //   gunsmith.preview_bounds() {x1, y1, x2, y2} of the build on screen (0..1), or nil
 //   gunsmith.preview_resolution(w, h) the view texture's size (default 1024 x 512)
 //   gunsmith.preview_texture(), preview_size() -> {w, h}, preview_available()
-::luabind::object gs_icon_rect_script(lua_State* L, u16 id);
-::luabind::object gs_icon_rect_section_script(lua_State* L, LPCSTR section);
+::luabind::object gs_icon_script(lua_State* L, u16 id, bool stock_static);
+int gs_icon_token(u16 id, bool stock_static);
+u32 gs_preload_models();
+u32 gs_icon_cache_clear();
+::luabind::object gs_icon_section_script(lua_State* L, LPCSTR section);
 ::luabind::object gs_preview_size_script(lua_State* L);
-LPCSTR gs_icon_texture();
 LPCSTR gs_preview_texture();
 bool gs_preview_available();
 void gs_preview_object(u16 id);

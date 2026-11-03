@@ -389,6 +389,18 @@ public:
 	{
 		return false;
 	}
+	// A rect of a named $user$ preview texture (PreviewRender) to and from memory, 4 bytes a pixel in the texture's
+	// own layout, rows top-down (DX10/11; the others fail). PreviewReadBegin starts copying the rect back to the CPU
+	// and returns a ticket (0: failed); PreviewReadEnd gives its w * h * 4 bytes once the GPU has them: 1 done, 0 not
+	// yet (ask again on a later frame), -1 failed or unknown ticket; the ticket is freed unless it returns 0. A null
+	// `out` drops the ticket.
+	// PreviewWriteRect fills the rect, creating the texture at tw x th on demand (cleared to transparent).
+	virtual u32 PreviewReadBegin(LPCSTR target, u32 x, u32 y, u32 w, u32 h) { return 0; }
+	virtual int PreviewReadEnd(u32 ticket, void* out) { return -1; }
+	virtual bool PreviewWriteRect(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const void* pixels)
+	{
+		return false;
+	}
 	// Constructor/destructor
 	virtual ~IRender_interface();
 protected:

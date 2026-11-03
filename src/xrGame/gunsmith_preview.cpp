@@ -8,6 +8,7 @@
 #include "gunsmith_preview.h"
 #include "gunsmith_visuals.h"
 #include "gunsmith_config.h"
+#include "gunsmith_icon_cache.h"
 #include "Weapon.h"
 #include "inventory_item_object.h"
 #include "Level.h"
@@ -18,10 +19,14 @@ namespace gunsmith
 {
 	namespace
 	{
-		LPCSTR ICON_TEXTURE = "$user$gs_icons";
+		LPCSTR ICON_PAGES[CPreview::MAX_PAGES] = {
+			"$user$gs_icons", "$user$gs_icons1", "$user$gs_icons2", "$user$gs_icons3",
+			"$user$gs_icons4", "$user$gs_icons5", "$user$gs_icons6", "$user$gs_icons7",
+		};
 		LPCSTR VIEW_TEXTURE = "$user$gs_view";
-		const u32 ICONS_PER_FRAME = 8;
 		const float VIEW_FOV = deg2rad(30.f);
+		// A cell asked for this frame or the last is in use: it is never given to another build.
+		const u32 CELL_HOLD_FRAMES = 1;
 
 		CPreview* g_instance = nullptr;
 
@@ -61,11 +66,18 @@ namespace gunsmith
 			return true;
 		}
 
-		// A live object's cell key: the object and its build.
-		void object_key(u16 id, const CTree& tree, string128& key)
+		// A build's cell key: a hash of its signature; part items apart (drawn from their other side).
+		shared_str build_key(const xr_string& sig, bool part)
 		{
-			// the tree's layout revision: a new number whenever its parts change
-			xr_sprintf(key, "o%u:%08x", u32(id), tree.layout_revision());
+			u64 h = 14695981039346656037ull;
+			for (char ch : sig)
+			{
+				h ^= u8(ch);
+				h *= 1099511628211ull;
+			}
+			string32 key;
+			xr_sprintf(key, "b%016llx%s", h, part ? "p" : "");
+			return shared_str(key);
 		}
 
 		// The inventory cell's aspect, fitted into an icon cell.
@@ -84,6 +96,30 @@ namespace gunsmith
 				h = CPreview::ICON_H;
 				w = _max(u32(1), u32(float(CPreview::ICON_H) * aspect));
 			}
+		}
+
+		// A tree's build from node `index` down as text: the same for the same parts in the same slots, whatever
+		// order the nodes were added in.
+		void signature(const CTree& tree, u8 index, xr_string& out)
+		{
+			out += tree.node(index).section.c_str();
+			xr_vector<std::pair<u8, u8>> children; // slot, node
+			for (u8 i = index + 1; i < tree.size(); ++i)
+				if (tree.node(i).parent == index)
+					children.push_back(std::make_pair(tree.node(i).slot, i));
+			if (children.empty())
+				return;
+			std::sort(children.begin(), children.end());
+			out += '(';
+			for (const auto& child : children)
+			{
+				string16 slot;
+				xr_sprintf(slot, "%u:", u32(child.first));
+				out += slot;
+				signature(tree, child.second, out);
+				out += ';';
+			}
+			out += ')';
 		}
 
 		void bounds(const xr_vector<std::pair<IRenderVisual*, Fmatrix>>& list, Fbox& box)
@@ -127,7 +163,7 @@ namespace gunsmith
 
 	CPreview::CPreview()
 	{
-		m_cells.resize((ATLAS_W / ICON_W) * (ATLAS_H / ICON_H));
+		m_cells.resize(MAX_PAGES * PAGE_CELLS);
 		m_view_box.invalidate();
 		Device.seqRender.Add(this, REG_PRIORITY_HIGH);
 	}
@@ -135,6 +171,8 @@ namespace gunsmith
 	CPreview::~CPreview()
 	{
 		Device.seqRender.Remove(this);
+		for (const SSave& save : m_saves)
+			::Render->PreviewReadEnd(save.ticket, nullptr); // dropped
 		for (auto& it : m_scenes)
 			xr_delete(it.second);
 	}
@@ -144,70 +182,235 @@ namespace gunsmith
 		return !m_failed && ::Render->get_dx_level() >= 0x000A0000;
 	}
 
-	bool CPreview::icon_rect(u16 id, Frect& rect)
+	LPCSTR CPreview::page_texture(u32 page)
 	{
+		return ICON_PAGES[page < MAX_PAGES ? page : 0];
+	}
+
+	void CPreview::icon(u16 id, bool stock_static, SIcon& out)
+	{
+		out = SIcon();
 		SSource src;
-		if (!object_source(id, src))
-			return false;
-		string128 key;
-		object_key(id, *src.tree, key);
-		return icon_request(key, id, src.owner.c_str(), src.part, rect);
+		if (!available() || !object_source(id, src))
+			return;
+		const SBuild& b = object_build(id, *src.tree, src.owner, src.part);
+		if (b.sig.empty())
+			return;
+		if (stock_static && b.stock)
+		{
+			out.state = eIconStock;
+			return;
+		}
+		icon_request(b.key, b.sig, *src.tree, id, src.owner.c_str(), src.part, out);
 	}
 
-	bool CPreview::icon_rect(LPCSTR section, Frect& rect)
+	void CPreview::icon(LPCSTR section, SIcon& out)
 	{
-		if (!section || !pSettings->section_exist(section) || !is_full_mode(section))
-			return false;
-		string256 key;
-		xr_sprintf(key, "s%s", section);
-		return icon_request(key, u16(-1), section, false, rect);
+		out = SIcon();
+		if (!available() || !section || !pSettings->section_exist(section) || !is_full_mode(section))
+			return;
+		const SDefault& d = default_build(shared_str(section));
+		if (d.sig.empty())
+			return;
+		icon_request(d.key, d.sig, d.tree, u16(-1), section, false, out);
 	}
 
-	bool CPreview::icon_request(LPCSTR key, u16 id, LPCSTR section, bool part, Frect& rect)
+	void CPreview::icon_request(const shared_str& key, const xr_string& sig, const CTree& tree, u16 id, LPCSTR section,
+	                            bool part, SIcon& out)
 	{
-		if (!available())
-			return false;
-
 		int index = -1;
-		for (u32 i = 0; i < m_cells.size() && index < 0; ++i)
-			if (m_cells[i].key == key)
-				index = int(i);
+		auto it = m_index.find(key);
+		if (it != m_index.end())
+			index = int(it->second);
 
 		if (index < 0)
 		{
-			// The same gun with a different build takes over its old cell; else a free cell,
-			// else the one unused longest.
-			for (u32 i = 0; i < m_cells.size() && index < 0 && id != u16(-1); ++i)
-				if (m_cells[i].id == id)
-					index = int(i);
-			for (u32 i = 0; i < m_cells.size() && index < 0; ++i)
-				if (!m_cells[i].key.size())
-					index = int(i);
+			index = free_cell();
 			if (index < 0)
 			{
-				index = 0;
-				for (u32 i = 1; i < m_cells.size(); ++i)
-					if (m_cells[i].used < m_cells[index].used)
-						index = int(i);
+				if (g_gs_debug & eGsDebugPreview)
+					Msg("- [gunsmith] preview: every icon cell is in use (%u pages), [%s] keeps its static icon", m_pages, section);
+				return;
 			}
 			SCell& c = m_cells[index];
 			if (g_gs_debug & eGsDebugPreview)
-				Msg("- [gunsmith] preview: icon cell %d [%s] (was [%s])", index, key, c.key.size() ? c.key.c_str() : "");
+				Msg("- [gunsmith] preview: icon cell %d [%s] for [%s]", index, key.c_str(), section);
+			c = SCell();
 			c.key = key;
-			c.id = id;
 			c.section = section;
 			c.part = part;
 			c.dirty = true;
 			icon_size(section, c.w, c.h);
+			if (icon_cache::enabled())
+				c.file = icon_cache::file_name(sig, tree, c.w, c.h, part);
+			m_index[key] = u32(index);
 		}
 
 		SCell& c = m_cells[index];
 		c.used = Device.dwFrame;
-		const u32 cols = ATLAS_W / ICON_W;
-		const float x = float((index % cols) * ICON_W);
-		const float y = float((index / cols) * ICON_H);
-		rect.set(x, y, x + float(c.w), y + float(c.h));
+		if (id != u16(-1))
+			c.id = id;
+		u32 page, x, y;
+		cell_origin(u32(index), page, x, y);
+		out.state = c.drawn ? eIconReady : eIconPending;
+		out.cell = u32(index);
+		out.texture = page_texture(page);
+		out.rect.set(float(x), float(y), float(x + c.w), float(y + c.h));
+	}
+
+	void CPreview::cell_origin(u32 index, u32& page, u32& x, u32& y) const
+	{
+		page = index / PAGE_CELLS;
+		const u32 local = index % PAGE_CELLS;
+		x = (local % PAGE_COLS) * ICON_W;
+		y = (local / PAGE_COLS) * ICON_H;
+	}
+
+	// A free cell on the pages in use, else the cell unused longest that nobody asked for this frame or the last,
+	// else the first cell of a new page; -1 when every cell of icon_pages pages is in use.
+	int CPreview::free_cell()
+	{
+		const u32 count = m_pages * PAGE_CELLS;
+		for (u32 i = 0; i < count; ++i)
+			if (!m_cells[i].key.size())
+				return int(i);
+		int best = -1;
+		for (u32 i = 0; i < count; ++i)
+			if (m_cells[i].used + CELL_HOLD_FRAMES < Device.dwFrame && (best < 0 || m_cells[i].used < m_cells[best].used))
+				best = int(i);
+		if (best >= 0)
+		{
+			release(u32(best));
+			return best;
+		}
+		const u32 pages = _min(settings().icon_pages, u32(MAX_PAGES));
+		if (m_pages < pages)
+		{
+			++m_pages;
+			if (g_gs_debug & eGsDebugPreview)
+				Msg("- [gunsmith] preview: icon page %u added", m_pages);
+			return int(count);
+		}
+		return -1;
+	}
+
+	void CPreview::release(u32 index)
+	{
+		SCell& c = m_cells[index];
+		if (c.key.size())
+			m_index.erase(c.key);
+		c = SCell();
+	}
+
+	const CPreview::SBuild& CPreview::object_build(u16 id, const CTree& tree, const shared_str& section, bool part)
+	{
+		SBuild& b = m_builds[id];
+		if (!b.valid || b.revision != tree.layout_revision() || b.section != section || b.part != part)
+		{
+			b.valid = true;
+			b.revision = tree.layout_revision();
+			b.section = section;
+			b.part = part;
+			b.sig.clear();
+			if (!tree.empty())
+				signature(tree, 0, b.sig);
+			b.key = build_key(b.sig, part);
+			b.stock = !part && !b.sig.empty() && b.sig == default_build(section).sig;
+		}
+		return b;
+	}
+
+	const CPreview::SDefault& CPreview::default_build(const shared_str& section)
+	{
+		auto it = m_defaults.find(section);
+		if (it != m_defaults.end())
+			return it->second;
+		SDefault& d = m_defaults[section];
+		d.tree.build_default(section.c_str(), 0);
+		if (!d.tree.empty())
+			signature(d.tree, 0, d.sig);
+		d.key = build_key(d.sig, false);
+		return d;
+	}
+
+	// What a cell's picture can be drawn from now: the object that last asked for it while it still has the build,
+	// else the section's default build when that is the build. False: nothing to draw it from yet.
+	bool CPreview::draw_source(const SCell& c, u16& id)
+	{
+		if (c.id != u16(-1))
+		{
+			SSource src;
+			if (object_source(c.id, src) && src.owner == c.section && object_build(c.id, *src.tree, src.owner, src.part).key == c.key)
+			{
+				id = c.id;
+				return true;
+			}
+		}
+		if (!c.part && default_build(c.section).key == c.key)
+		{
+			id = u16(-1);
+			return true;
+		}
+		return false;
+	}
+
+	// A cell's picture from the icon cache, without any model.
+	bool CPreview::load_icon(u32 index)
+	{
+		SCell& c = m_cells[index];
+		if (!c.file.size() || !icon_cache::load(c.file, c.w, c.h, m_pixels))
+			return false;
+		u32 page, x, y;
+		cell_origin(index, page, x, y);
+		if (!::Render->PreviewWriteRect(page_texture(page), ATLAS_W, ATLAS_H, x, y, c.w, c.h, m_pixels.data()))
+			return false;
+		c.dirty = false;
+		c.drawn = true;
+		if (g_gs_debug & eGsDebugPreview)
+			Msg("- [gunsmith] preview: icon %u [%s] from the cache", index, c.key.c_str());
 		return true;
+	}
+
+	// Drawn icons the GPU has handed back go into the icon cache.
+	void CPreview::save_icons()
+	{
+		for (u32 i = 0; i < m_saves.size();)
+		{
+			const SSave& save = m_saves[i];
+			m_pixels.resize(save.w * save.h * 4);
+			const int done = ::Render->PreviewReadEnd(save.ticket, m_pixels.data());
+			if (done == 0)
+			{
+				++i;
+				continue;
+			}
+			if (done > 0)
+				icon_cache::save(save.file, save.w, save.h, m_pixels.data());
+			m_saves.erase(m_saves.begin() + i);
+		}
+	}
+
+	u32 CPreview::preload()
+	{
+		if (!g_pGameLevel)
+			return 0;
+		CTimer timer;
+		timer.Start();
+		u32 count = 0;
+		for (u32 i = 0, n = Level().Objects.o_count(); i < n; ++i)
+		{
+			CObject* O = Level().Objects.o_get_by_iterator(i);
+			SSource src;
+			if (!O || O->getDestroy() || !object_source(O->ID(), src))
+				continue;
+			if (IKinematics* K = src.root->dcast_PKinematics())
+			{
+				src.visuals->ensure(CVisuals::eWorld, K, *src.tree, src.owner.c_str(), nullptr, true);
+				++count;
+			}
+		}
+		Msg("- [gunsmith] preview: part models of %u guns and parts loaded in %.0f ms", count, timer.GetElapsed_sec() * 1000.f);
+		return count;
 	}
 
 	void CPreview::view_object(u16 id)
@@ -336,12 +539,12 @@ namespace gunsmith
 		return true;
 	}
 
-	void CPreview::draw_icon(u32 index)
+	void CPreview::draw_icon(u32 index, u16 id)
 	{
 		SCell& c = m_cells[index];
 		c.dirty = false;
 		DRAW_LIST list;
-		if (!draw_list(c.id, c.section.c_str(), list))
+		if (!draw_list(id, c.section.c_str(), list))
 			return;
 
 		Fbox box;
@@ -370,14 +573,24 @@ namespace gunsmith
 			visuals.push_back(item.first);
 			xforms.push_back(item.second);
 		}
-		const u32 cols = ATLAS_W / ICON_W;
-		const u32 x = (index % cols) * ICON_W;
-		const u32 y = (index / cols) * ICON_H;
-		if (!::Render->PreviewRender(ICON_TEXTURE, ATLAS_W, ATLAS_H, x, y, c.w, c.h, view, proj, visuals.data(),
+		u32 page, x, y;
+		cell_origin(index, page, x, y);
+		if (!::Render->PreviewRender(page_texture(page), ATLAS_W, ATLAS_H, x, y, c.w, c.h, view, proj, visuals.data(),
 		                             xforms.data(), u32(visuals.size())))
 		{
 			m_failed = true;
 			return;
+		}
+		c.drawn = true;
+		if (c.file.size())
+		{
+			SSave save;
+			save.ticket = ::Render->PreviewReadBegin(page_texture(page), x, y, c.w, c.h);
+			save.file = c.file;
+			save.w = c.w;
+			save.h = c.h;
+			if (save.ticket)
+				m_saves.push_back(save);
 		}
 		if (g_gs_debug & eGsDebugPreview)
 			Msg("- [gunsmith] preview: drew icon %u [%s], %u models", index, c.key.c_str(), u32(visuals.size()));
@@ -483,31 +696,36 @@ namespace gunsmith
 	{
 		if (!available() || !g_pGameLevel)
 			return;
-		// A gun whose build changed is redrawn in its cell, whether or not the UI asks again
-		// (the inventory doesn't refresh a cell when a part is swapped from its menu).
-		for (SCell& c : m_cells)
-		{
-			if (c.id == u16(-1) || c.dirty)
-				continue;
-			SSource src;
-			if (!object_source(c.id, src))
-				continue;
-			string128 key;
-			object_key(c.id, *src.tree, key);
-			if (c.key != key)
-			{
-				c.key = key;
-				c.dirty = true;
-			}
-		}
+		save_icons();
 
-		u32 drawn = 0;
-		for (u32 i = 0; i < m_cells.size() && drawn < ICONS_PER_FRAME && !m_failed; ++i)
+		// New icons in use, from the icon cache or drawn, until the frame's budget is spent (at least one a frame).
+		// A cell nobody shows waits until it is asked for again; one with nothing to draw it from waits for one.
+		const u32 count = m_pages * PAGE_CELLS;
+		const float budget = settings().icon_budget_ms;
+		CTimer timer;
+		timer.Start();
+		bool any = false;
+		for (u32 i = 0; i < count && !m_failed; ++i)
 		{
-			if (!m_cells[i].dirty)
+			SCell& c = m_cells[i];
+			if (!c.dirty || c.used + CELL_HOLD_FRAMES < Device.dwFrame)
 				continue;
-			draw_icon(i);
-			++drawn;
+			if (any && timer.GetElapsed_sec() * 1000.f >= budget)
+				break;
+			if (!c.cache_tried)
+			{
+				c.cache_tried = true;
+				if (load_icon(i))
+				{
+					any = true;
+					continue;
+				}
+			}
+			u16 id;
+			if (!draw_source(c, id))
+				continue;
+			draw_icon(i, id);
+			any = true;
 		}
 		// The view is drawn while the workbench keeps ticking it.
 		if (!m_failed && Device.dwFrame - m_view_tick <= 1 && m_view_id != u16(-1))

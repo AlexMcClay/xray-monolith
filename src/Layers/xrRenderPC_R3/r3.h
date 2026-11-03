@@ -419,6 +419,9 @@ public:
 	void RenderToTarget(RRT target) override;
 	bool PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const Fmatrix& view,
 					   const Fmatrix& proj, IRenderVisual* const* visuals, const Fmatrix* xforms, u32 count) override;
+	u32 PreviewReadBegin(LPCSTR target, u32 x, u32 y, u32 w, u32 h) override;
+	int PreviewReadEnd(u32 ticket, void* out) override;
+	bool PreviewWriteRect(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const void* pixels) override;
 	void PreviewRelease(); // dx10PreviewRender.cpp
 	// Constructor/destructor/loader
 	CRender();

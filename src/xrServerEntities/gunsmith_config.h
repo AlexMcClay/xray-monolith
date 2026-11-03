@@ -179,6 +179,14 @@ namespace gunsmith
 		// npc_laser_distance (30 m) and in front of the camera (a ray each per frame).
 		u32 npc_devices_max;
 		float npc_devices_distance, npc_laser_distance;
+		// Inventory icons (gunsmith_preview): drawing new or changed icons stops for the frame once it has taken
+		// icon_budget_ms (4; at least one icon a frame); at most icon_pages atlas pages of 40 cells (4, 1 to 8).
+		float icon_budget_ms;
+		u32 icon_pages;
+		// The icon disk cache (gunsmith_icon_cache.h): on unless icon_cache = false; kept under icon_cache_mb (256);
+		// icon_cache_version (0) is part of every file name, so a new number starts afresh (e.g. after textures change).
+		bool icon_cache;
+		u32 icon_cache_mb, icon_cache_version;
 	};
 
 	const SSettings& settings();

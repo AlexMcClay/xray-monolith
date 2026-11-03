@@ -428,6 +428,11 @@ namespace gunsmith
 				s.npc_devices_max = READ_IF_EXISTS(pSettings, r_u32, sect, "npc_devices_max", 4);
 				s.npc_devices_distance = READ_IF_EXISTS(pSettings, r_float, sect, "npc_devices_distance", 60.f);
 				s.npc_laser_distance = READ_IF_EXISTS(pSettings, r_float, sect, "npc_laser_distance", 30.f);
+				s.icon_budget_ms = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_budget_ms", 4.f), 0.f, 100.f);
+				s.icon_pages = clampr(READ_IF_EXISTS(pSettings, r_u32, sect, "icon_pages", 4), u32(1), u32(8));
+				s.icon_cache = !!READ_IF_EXISTS(pSettings, r_bool, sect, "icon_cache", true);
+				s.icon_cache_mb = clampr(READ_IF_EXISTS(pSettings, r_u32, sect, "icon_cache_mb", 256), u32(16), u32(8192));
+				s.icon_cache_version = READ_IF_EXISTS(pSettings, r_u32, sect, "icon_cache_version", 0);
 				loaded = true;
 			}
 			return s;

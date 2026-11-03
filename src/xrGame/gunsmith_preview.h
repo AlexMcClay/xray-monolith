@@ -14,11 +14,17 @@ class IRenderVisual;
 
 namespace gunsmith
 {
-	// Two $user$ textures, drawn by IRender_interface::PreviewRender (DX10/11 only):
-	//   $user$gs_icons  inventory icons: an atlas of side views, muzzle to the right like
-	//                   vanilla icons, one cell per build, redrawn when the build changes
+	// $user$ textures, drawn by IRender_interface::PreviewRender (DX10/11 only):
+	//   $user$gs_icons, $user$gs_icons1...  inventory icons: atlas pages of side views, muzzle to
+	//                   the right like vanilla icons, one cell per build (every object with the same
+	//                   parts in the same slots shares it); a page is added when every cell is in use
+	//                   (icon_pages at most)
 	//   $user$gs_view   the workbench view: a perspective the player orbits
-	// A live weapon is drawn from its own models; a section from its gs_default_build.
+	// A cell is filled from the icon disk cache when it has the build (gunsmith_icon_cache.h), else drawn
+	// from the models of an object with that build (or a section's gs_default_build) and then saved there.
+	//
+	// A cell shown by the UI must be asked for again every frame it is shown (icon()): a cell nobody
+	// asked for this frame or the last can be given to another build, never one still asked for.
 	class CPreview : public pureRender
 	{
 	public:
@@ -28,9 +34,31 @@ namespace gunsmith
 			ICON_H = 200,
 			ATLAS_W = 2048,
 			ATLAS_H = 2048,
+			PAGE_COLS = ATLAS_W / ICON_W,
+			PAGE_CELLS = PAGE_COLS * (ATLAS_H / ICON_H),
+			MAX_PAGES = 8,
 			VIEW_W = 1024, // default view texture size; view_resolution() changes it
 			VIEW_H = 512,
 			VIEW_MAX = 2048,
+		};
+
+		// What an icon request found. eNone: nothing to draw (not a full-mode gun or a part carrying parts,
+		// previews unavailable, or every cell of every page in use: keep the static icon). eStock: a weapon
+		// with its section's default build, when the caller has a static icon for that (no cell taken).
+		// ePending: a cell is taken but not drawn yet (keep the static icon). eReady: the cell shows it.
+		enum EIcon
+		{
+			eIconNone,
+			eIconStock,
+			eIconPending,
+			eIconReady,
+		};
+		struct SIcon
+		{
+			EIcon state = eIconNone;
+			u32 cell = 0; // index over every page
+			LPCSTR texture = nullptr; // the cell's page
+			Frect rect; // in the page, pixels
 		};
 
 		CPreview(); // use instance()
@@ -43,11 +71,18 @@ namespace gunsmith
 		bool available() const;
 
 		// The icon of a weapon object (gs_mode = full) or of a part item carrying parts, or of a
-		// section's default build: a rect in the atlas (pixels) with the section's inventory
-		// aspect. A new or changed build is drawn on the next frame. False when previews aren't
-		// available or the object has nothing to show.
-		bool icon_rect(u16 id, Frect& rect);
-		bool icon_rect(LPCSTR section, Frect& rect);
+		// section's default build: a cell with the section's inventory aspect. A new or changed
+		// build is drawn within a few frames (icon_budget_ms of drawing a frame). With
+		// `stock_static`, a weapon whose build is its section's default build takes no cell (eStock).
+		// Asking marks the cell in use for this frame.
+		void icon(u16 id, bool stock_static, SIcon& out);
+		void icon(LPCSTR section, SIcon& out);
+		static LPCSTR page_texture(u32 page);
+
+		// Loads the part models of every Gunsmith gun and part item carrying parts on the level (their world
+		// models), so neither their icons nor their first sight in the world wait for files. For a loading screen.
+		// Returns how many objects.
+		u32 preload();
 
 		// Workbench view: what it shows, its camera, and view_tick() every frame it is shown.
 		void view_object(u16 id);
@@ -82,23 +117,64 @@ namespace gunsmith
 		struct SScene; // a section's default build, loaded once
 		struct SCell
 		{
-			shared_str key; // "o<id>:<tree layout revision>" or "s<section>"
-			u16 id = u16(-1);
+			shared_str key; // "b<hash of the build's signature>", "p" added for a part item
+			u16 id = u16(-1); // the object that last asked for it, drawn from its own models; none: the default build
 			shared_str section;
+			shared_str file; // its icon cache file, or empty
 			u32 used = 0; // frame last asked for
 			u32 w = 0, h = 0; // drawn area, from the cell's top left
 			bool dirty = false;
+			bool drawn = false; // holds the build's picture
 			bool part = false; // a part item: drawn from its other side, so it faces like a gun
+			bool cache_tried = false;
+		};
+		// An object's build, cached per object and layout revision.
+		struct SBuild
+		{
+			shared_str section, key;
+			xr_string sig;
+			u32 revision = 0;
+			bool valid = false, part = false;
+			bool stock = false; // its section's default build
+		};
+		// A section's default build.
+		struct SDefault
+		{
+			shared_str key;
+			xr_string sig;
+			CTree tree;
+		};
+		// A drawn icon on its way back from the GPU, to be saved in the icon cache.
+		struct SSave
+		{
+			u32 ticket;
+			shared_str file;
+			u32 w, h;
 		};
 
-		bool icon_request(LPCSTR key, u16 id, LPCSTR section, bool part, Frect& rect);
+		void icon_request(const shared_str& key, const xr_string& sig, const CTree& tree, u16 id, LPCSTR section,
+		                  bool part, SIcon& out);
+		int free_cell();
+		void release(u32 index);
+		const SBuild& object_build(u16 id, const CTree& tree, const shared_str& section, bool part);
+		const SDefault& default_build(const shared_str& section);
+		bool draw_source(const SCell& c, u16& id);
+		bool load_icon(u32 index);
+		void save_icons();
+		void cell_origin(u32 index, u32& page, u32& x, u32& y) const;
 		bool draw_list(u16 id, LPCSTR section, DRAW_LIST& out);
 		SScene* scene(LPCSTR section);
-		void draw_icon(u32 index);
+		void draw_icon(u32 index, u16 id);
 		void draw_view();
 		void view_matrices(const Fbox& box, Fmatrix& view, Fmatrix& proj) const;
 
-		xr_vector<SCell> m_cells;
+		xr_vector<SCell> m_cells; // PAGE_CELLS a page, m_pages pages
+		u32 m_pages = 1;
+		xr_unordered_map<shared_str, u32> m_index; // cell key -> cell
+		xr_unordered_map<u16, SBuild> m_builds;
+		xr_unordered_map<shared_str, SDefault> m_defaults;
+		xr_vector<SSave> m_saves;
+		xr_vector<u8> m_pixels; // scratch for loading and saving icons
 		xr_map<shared_str, SScene*> m_scenes;
 		bool m_failed = false;
 
