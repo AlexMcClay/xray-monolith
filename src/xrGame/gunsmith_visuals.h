@@ -56,7 +56,7 @@ namespace gunsmith
 		enum { eTacLight = 1, eTacLaser = 2, eTacIrLight = 4, eTacIrLaser = 8, eTacAnyLight = 5, eTacAnyLaser = 10 };
 		struct STacMode
 		{
-			shared_str text; // the mode as written in tactical_modes ("light, laser", "ir light", "light high")
+			shared_str text; // the mode as the ini reads it (no spaces: "light,laser", "ir_light", "light_high")
 			shared_str light, laser;
 			Fvector light_point, laser_point;
 			Fvector light_lens, laser_lens; // where each lens glows (tactical_mode_<n>_light_lens...; else the point)

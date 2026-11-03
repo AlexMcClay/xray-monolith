@@ -302,7 +302,7 @@ bool fire_blocked_script(CScriptGameObject* self)
 }
 
 // Tactical devices: { on = bool, devices = { { node, section, mode, modes = { "light", "light, laser", ... } }, ... } }
-// (each mode's text as its tactical_modes writes it, e.g. "ir light, ir laser" or "light high")
+// (each mode's text as the ini reads it: "ir_light,ir_laser", "light_high")
 ::luabind::object gs_tactical_state_script(lua_State* L, CScriptGameObject* self)
 {
 	CWeapon* weapon = gs_weapon(self, "gs_tactical_state");

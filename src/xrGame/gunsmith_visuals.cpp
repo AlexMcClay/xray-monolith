@@ -108,7 +108,8 @@ namespace gunsmith
 		v.eye_offset = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_eye_offset", 0.f) : 0.f;
 		v.eye_shift = section ? READ_IF_EXISTS(pSettings, r_float, section, "aim_eye_shift", 0.f) : 0.f;
 		// "light | light, laser | laser": one entry per mode, each a comma list of what is on: light, laser,
-		// ir light, ir laser, each maybe followed by a word of its own (high, low) that only names it
+		// ir_light, ir_laser, each maybe followed by _<word> (light_high) that only names it. The ini reader drops
+		// every space outside quotes, so words are joined with '_' ("ir light" would arrive as "irlight", also taken).
 		if (section && pSettings->line_exist(section, "tactical_modes"))
 		{
 			LPCSTR modes = pSettings->r_string(section, "tactical_modes");
@@ -123,9 +124,9 @@ namespace gunsmith
 				for (int w = 0, wc = _GetItemCount(mode, ','); w < wc; ++w)
 				{
 					_Trim(_GetItem(mode, w, what, ','));
-					if (strstr(what, "ir light") == what)
+					if (strstr(what, "ir_light") == what || strstr(what, "irlight") == what)
 						flags |= SPartVisual::eTacIrLight;
-					else if (strstr(what, "ir laser") == what)
+					else if (strstr(what, "ir_laser") == what || strstr(what, "irlaser") == what)
 						flags |= SPartVisual::eTacIrLaser;
 					else if (strstr(what, "light") == what)
 						flags |= SPartVisual::eTacLight;
