@@ -781,12 +781,14 @@ void CWeapon::RenderAttachments()
 	m_gs_devices.render(gunsmith::CVisuals::eWorld);
 }
 
-// Laser beams and dots are in the world in first person too (CWeapon::renderable_Render runs then, without the
-// world model); main pass only.
+// Laser beams and dots are in the world in first person too: from CWeapon::renderable_Render, and from
+// CActor::renderable_Render in first person (where the held gun isn't rendered); main pass, once a frame.
 void CWeapon::gs_render_world()
 {
-	if (m_gs_full_mode && ::Render->active_phase() == 0)
-		m_gs_devices.render_world();
+	if (!m_gs_full_mode || ::Render->active_phase() != 0 || m_gs_world_frame == Device.dwFrame)
+		return;
+	m_gs_world_frame = Device.dwFrame;
+	m_gs_devices.render_world();
 }
 
 void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)

@@ -2259,6 +2259,10 @@ void CActor::renderable_Render()
 	{
 		if (::Render->active_phase() == 0) // can render first person body here
 		{
+			// The held gun's world effects (laser beams and dots): the gun itself isn't rendered in first person
+			if (CWeapon* weapon = smart_cast<CWeapon*>(inventory().ActiveItem()))
+				weapon->gs_render_world();
+
 			if (canRenderLegs(this, m_holder))
 			{
 				m_legs_controller.render();
