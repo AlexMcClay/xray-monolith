@@ -416,6 +416,9 @@ namespace gunsmith
 				s.aim_roll_min = READ_IF_EXISTS(pSettings, r_float, sect, "aim_roll_min", 1.f);
 				s.aim_turn_max = READ_IF_EXISTS(pSettings, r_float, sect, "aim_turn_max", 20.f);
 				s.aim_speed = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "aim_speed", 20.f), 0.5f, 60.f);
+				s.device_shadows = READ_IF_EXISTS(pSettings, r_u32, sect, "device_shadows", 1);
+				s.device_shadow_near = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "device_shadow_near", 0.5f), 0.05f, 3.f);
+				s.device_hide_actor_shadow = !!READ_IF_EXISTS(pSettings, r_bool, sect, "device_hide_actor_shadow", true);
 				loaded = true;
 			}
 			return s;
@@ -423,4 +426,36 @@ namespace gunsmith
 	}
 
 	const SSettings& settings() { return settings_rw(); }
+
+	bool set_setting(LPCSTR name, float value)
+	{
+		SSettings& s = settings_rw();
+		if (!xr_strcmp(name, "device_shadows"))
+			s.device_shadows = u32(_max(value, 0.f) + 0.5f);
+		else if (!xr_strcmp(name, "device_shadow_near"))
+			s.device_shadow_near = clampr(value, 0.05f, 3.f);
+		else if (!xr_strcmp(name, "device_hide_actor_shadow"))
+			s.device_hide_actor_shadow = value != 0.f;
+		else if (!xr_strcmp(name, "aim_speed"))
+			s.aim_speed = clampr(value, 0.5f, 60.f);
+		else
+			return false;
+		return true;
+	}
+
+	bool get_setting(LPCSTR name, float& value)
+	{
+		const SSettings& s = settings_rw();
+		if (!xr_strcmp(name, "device_shadows"))
+			value = float(s.device_shadows);
+		else if (!xr_strcmp(name, "device_shadow_near"))
+			value = s.device_shadow_near;
+		else if (!xr_strcmp(name, "device_hide_actor_shadow"))
+			value = s.device_hide_actor_shadow ? 1.f : 0.f;
+		else if (!xr_strcmp(name, "aim_speed"))
+			value = s.aim_speed;
+		else
+			return false;
+		return true;
+	}
 }

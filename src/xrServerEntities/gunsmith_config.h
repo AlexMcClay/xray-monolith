@@ -162,7 +162,17 @@ namespace gunsmith
 		// in an aiming pose, or the data is bad). The correction follows its target by aim_speed of the remaining
 		// difference per second while the gun is idle (20).
 		float aim_roll_min, aim_turn_max, aim_speed;
+		// Item lights (tactical devices): how many of a holder's lights cast shadows, the strongest first (1;
+		// each costs a shadow-map pass); their shadow map's near plane in metres (0.5: the holder's body and gun
+		// right behind the lens don't block the light); whether the player casts no shadow while one shines (true,
+		// as with the left-hand flashlight).
+		u32 device_shadows;
+		float device_shadow_near;
+		bool device_hide_actor_shadow;
 	};
 
 	const SSettings& settings();
+	// Changes a setting while the game runs (Lua gunsmith.set_setting, e.g. from MCM). False: unknown name.
+	bool set_setting(LPCSTR name, float value);
+	bool get_setting(LPCSTR name, float& value);
 }

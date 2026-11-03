@@ -25,13 +25,10 @@ namespace gunsmith
 		float range = 30.f;
 		Fcolor color;
 		float cone = deg2rad(40.f);
-		shared_str texture, glow_texture;
-		float glow_radius = 0.f;
+		shared_str texture;
 		bool volumetric = false;
 		float vol_quality = 1.f, vol_intensity = 0.15f, vol_distance = 0.4f;
 		float dot_range = 0.25f;
-		shared_str dot_glow_texture;
-		float dot_glow_radius = 0.02f;
 		shared_str beam_visual;
 		float beam_hud_length = 4.f;
 
@@ -53,9 +50,11 @@ namespace gunsmith
 		// Places and lights every device in its current mode. ctx/root/root_xform: the model the
 		// devices are drawn on (CVisuals::eHud with the HUD item's transform, or eWorld with the
 		// weapon's). hud_proj: the HUD projection when ctx is the HUD (laser rays are cast in the
-		// world), else null. ignore: skipped by the laser's ray (the holder).
+		// world), else null. ignore: skipped by the laser's ray (the holder). player: the lights are the
+		// player's own (renderers treat them as the head torch, e.g. less volumetric fog).
+		// The strongest device_shadows lights (gunsmith_settings) cast shadows.
 		void update(const CTree& tree, CVisuals& vis, int ctx, IKinematics* root, const Fmatrix& root_xform,
-					const Fmatrix* hud_proj, CObject* ignore);
+					const Fmatrix* hud_proj, CObject* ignore, bool player);
 		// Switches everything off.
 		void off();
 		// Draws the laser beams placed for `ctx` (from that model's render pass).
@@ -69,9 +68,9 @@ namespace gunsmith
 			u8 node = 0;
 			shared_str section;
 			ref_light light;
-			ref_glow light_glow;
+			float light_score = 0.f; // brightness x range x cone: who gets the shadows
+			bool shadow = false;
 			ref_light dot;
-			ref_glow dot_glow;
 			IRenderVisual* beam[2] = { nullptr, nullptr }; // world, HUD
 			float laser_range = 300.f; // the laser section's range (not light range's r2 variant)
 			float beam_hud_length = 4.f;
@@ -85,7 +84,7 @@ namespace gunsmith
 		bool m_rev_valid = false;
 		bool m_lit = false;
 
-		void build(SDevice& d, bool shadow);
+		void build(SDevice& d);
 		void free_device(SDevice& d);
 		void device_off(SDevice& d);
 	};

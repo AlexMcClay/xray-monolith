@@ -276,6 +276,20 @@ void gs_refresh_stats_script()
 				weapon->gs_rebuild_stats();
 }
 
+// [gunsmith_settings] values that can change while the game runs (gunsmith::set_setting). get: nil if unknown.
+bool gs_set_setting(LPCSTR name, float value)
+{
+	return name && gunsmith::set_setting(name, value);
+}
+
+::luabind::object gs_get_setting_script(lua_State* L, LPCSTR name)
+{
+	float v;
+	if (!name || !gunsmith::get_setting(name, v))
+		return ::luabind::object();
+	return ::luabind::object(L, v);
+}
+
 bool gs_is_full_mode(LPCSTR section)
 {
 	return section && pSettings->section_exist(section) && gunsmith::is_full_mode(section);
@@ -347,6 +361,8 @@ void gunsmith_script_register(lua_State* L)
 		def("preview_bounds", &gs_preview_bounds_script, raw<1>()),
 		def("preview_resolution", &gs_preview_resolution),
 		def("is_full_mode", &gs_is_full_mode),
+		def("set_setting", &gs_set_setting),
+		def("get_setting", &gs_get_setting_script, raw<1>()),
 		def("refresh_stats", &gs_refresh_stats_script),
 		def("carries_parts", &gs_carries_parts)
 	];

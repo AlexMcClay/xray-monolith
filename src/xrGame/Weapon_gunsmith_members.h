@@ -115,8 +115,8 @@ public:
 	// Every device on or off; false without devices.
 	bool gs_devices_set_on(bool on);
 	bool gs_set_device_mode(u8 node, u8 mode);
-	// A device light (not just a laser) is shining in first person or on the world model.
-	bool gs_devices_lit() const { return m_gs_devices.lit(); }
+	// A device light (not just a laser) shines and the player's shadow should go (device_hide_actor_shadow): CActor::AllowActorShadow.
+	bool gs_devices_lit() const { return m_gs_devices.lit() && gunsmith::settings().device_hide_actor_shadow; }
 
 protected:
 	gunsmith::CTacticalDevices m_gs_devices;

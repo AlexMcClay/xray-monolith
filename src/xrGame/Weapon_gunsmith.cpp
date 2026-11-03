@@ -844,7 +844,7 @@ void CWeapon::gs_update_devices()
 		Fmatrix proj;
 		proj.build_projection(deg2rad(GetBaseHudFov() * 83.f), Device.fASPECT, R_VIEWPORT_NEAR,
 							  g_pGamePersistent->Environment().CurrentEnv->far_plane);
-		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eHud, hi->m_model, hi->m_item_transform, &proj, actor);
+		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eHud, hi->m_model, hi->m_item_transform, &proj, actor, true);
 	}
 	else
 	{
@@ -854,7 +854,7 @@ void CWeapon::gs_update_devices()
 			m_gs_devices.off();
 			return;
 		}
-		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eWorld, K, XFORM(), nullptr, actor);
+		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eWorld, K, XFORM(), nullptr, actor, true);
 	}
 }
 

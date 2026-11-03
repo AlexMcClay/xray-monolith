@@ -7,6 +7,7 @@
 #include "stdafx.h"
 #include "gunsmith_tactical.h"
 #include "gunsmith_visuals.h"
+#include "gunsmith_config.h"
 #include "Level.h"
 #include "../Include/xrRender/Kinematics.h"
 #include "../Include/xrRender/RenderVisual.h"
@@ -77,15 +78,11 @@ namespace gunsmith
 			? pSettings->r_fcolor(section, key_r2(section, "color", buf)) : Fcolor().set(1.f, 1.f, 1.f, 1.f);
 		cone = deg2rad(READ_IF_EXISTS(pSettings, r_float, section, "spot_angle", 40.f));
 		texture = READ_IF_EXISTS(pSettings, r_string, section, "spot_texture", "");
-		glow_texture = READ_IF_EXISTS(pSettings, r_string, section, "glow_texture", "");
-		glow_radius = READ_IF_EXISTS(pSettings, r_float, section, "glow_radius", 0.f);
 		volumetric = !!READ_IF_EXISTS(pSettings, r_bool, section, "volumetric", false);
 		vol_quality = READ_IF_EXISTS(pSettings, r_float, section, "volumetric_quality", 1.f);
 		vol_intensity = READ_IF_EXISTS(pSettings, r_float, section, "volumetric_intensity", 0.15f);
 		vol_distance = READ_IF_EXISTS(pSettings, r_float, section, "volumetric_distance", 0.4f);
 		dot_range = READ_IF_EXISTS(pSettings, r_float, section, "dot_range", 0.25f);
-		dot_glow_texture = READ_IF_EXISTS(pSettings, r_string, section, "dot_glow_texture", "");
-		dot_glow_radius = READ_IF_EXISTS(pSettings, r_float, section, "dot_glow_radius", 0.02f);
 		beam_visual = READ_IF_EXISTS(pSettings, r_string, section, "beam_visual", "");
 		beam_hud_length = READ_IF_EXISTS(pSettings, r_float, section, "beam_hud_length", 4.f);
 	}
@@ -94,9 +91,7 @@ namespace gunsmith
 	{
 		device_off(d);
 		d.light.destroy();
-		d.light_glow.destroy();
 		d.dot.destroy();
-		d.dot_glow.destroy();
 		for (IRenderVisual*& v : d.beam)
 			if (v)
 				::Render->model_Delete(v);
@@ -112,7 +107,7 @@ namespace gunsmith
 		m_lit = false;
 	}
 
-	void CTacticalDevices::build(SDevice& d, bool shadow)
+	void CTacticalDevices::build(SDevice& d)
 	{
 		const SPartVisual& pv = part_visual(d.section);
 		bool has_light = false, has_laser = false;
@@ -132,21 +127,15 @@ namespace gunsmith
 			d.light->set_cone(ld.cone);
 			if (ld.texture.size())
 				d.light->set_texture(ld.texture.c_str());
-			// Only one device light casts shadows: each shadowed spot costs a shadow-map pass.
-			d.light->set_shadow(shadow);
+			// Shadows are handed out each frame (update): each shadowed spot costs a shadow-map pass.
+			d.light->set_shadow(false);
+			d.shadow = false;
 			d.light->set_volumetric(ld.volumetric);
 			d.light->set_volumetric_quality(ld.vol_quality);
 			d.light->set_volumetric_intensity(ld.vol_intensity);
 			d.light->set_volumetric_distance(ld.vol_distance);
 			d.light->set_active(false);
-			if (ld.glow_texture.size() && ld.glow_radius > 0.f)
-			{
-				d.light_glow = ::Render->glow_create();
-				d.light_glow->set_texture(ld.glow_texture.c_str());
-				d.light_glow->set_radius(ld.glow_radius);
-				d.light_glow->set_color(ld.color);
-				d.light_glow->set_active(false);
-			}
+			d.light_score = _max(ld.color.r, _max(ld.color.g, ld.color.b)) * ld.range * ld.cone;
 		}
 		if (has_laser)
 		{
@@ -158,14 +147,6 @@ namespace gunsmith
 			d.dot->set_color(zd.color);
 			d.dot->set_shadow(false);
 			d.dot->set_active(false);
-			if (zd.dot_glow_texture.size())
-			{
-				d.dot_glow = ::Render->glow_create();
-				d.dot_glow->set_texture(zd.dot_glow_texture.c_str());
-				d.dot_glow->set_radius(zd.dot_glow_radius);
-				d.dot_glow->set_color(zd.color);
-				d.dot_glow->set_active(false);
-			}
 			d.beam[CVisuals::eWorld] = load_beam(zd.beam_visual, false);
 			d.beam[CVisuals::eHud] = load_beam(zd.beam_visual, true);
 			if (pv.laser_section.size() && pSettings->line_exist(pv.laser_section, "range"))
@@ -197,7 +178,6 @@ namespace gunsmith
 		m_sig = sig;
 		m_rev = tree.layout_revision();
 		m_rev_valid = true;
-		bool shadow_given = false;
 		for (u8 i = 1; i < tree.size(); ++i)
 		{
 			const SNode& n = tree.node(i);
@@ -207,11 +187,7 @@ namespace gunsmith
 			SDevice d;
 			d.node = i;
 			d.section = n.section;
-			bool has_light = false;
-			for (u8 f : pv.tac_modes)
-				has_light |= !!(f & SPartVisual::eTacLight);
-			build(d, has_light && !shadow_given);
-			shadow_given |= has_light;
+			build(d);
 			m_devices.push_back(d);
 		}
 	}
@@ -220,12 +196,8 @@ namespace gunsmith
 	{
 		if (d.light)
 			d.light->set_active(false);
-		if (d.light_glow)
-			d.light_glow->set_active(false);
 		if (d.dot)
 			d.dot->set_active(false);
-		if (d.dot_glow)
-			d.dot_glow->set_active(false);
 		d.beam_ctx = -1;
 	}
 
@@ -237,10 +209,14 @@ namespace gunsmith
 	}
 
 	void CTacticalDevices::update(const CTree& tree, CVisuals& vis, int ctx, IKinematics* root, const Fmatrix& root_xform,
-								  const Fmatrix* hud_proj, CObject* ignore)
+								  const Fmatrix* hud_proj, CObject* ignore, bool player)
 	{
 		m_lit = false;
 		const bool hud = ctx == CVisuals::eHud;
+		const SSettings& gs = settings();
+		// the lights shining this frame, to hand out the shadows
+		SDevice* shining[16];
+		u32 n_shining = 0;
 		for (SDevice& d : m_devices)
 		{
 			const SPartVisual& pv = part_visual(d.section);
@@ -265,25 +241,18 @@ namespace gunsmith
 				Fvector p;
 				M.transform_tiny(p, pv.light_point);
 				d.light->set_hud_mode(hud);
+				d.light->set_is_playerlight(player);
+				// the shadow map's near plane: the holder's body and gun right behind the lens stay out of it
+				d.light->set_virtual_size(gs.device_shadow_near);
 				d.light->set_position(p);
 				d.light->set_rotation(dir, right);
 				d.light->set_active(true);
-				if (d.light_glow)
-				{
-					// glows have no HUD mode: only on the world model
-					d.light_glow->set_position(p);
-					d.light_glow->set_direction(dir);
-					d.light_glow->set_active(!hud);
-				}
+				if (n_shining < sizeof(shining) / sizeof(shining[0]))
+					shining[n_shining++] = &d;
 				m_lit = true;
 			}
-			else
-			{
-				if (d.light)
-					d.light->set_active(false);
-				if (d.light_glow)
-					d.light_glow->set_active(false);
-			}
+			else if (d.light)
+				d.light->set_active(false);
 
 			// Laser: a ray into the world, a dot where it hits, and a beam from the device
 			if (d.dot && (flags & SPartVisual::eTacLaser))
@@ -307,19 +276,9 @@ namespace gunsmith
 					d.dot->set_hud_mode(false);
 					d.dot->set_position(at);
 					d.dot->set_active(true);
-					if (d.dot_glow)
-					{
-						d.dot_glow->set_position(at);
-						d.dot_glow->set_direction(Fvector().invert(wd));
-						d.dot_glow->set_active(true);
-					}
 				}
 				else
-				{
 					d.dot->set_active(false);
-					if (d.dot_glow)
-						d.dot_glow->set_active(false);
-				}
 
 				// The beam model is 1 m long along -Z: stretch it to the laser's length. In first
 				// person it is drawn with the HUD and kept short (beam_hud_length): it fades out there.
@@ -342,9 +301,19 @@ namespace gunsmith
 			{
 				if (d.dot)
 					d.dot->set_active(false);
-				if (d.dot_glow)
-					d.dot_glow->set_active(false);
 				d.beam_ctx = -1;
+			}
+		}
+
+		// The strongest lights get the shadows (device_shadows of them).
+		std::sort(shining, shining + n_shining, [](const SDevice* a, const SDevice* b) { return a->light_score > b->light_score; });
+		for (u32 i = 0; i < n_shining; ++i)
+		{
+			const bool shadow = i < gs.device_shadows;
+			if (shining[i]->shadow != shadow)
+			{
+				shining[i]->light->set_shadow(shadow);
+				shining[i]->shadow = shadow;
 			}
 		}
 	}
