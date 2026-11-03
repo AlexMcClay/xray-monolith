@@ -425,6 +425,9 @@ namespace gunsmith
 				s.laser_bright_k = READ_IF_EXISTS(pSettings, r_float, sect, "laser_bright_k", 1.f);
 				s.laser_dot_size_k = READ_IF_EXISTS(pSettings, r_float, sect, "laser_dot_size_k", 1.f);
 				s.laser_beam_width_k = READ_IF_EXISTS(pSettings, r_float, sect, "laser_beam_width_k", 1.f);
+				s.npc_devices_max = READ_IF_EXISTS(pSettings, r_u32, sect, "npc_devices_max", 4);
+				s.npc_devices_distance = READ_IF_EXISTS(pSettings, r_float, sect, "npc_devices_distance", 60.f);
+				s.npc_laser_distance = READ_IF_EXISTS(pSettings, r_float, sect, "npc_laser_distance", 30.f);
 				loaded = true;
 			}
 			return s;
@@ -456,6 +459,12 @@ namespace gunsmith
 			s.laser_dot_size_k = clampr(value, 0.1f, 10.f);
 		else if (!xr_strcmp(name, "laser_beam_width_k"))
 			s.laser_beam_width_k = clampr(value, 0.1f, 10.f);
+		else if (!xr_strcmp(name, "npc_devices_max"))
+			s.npc_devices_max = u32(_max(value, 0.f) + 0.5f);
+		else if (!xr_strcmp(name, "npc_devices_distance"))
+			s.npc_devices_distance = _max(value, 0.f);
+		else if (!xr_strcmp(name, "npc_laser_distance"))
+			s.npc_laser_distance = _max(value, 0.f);
 		else
 			return false;
 		return true;
@@ -484,6 +493,12 @@ namespace gunsmith
 			value = s.laser_dot_size_k;
 		else if (!xr_strcmp(name, "laser_beam_width_k"))
 			value = s.laser_beam_width_k;
+		else if (!xr_strcmp(name, "npc_devices_max"))
+			value = float(s.npc_devices_max);
+		else if (!xr_strcmp(name, "npc_devices_distance"))
+			value = s.npc_devices_distance;
+		else if (!xr_strcmp(name, "npc_laser_distance"))
+			value = s.npc_laser_distance;
 		else
 			return false;
 		return true;

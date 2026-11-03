@@ -7,6 +7,7 @@
 #include "stdafx.h"
 #include "Weapon.h"
 #include "inventory.h"
+#include "InventoryOwner.h"
 #include "xrserver_objects_alife_items.h"
 #include "actor.h"
 #include "level.h"
@@ -829,18 +830,26 @@ bool CWeapon::gs_set_device_mode(u8 node, u8 mode)
 	return true;
 }
 
-// Devices light only on the actor's active weapon (NPCs' stay off), drawn on the HUD model in
-// first person and on the world model otherwise.
+// Devices light on a holder's active weapon while they are on: the actor's on the HUD model in first person and on
+// the world model otherwise; other holders' (NPCs, whose scripts switch them) on the world model, within the
+// npc_devices_* limits.
 void CWeapon::gs_update_devices()
 {
 	if (!m_gs_full_mode)
 		return;
-	// Other guns (NPCs', the bag's) skip the device list's rebuild check each frame and keep whatever
+	// Other guns (the bag's, holstered ones) skip the device list's rebuild check each frame and keep whatever
 	// they built, off. It is rebuilt when in hand.
-	CActor* actor = smart_cast<CActor*>(H_Parent());
-	if (!actor || actor->inventory().ActiveItem() != this || !gs_devices_on())
+	CObject* holder = H_Parent();
+	CInventoryOwner* owner = smart_cast<CInventoryOwner*>(holder);
+	if (!owner || owner->inventory().ActiveItem() != this || !gs_devices_on())
 	{
 		m_gs_devices.off();
+		return;
+	}
+	CActor* actor = smart_cast<CActor*>(holder);
+	if (!actor)
+	{
+		gs_update_npc_devices(holder);
 		return;
 	}
 	m_gs_devices.sync(m_gs_tree);
@@ -854,7 +863,8 @@ void CWeapon::gs_update_devices()
 		Fmatrix proj;
 		proj.build_projection(deg2rad(GetBaseHudFov() * 83.f), Device.fASPECT, R_VIEWPORT_NEAR,
 							  g_pGamePersistent->Environment().CurrentEnv->far_plane);
-		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eHud, hi->m_model, hi->m_item_transform, &proj, actor, true);
+		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eHud, hi->m_model, hi->m_item_transform, &proj, actor, true,
+							gunsmith::settings().device_shadows);
 	}
 	else
 	{
@@ -864,8 +874,39 @@ void CWeapon::gs_update_devices()
 			m_gs_devices.off();
 			return;
 		}
-		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eWorld, K, XFORM(), nullptr, actor, true);
+		m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eWorld, K, XFORM(), nullptr, actor, true,
+							gunsmith::settings().device_shadows);
 	}
+}
+
+// An NPC's devices: the first npc_devices_max guns a frame within npc_devices_distance of the camera light up,
+// unshadowed; their lasers only near the camera and in front of it.
+void CWeapon::gs_update_npc_devices(CObject* holder)
+{
+	const gunsmith::SSettings& gs = gunsmith::settings();
+	static u32 frame = u32(-1), lit = 0;
+	if (frame != Device.dwFrame)
+	{
+		frame = Device.dwFrame;
+		lit = 0;
+	}
+	Fvector to;
+	to.sub(holder->Position(), Device.vCameraPosition);
+	const float dist = to.magnitude();
+	IKinematics* K = Visual() ? Visual()->dcast_PKinematics() : nullptr;
+	if (!K || dist > gs.npc_devices_distance || lit >= gs.npc_devices_max)
+	{
+		m_gs_devices.off();
+		return;
+	}
+	m_gs_devices.sync(m_gs_tree);
+	if (m_gs_devices.empty())
+		return;
+	++lit;
+	if (dist > EPS_L)
+		to.div(dist);
+	const bool lasers = dist <= gs.npc_laser_distance && to.dotproduct(Device.vCameraDirection) > 0.3f;
+	m_gs_devices.update(m_gs_tree, m_gs_visuals, gunsmith::CVisuals::eWorld, K, XFORM(), nullptr, holder, false, 0, lasers);
 }
 
 bool CWeapon::hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos)

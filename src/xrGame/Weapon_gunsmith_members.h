@@ -121,6 +121,7 @@ public:
 protected:
 	gunsmith::CTacticalDevices m_gs_devices;
 	void gs_update_devices();
+	void gs_update_npc_devices(CObject* holder);
 
 public:
 	void gs_render_world(bool from_actor = false);

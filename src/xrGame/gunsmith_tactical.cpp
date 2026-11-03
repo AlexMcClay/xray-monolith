@@ -336,7 +336,7 @@ namespace gunsmith
 	}
 
 	void CTacticalDevices::update(const CTree& tree, CVisuals& vis, int ctx, IKinematics* root, const Fmatrix& root_xform,
-								  const Fmatrix* hud_proj, CObject* ignore, bool player)
+								  const Fmatrix* hud_proj, CObject* ignore, bool player, u32 shadows, bool lasers)
 	{
 		m_lit = false;
 		const bool hud = ctx == CVisuals::eHud;
@@ -399,7 +399,7 @@ namespace gunsmith
 				d.light->set_active(false);
 
 			// Laser: a ray into the world, a dot where it hits, a beam from the device to the dot
-			const SLightDesc* Z = d.laser_def;
+			const SLightDesc* Z = lasers ? d.laser_def : nullptr;
 			if (Z && (!Z->ir || gs.ir_visible))
 			{
 				Fvector p;
@@ -496,11 +496,11 @@ namespace gunsmith
 			}
 		}
 
-		// The strongest lights get the shadows (device_shadows of them).
+		// The strongest lights get the shadows (`shadows` of them).
 		std::sort(shining, shining + n_shining, [](const SDevice* a, const SDevice* b) { return a->light_score > b->light_score; });
 		for (u32 i = 0; i < n_shining; ++i)
 		{
-			const bool shadow = i < gs.device_shadows;
+			const bool shadow = i < shadows;
 			if (shining[i]->shadow != shadow)
 			{
 				shining[i]->light->set_shadow(shadow);

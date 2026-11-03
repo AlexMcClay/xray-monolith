@@ -174,6 +174,11 @@ namespace gunsmith
 		bool ir_visible;
 		float device_light_range_k, device_light_bright_k;
 		float laser_bright_k, laser_dot_size_k, laser_beam_width_k;
+		// Devices on other holders' guns (NPCs; on and off is their scripts' call): at most npc_devices_max (4) of
+		// them lit at once, within npc_devices_distance (60 m) of the camera, with no shadows; their lasers only within
+		// npc_laser_distance (30 m) and in front of the camera (a ray each per frame).
+		u32 npc_devices_max;
+		float npc_devices_distance, npc_laser_distance;
 	};
 
 	const SSettings& settings();

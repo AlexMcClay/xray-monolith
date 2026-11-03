@@ -66,10 +66,10 @@ namespace gunsmith
 		// devices are drawn on (CVisuals::eHud with the HUD item's transform, or eWorld with the
 		// weapon's). hud_proj: the HUD projection when ctx is the HUD (laser rays, beams and dots are in the
 		// world), else null. ignore: skipped by the laser's ray (the holder). player: the lights are the
-		// player's own (renderers treat them as the head torch, e.g. less volumetric fog).
-		// The strongest device_shadows lights (gunsmith_settings) cast shadows.
+		// player's own (renderers treat them as the head torch, e.g. less volumetric fog). The strongest
+		// `shadows` lights cast shadows. lasers: false leaves the lasers off (no ray, beam or dot).
 		void update(const CTree& tree, CVisuals& vis, int ctx, IKinematics* root, const Fmatrix& root_xform,
-					const Fmatrix* hud_proj, CObject* ignore, bool player);
+					const Fmatrix* hud_proj, CObject* ignore, bool player, u32 shadows, bool lasers = true);
 		// Switches everything off.
 		void off();
 		// Draws the lit lenses placed for `ctx` (from that model's render pass).
