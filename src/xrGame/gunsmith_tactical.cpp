@@ -115,8 +115,11 @@ namespace gunsmith
 		}
 
 		// The lens glow: brighter and larger as the device points at the camera (Tarkov's flare fades in from
-		// lens_angle_min, the cosine to the device's axis).
-		void place_lens(Fmatrix& M, const SLightDesc& def, const Fvector& at, const Fvector& dir)
+		// lens_angle_min, the cosine to the device's axis). dim: an infrared emitter seen without night vision, its lens
+		// only, faint and without the flare.
+		const float IR_LENS_DIM = 0.35f; // Tarkov's IR lens disc (0.257) against a light's (0.749)
+
+		void place_lens(Fmatrix& M, const SLightDesc& def, const Fvector& at, const Fvector& dir, bool dim = false)
 		{
 			Fvector to_cam;
 			to_cam.sub(Device.vCameraPosition, at);
@@ -125,10 +128,10 @@ namespace gunsmith
 				to_cam.invert(dir);
 			else
 				to_cam.div(dist);
-			const float a = clampr((dir.dotproduct(to_cam) - def.lens_angle_min) / _max(1.f - def.lens_angle_min, EPS_L), 0.f, 1.f);
+			const float a = dim ? 0.f : clampr((dir.dotproduct(to_cam) - def.lens_angle_min) / _max(1.f - def.lens_angle_min, EPS_L), 0.f, 1.f);
 			Fvector c;
 			c.mad(at, to_cam, 0.002f);
-			facing_xform(M, c, to_cam, def.lens_size * (1.f + 1.5f * a), def.lens_intensity * (0.35f + 0.65f * a));
+			facing_xform(M, c, to_cam, def.lens_size * (1.f + 1.5f * a), def.lens_intensity * (0.35f + 0.65f * a) * (dim ? IR_LENS_DIM : 1.f));
 		}
 	}
 
@@ -395,8 +398,19 @@ namespace gunsmith
 					d.lens_ctx[eLensLight] = ctx;
 				}
 			}
-			else if (d.light)
-				d.light->set_active(false);
+			else
+			{
+				if (d.light)
+					d.light->set_active(false);
+				// an infrared light without night vision: its lens only, faintly (Tarkov's dim IR lens)
+				if (L && L->ir && d.lens[eLensLight][ctx] && L->lens_size > 0.f)
+				{
+					Fvector lp;
+					M.transform_tiny(lp, md.light_lens);
+					place_lens(d.lens_xform[eLensLight], *L, lp, dir, true);
+					d.lens_ctx[eLensLight] = ctx;
+				}
+			}
 
 			// Laser: a ray into the world, a dot where it hits, a beam from the device to the dot
 			const SLightDesc* Z = lasers ? d.laser_def : nullptr;
@@ -493,6 +507,14 @@ namespace gunsmith
 				if (d.dot)
 					d.dot->set_active(false);
 				d.beam_on = d.dot_on = false;
+				// an infrared laser without night vision: its lens only, faintly
+				if (Z && Z->ir && d.lens[eLensLaser][ctx] && Z->lens_size > 0.f)
+				{
+					Fvector lp;
+					M.transform_tiny(lp, md.laser_lens);
+					place_lens(d.lens_xform[eLensLaser], *Z, lp, dir, true);
+					d.lens_ctx[eLensLaser] = ctx;
+				}
 			}
 		}
 
