@@ -781,13 +781,13 @@ void CWeapon::RenderAttachments()
 	m_gs_devices.render(gunsmith::CVisuals::eWorld);
 }
 
-// Laser beams and dots are in the world in first person too: from CWeapon::renderable_Render, and from
-// CActor::renderable_Render in first person (where the held gun isn't rendered); main pass, once a frame.
-void CWeapon::gs_render_world()
+// Laser beams and dots are in the world in first person too. The gun on the HUD isn't rendered in the world, so
+// then CActor::renderable_Render draws them (from_actor); otherwise CWeapon::renderable_Render. Main phase, every
+// traversal of it: the renderer keeps each visual only in the traversal of its shader's priority.
+void CWeapon::gs_render_world(bool from_actor)
 {
-	if (!m_gs_full_mode || ::Render->active_phase() != 0 || m_gs_world_frame == Device.dwFrame)
+	if (!m_gs_full_mode || ::Render->active_phase() != 0 || from_actor != !!GetHUDmode())
 		return;
-	m_gs_world_frame = Device.dwFrame;
 	m_gs_devices.render_world();
 }
 

@@ -121,10 +121,9 @@ public:
 protected:
 	gunsmith::CTacticalDevices m_gs_devices;
 	void gs_update_devices();
-	u32 m_gs_world_frame = u32(-1); // the frame gs_render_world last drew
 
 public:
-	void gs_render_world();
+	void gs_render_world(bool from_actor = false);
 
 protected:
 	// Aiming through a fitted sight part: corrects UpdateHudAdditional's aim offset (Weapon_gunsmith.cpp) for the

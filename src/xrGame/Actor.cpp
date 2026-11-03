@@ -2261,7 +2261,7 @@ void CActor::renderable_Render()
 		{
 			// The held gun's world effects (laser beams and dots): the gun itself isn't rendered in first person
 			if (CWeapon* weapon = smart_cast<CWeapon*>(inventory().ActiveItem()))
-				weapon->gs_render_world();
+				weapon->gs_render_world(true);
 
 			if (canRenderLegs(this, m_holder))
 			{
