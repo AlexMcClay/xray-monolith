@@ -3495,6 +3495,7 @@
     <ClCompile Include="gunsmith_tactical.cpp" />
     <ClCompile Include="gunsmith_grip_ik.cpp" />
     <ClCompile Include="hud_hand_ik.cpp" />
+    <ClCompile Include="hud_item_layers.cpp" />
     <ClCompile Include="gunsmith_preview.cpp" />
     <ClCompile Include="gunsmith_icon_cache.cpp" />
     <ClCompile Include="gunsmith_console.cpp" />

@@ -8771,6 +8771,9 @@
     <ClCompile Include="hud_hand_ik.cpp">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClCompile>
+    <ClCompile Include="hud_item_layers.cpp">
+      <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
+    </ClCompile>
     <ClCompile Include="gunsmith_preview.cpp">
       <Filter>AI\AScript\ScriptClasses\ScriptGameObject</Filter>
     </ClCompile>

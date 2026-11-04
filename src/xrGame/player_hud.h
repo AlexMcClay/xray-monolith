@@ -368,6 +368,21 @@ struct attachable_hud_item
 	u32 m_upd_firedeps_frame;
 	void tune(Ivector values);
 	u32 anim_play(const shared_str& anim_name, BOOL bMixIn, const CMotionDef*& md, u8& rnd, float speed = 0, bool bMixIn2 = true);
+
+	// Animation layers (hud_item_layers.cpp): a HUD motion (`anm`, a key of the item's HUD section, as anim_play takes
+	// it) on one bone partition of the item's model, on channel 1, which overrides channel 0 (where every HUD motion
+	// plays) for that partition's bones: whatever the item plays, those bones follow the layer. `loop`: it cycles,
+	// else it holds its last frame; `speed` 0: the HUD key's own. Kept until stopped or the model goes.
+	bool layer_play(const shared_str& part, const shared_str& anm, float speed, bool loop);
+	void layer_stop(const shared_str& part);
+	// The HUD key the layer on `part` plays, or empty
+	shared_str layer(const shared_str& part);
+	struct SLayer
+	{
+		shared_str anm;
+		MotionID motion;
+	};
+	xr_map<shared_str, SLayer> m_layers;
 };
 
 class player_hud
@@ -493,6 +508,10 @@ public:
 	float get_ik_weight(u32 hand);
 	Fmatrix get_ik_hand(u32 hand);
 	Fmatrix get_ik_hand_bone(u32 hand, u32 item, LPCSTR bone);
+	// script (player_hud:...): animation layers on HUD item `item`'s model (attachable_hud_item::layer_play)
+	bool play_item_layer(u32 item, LPCSTR part, LPCSTR anm, float speed, bool loop);
+	void stop_item_layer(u32 item, LPCSTR part);
+	LPCSTR item_layer(u32 item, LPCSTR part);
 	Fvector m_adjust_offset[2][10]; // pos,rot/ normal,aim,GL,aim_alt,safemode, normal2, attach_base, attach_mount, aim for attach, alt aim for attach
 	Fvector m_adjust_obj[2]; // pos,rot; used for the item/weapon itself
 	Fvector m_adjust_ui_offset[2]; // pos,rot; used for custom device ui
