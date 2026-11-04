@@ -229,6 +229,22 @@ bool fire_blocked_script(CScriptGameObject* self)
 	return weapon && weapon->IsFireBlocked();
 }
 
+// What the first-person rounds show (CWeapon::SetHudRounds): the magazine's count, the chamber and the ejection port
+// (0 nothing, 1 a round, 2 a fired case), -1 each for the default; the magazine's ammo section ("" for the loaded ones).
+void set_hud_rounds_script(CScriptGameObject* self, int mag, int chamber, int port, LPCSTR section)
+{
+	if (CWeapon* weapon = self ? smart_cast<CWeapon*>(&self->object()) : nullptr)
+		weapon->SetHudRounds(mag, chamber, port, section);
+}
+
+// Each chamber's and port's round (CWeapon::SetHudRoundSlots): a digit per mount, 0 nothing, 1 a round, 2 a case,
+// another character the set_hud_rounds value.
+void set_hud_round_slots_script(CScriptGameObject* self, LPCSTR chambers, LPCSTR ports)
+{
+	if (CWeapon* weapon = self ? smart_cast<CWeapon*>(&self->object()) : nullptr)
+		weapon->SetHudRoundSlots(chambers, ports);
+}
+
 // The section of the sight the weapon aims through (gs_mode = full), or nil.
 ::luabind::object gs_sight_section_script(lua_State* L, CScriptGameObject* self)
 {
@@ -438,6 +454,8 @@ bool fire_blocked_script(CScriptGameObject* self)
 		.def("gs_jam_type", &gs_jam_type_script)
 		.def("set_fire_blocked", &set_fire_blocked_script)
 		.def("fire_blocked", &fire_blocked_script)
+		.def("set_hud_rounds", &set_hud_rounds_script)
+		.def("set_hud_round_slots", &set_hud_round_slots_script)
 		.def("gs_can_attach", &gs_can_attach_script)
 		.def("gs_attach", &gs_attach_script)
 		.def("gs_detach", &gs_detach_spawn_script, raw<1>())

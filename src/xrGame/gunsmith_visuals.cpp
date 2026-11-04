@@ -154,6 +154,13 @@ namespace gunsmith
 				v.tac_mode_data.push_back(md);
 			}
 		}
+		if (section && pSettings->line_exist(section, "gs_rounds"))
+		{
+			LPCSTR list = pSettings->r_string(section, "gs_rounds");
+			string64 item;
+			for (int i = 0, n = _GetItemCount(list); i < n; ++i)
+				v.round_mounts.push_back(_Trim(_GetItem(list, i, item)));
+		}
 		v.grip_priority = section ? READ_IF_EXISTS(pSettings, r_s32, section, "grip_priority", 1) : 1;
 		v.grip_type = section ? READ_IF_EXISTS(pSettings, r_s32, section, "grip_type", 0) : 0;
 		clamp(v.grip_type, 0, 1);
@@ -317,6 +324,10 @@ namespace gunsmith
 		for (SChild& ch : c.children)
 			if (ch.visual)
 				::Render->model_Delete(ch.visual);
+		for (xr_vector<SRoundSlot>* v : { &c.mag_rounds, &c.round_chambers, &c.round_ports })
+			for (SRoundSlot& s : *v)
+				if (s.visual)
+					::Render->model_Delete(s.visual);
 		c = SContext();
 	}
 
@@ -508,6 +519,8 @@ namespace gunsmith
 			c.children.push_back(ch);
 		}
 		show_modes(c, tree);
+		if (ctx == eHud)
+			build_rounds(c, root, receiver, hud_sect);
 	}
 
 	// Only the current sight mode's meshes are shown (each mode's are on its own bone).
@@ -815,5 +828,173 @@ namespace gunsmith
 			eye.mad(f, -shift);
 			return;
 		}
+	}
+
+	// ---------------------------------------------------------------- rounds (SRoundShow)
+
+	namespace
+	{
+		// An ammo section's round or case model (gs_round_visual, gs_round_case_visual), as its first-person copy
+		// <folder>\hud\<name> (a model's HUD shaders are fixed by the first load of its path); empty without one.
+		const shared_str& round_model(const shared_str& ammo, bool is_case)
+		{
+			static xr_map<shared_str, std::pair<shared_str, shared_str>> cache;
+			static const shared_str none;
+			if (!ammo.size())
+				return none;
+			auto it = cache.find(ammo);
+			if (it == cache.end())
+			{
+				std::pair<shared_str, shared_str> p;
+				if (pSettings->section_exist(ammo))
+				{
+					LPCSTR keys[2] = { "gs_round_visual", "gs_round_case_visual" };
+					for (int k = 0; k < 2; ++k)
+					{
+						if (!pSettings->line_exist(ammo, keys[k]))
+							continue;
+						string_path path, name;
+						xr_strcpy(path, pSettings->r_string(ammo, keys[k]));
+						LPSTR slash = strrchr(path, '\\');
+						xr_strcpy(name, slash ? slash + 1 : path);
+						if (slash)
+							slash[1] = 0;
+						else
+							path[0] = 0;
+						xr_strcat(path, "hud\\");
+						xr_strcat(path, name);
+						(k ? p.second : p.first) = path;
+					}
+				}
+				it = cache.insert(mk_pair(ammo, p)).first;
+			}
+			return is_case ? it->second.second : it->second.first;
+		}
+	}
+
+	bool CVisuals::has_rounds() const
+	{
+		const SContext& c = m_ctx[eHud];
+		return c.built && (!c.mag_rounds.empty() || !c.round_chambers.empty() || !c.round_ports.empty());
+	}
+
+	namespace
+	{
+		// patron_<n>'s n (the digits the name ends with), else `fallback`
+		u32 round_number(const shared_str& name, u32 fallback)
+		{
+			LPCSTR end = name.c_str() + name.size(), d = end;
+			while (d > name.c_str() && isdigit(u8(d[-1])))
+				--d;
+			return d < end ? u32(atoi(d)) : fallback;
+		}
+	}
+
+	void CVisuals::build_rounds(SContext& c, IKinematics* root, LPCSTR receiver, LPCSTR hud_sect)
+	{
+		// the HUD section's mounts of a key (a list of mount names), on the receiver
+		auto receiver_slots = [&](LPCSTR key, xr_vector<SRoundSlot>& out, bool numbered) {
+			if (!hud_sect || !pSettings->line_exist(hud_sect, key))
+				return;
+			LPCSTR list = pSettings->r_string(hud_sect, key);
+			string128 item;
+			for (int i = 0, n = _GetItemCount(list); i < n; ++i)
+			{
+				const shared_str name = _Trim(_GetItem(list, i, item));
+				SRoundSlot s;
+				resolve_mount(root, name, eHud, true, receiver, hud_sect, true, s.mount, s.bone);
+				s.child = -1;
+				s.number = numbered ? round_number(name, u32(out.size() + 1)) : 0;
+				out.push_back(s);
+			}
+		};
+		receiver_slots("gs_round_mag", c.mag_rounds, true);
+		for (u32 i = 0; i < c.children.size(); ++i)
+		{
+			const SChild& ch = c.children[i];
+			LPCSTR section = c.sig[ch.node].section.c_str();
+			for (const shared_str& name : ch.pv->round_mounts)
+			{
+				SRoundSlot s;
+				s.child = int(i);
+				shared_str follow;
+				if (!read_virtual_mount(section, name.c_str(), s.mount, &follow))
+				{
+					warn_once(section, "has no gs_mount_<name>_pos for its round", name.c_str());
+					continue;
+				}
+				s.bone = follow.size() ? ch.K->LL_BoneID(follow) : BI_NONE;
+				if (s.bone == BI_NONE)
+					s.bone = ch.K->LL_GetBoneRoot();
+				s.number = round_number(name, u32(c.mag_rounds.size() + 1));
+				c.mag_rounds.push_back(s);
+			}
+		}
+		receiver_slots("gs_round_chamber", c.round_chambers, false);
+		receiver_slots("gs_round_port", c.round_ports, false);
+	}
+
+	void CVisuals::draw_round(SContext& c, IKinematics* root, const Fmatrix& root_xform, SRoundSlot& s, const shared_str& path)
+	{
+		if (!path.size())
+			return;
+		if (s.path != path)
+		{
+			if (s.visual)
+				::Render->model_Delete(s.visual);
+			s.visual = nullptr;
+			s.path = path; // (a model that doesn't load isn't asked for again)
+			if (model_file_exists(path))
+			{
+				const bool was_hud = ::Render->hud_loading;
+				::Render->hud_loading = true;
+				s.visual = ::Render->model_Create(path.c_str());
+				::Render->hud_loading = was_hud;
+				IKinematics* K = s.visual ? s.visual->dcast_PKinematics() : nullptr;
+				if (K)
+				{
+					K->CalculateBones_Invalidate();
+					K->CalculateBones(TRUE);
+				}
+			}
+			else
+				warn_once("rounds", "round model file not found", path.c_str());
+		}
+		if (!s.visual)
+			return;
+		Fmatrix m;
+		if (s.child < 0)
+			m.set(root->LL_GetTransform_R(s.bone));
+		else
+			m.mul_43(c.children[s.child].local, c.children[s.child].K->LL_GetTransform_R(s.bone));
+		m.mulB_43(s.mount);
+		s.xform.mul_43(root_xform, m);
+		::Render->set_Transform(&s.xform);
+		::Render->add_Visual(s.visual);
+	}
+
+	// As Tarkov's MagVisualController: a magazine's i-th round mount (as gs_rounds lists them) shows while the magazine
+	// shows patron_<n> or more rounds, the i-th round from the top.
+	void CVisuals::render_rounds(IKinematics* root, const Fmatrix& root_xform, const SRoundShow& show)
+	{
+		SContext& c = m_ctx[eHud];
+		if (!c.built || c.root != root || !has_rounds())
+			return;
+		update_local(c, root);
+		const u32 sects = u32(show.mag_sect.size());
+		for (u32 i = 0; i < c.mag_rounds.size() && sects; ++i)
+		{
+			SRoundSlot& s = c.mag_rounds[i];
+			if (s.number > show.mag)
+				continue;
+			draw_round(c, root, root_xform, s, round_model(show.mag_sect[_min(i, sects - 1)], false));
+		}
+		for (u32 i = 0; i < c.round_chambers.size() && i < show.chambers.size(); ++i)
+			if (show.chambers[i] != SRoundShow::eNone)
+				draw_round(c, root, root_xform, c.round_chambers[i],
+						   round_model(show.chamber_sect, show.chambers[i] == SRoundShow::eCase));
+		for (u32 i = 0; i < c.round_ports.size() && i < show.ports.size(); ++i)
+			if (show.ports[i] != SRoundShow::eNone)
+				draw_round(c, root, root_xform, c.round_ports[i], round_model(show.port_sect, show.ports[i] == SRoundShow::eCase));
 	}
 }

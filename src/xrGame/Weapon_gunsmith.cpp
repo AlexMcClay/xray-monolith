@@ -798,7 +798,63 @@ void CWeapon::render_hud_attachments(IKinematics* model, const Fmatrix& xform)
 		return;
 	m_gs_visuals.ensure(gunsmith::CVisuals::eHud, model, m_gs_tree, cNameSect().c_str(), HudSection().c_str(), true);
 	m_gs_visuals.render(gunsmith::CVisuals::eHud, model, xform);
+	if (m_gs_visuals.has_rounds())
+	{
+		gs_round_show(m_gs_round_show, m_gs_visuals.chamber_count(), m_gs_visuals.port_count());
+		m_gs_visuals.render_rounds(model, xform, m_gs_round_show);
+	}
 	m_gs_devices.render(gunsmith::CVisuals::eHud);
+}
+
+void CWeapon::SetHudRounds(int mag, int chamber, int port, LPCSTR section)
+{
+	m_hud_rounds_mag = mag < 0 ? -1 : mag;
+	m_hud_rounds_chamber = chamber < 0 ? -1 : _min(chamber, int(gunsmith::SRoundShow::eCase));
+	m_hud_rounds_port = port < 0 ? -1 : _min(port, int(gunsmith::SRoundShow::eCase));
+	m_hud_rounds_sect = section && *section ? shared_str(section) : shared_str();
+	if (mag < 0 && chamber < 0 && port < 0)
+		m_hud_round_chambers = m_hud_round_ports = "";
+}
+
+void CWeapon::SetHudRoundSlots(LPCSTR chambers, LPCSTR ports)
+{
+	m_hud_round_chambers = chambers ? chambers : "";
+	m_hud_round_ports = ports ? ports : "";
+}
+
+// The rounds loaded are m_magazine, the next to fire last: it is the chambered round when the chamber shows a round,
+// and the magazine's top round the one under it. A script's section stands for a new magazine (a reload), every round
+// of it; past the rounds loaded the loaded type fills in. The first chamber and port are SetHudRounds' (or the
+// default), the others nothing; SetHudRoundSlots' digits override each.
+void CWeapon::gs_round_show(gunsmith::SRoundShow& s, u32 chambers, u32 ports) const
+{
+	const int n = int(m_magazine.size());
+	const shared_str loaded_type = m_ammoType < m_ammoTypes.size() ? m_ammoTypes[m_ammoType] : shared_str();
+	const shared_str& top = n ? m_magazine.back().m_ammoSect : loaded_type;
+	auto slots = [](xr_vector<u8>& out, u32 count, u8 first, const xr_string& digits) {
+		out.assign(count, gunsmith::SRoundShow::eNone);
+		if (count)
+			out[0] = first;
+		for (u32 i = 0; i < count && i < digits.size(); ++i)
+			if (digits[i] >= '0' && digits[i] <= '2')
+				out[i] = u8(digits[i] - '0');
+	};
+	slots(s.chambers, chambers, u8(m_hud_rounds_chamber >= 0 ? m_hud_rounds_chamber : (chambers && n > 0 ? 1 : 0)),
+		  m_hud_round_chambers);
+	slots(s.ports, ports, u8(m_hud_rounds_port >= 0 ? m_hud_rounds_port : 0), m_hud_round_ports);
+	s.chamber_sect = top;
+	s.port_sect = top;
+	const int in_chamber = chambers && s.chambers[0] == gunsmith::SRoundShow::eRound ? 1 : 0;
+	s.mag = u32(m_hud_rounds_mag >= 0 ? m_hud_rounds_mag : _max(0, n - in_chamber));
+	s.mag_sect.clear();
+	if (m_hud_rounds_sect.size())
+		s.mag_sect.push_back(m_hud_rounds_sect);
+	else
+		for (u32 i = 0; i < s.mag && i < 128; ++i)
+		{
+			const int idx = n - 1 - in_chamber - int(i);
+			s.mag_sect.push_back(idx >= 0 ? m_magazine[idx].m_ammoSect : loaded_type);
+		}
 }
 
 bool CWeapon::gs_has_devices() const

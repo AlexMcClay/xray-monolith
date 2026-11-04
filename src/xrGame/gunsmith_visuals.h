@@ -73,6 +73,8 @@ namespace gunsmith
 		Fvector grip_fingers[2][15]; // radians
 		int grip_priority;
 		int grip_type;
+		// gs_rounds: the part's round mounts (a magazine's patron_<n>, each a gs_mount_<name>_*), see SRoundShow
+		xr_vector<shared_str> round_mounts;
 		// The flags of mode `mode` (clamped to the last mode).
 		u8 tac_flags(u8 mode) const { return tac_modes.empty() ? 0 : tac_modes[_min(u32(mode), u32(tac_modes.size() - 1))]; }
 		const STacMode& tac_mode(u8 mode) const { return tac_mode_data[_min(u32(mode), u32(tac_mode_data.size() - 1))]; }
@@ -114,6 +116,21 @@ namespace gunsmith
 	// not at true scale). Keys: see the Gunsmith config reference.
 	// False when the section has neither pos nor rot.
 	bool read_virtual_mount(LPCSTR section, LPCSTR name, Fmatrix& out, shared_str* bone = nullptr);
+
+	// The rounds a gun shows in first person (Gunsmith Docs animations-and-sounds.md, "Rounds in the gun"), as Tarkov:
+	// on a part's round mounts (gs_rounds on the part: a magazine's patron_<n> holds a round while it shows n or more;
+	// the HUD section's gs_round_mag the same on the receiver, a tube's round at its mouth), the HUD section's chambers
+	// (gs_round_chamber) and ejection ports (gs_round_port: mount names, several for a cylinder or a double barrel).
+	// Each is the model its ammo section names, gs_round_visual for a round, gs_round_case_visual for a fired case
+	// (first-person copies in <folder>\hud\), made in the mount's frame.
+	struct SRoundShow
+	{
+		enum { eNone = 0, eRound = 1, eCase = 2 };
+		u32 mag = 0;                    // the rounds the magazine shows
+		xr_vector<shared_str> mag_sect; // their ammo sections, top first (past the end: the last one)
+		xr_vector<u8> chambers, ports;  // per mount, as the HUD section lists them (past the end: eNone)
+		shared_str chamber_sect, port_sect;
+	};
 
 	// The child models of one weapon. Two contexts: the world model and the HUD model.
 	// A context is rebuilt when the tree's layout (sections, parents, slots) or the root
@@ -186,7 +203,25 @@ namespace gunsmith
 		void slot_points(int ctx, IKinematics* root, const CTree& tree, LPCSTR receiver, LPCSTR hud_sect,
 						 xr_vector<SSlotPoint>& out);
 
+		// HUD: whether the build has round mounts (a part's or the HUD section's) and a chamber among them; and the
+		// rounds `show` says drawn on them (after render(), the same root and transform).
+		bool has_rounds() const;
+		bool has_chamber() const { return !m_ctx[eHud].round_chambers.empty(); }
+		u32 chamber_count() const { return u32(m_ctx[eHud].round_chambers.size()); }
+		u32 port_count() const { return u32(m_ctx[eHud].round_ports.size()); }
+		void render_rounds(IKinematics* root, const Fmatrix& root_xform, const SRoundShow& show);
+
 	private:
+		struct SRoundSlot
+		{
+			int child = -1;     // the part it is on (index in children), -1: the root model
+			u16 bone = 0;       // on that model
+			Fmatrix mount;      // in the bone's frame (model space)
+			u32 number = 0;     // patron_<n>: shown while the magazine shows n or more
+			IRenderVisual* visual = nullptr;
+			shared_str path;    // the model asked for (visual: it, or null when it didn't load)
+			Fmatrix xform;      // handed to the renderer; must outlive the frame
+		};
 		struct SChild
 		{
 			u8 node;
@@ -228,6 +263,10 @@ namespace gunsmith
 			// gs_aim_eye_far: the furthest forward (receiver model z) the eye goes behind an optic
 			bool has_eye_far = false;
 			float eye_far = 0.f;
+			// round mounts (HUD): the receiver's (gs_round_mag) and the parts' in tree order, each part's as gs_rounds
+			// lists them; the chambers and ports
+			xr_vector<SRoundSlot> mag_rounds;
+			xr_vector<SRoundSlot> round_chambers, round_ports;
 		};
 
 		SContext m_ctx[2];
@@ -238,6 +277,8 @@ namespace gunsmith
 
 		void update_local(SContext& c, IKinematics* root);
 		void show_modes(SContext& c, const CTree& tree);
+		void build_rounds(SContext& c, IKinematics* root, LPCSTR receiver, LPCSTR hud_sect);
+		void draw_round(SContext& c, IKinematics* root, const Fmatrix& root_xform, SRoundSlot& s, const shared_str& path);
 		SSightAim aim_of(const SChild& ch) const;
 		const SChild* pick_sight(const SContext& c) const;
 		// the receiver's own sight line (gs_aim_point + gs_aim_dir) is aimed along when no part is a sight, or the

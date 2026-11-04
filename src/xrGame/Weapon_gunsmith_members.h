@@ -29,6 +29,17 @@ public:
 	void SetFireBlocked(bool v) { m_fire_blocked = v; }
 	bool IsFireBlocked() const { return m_fire_blocked; }
 
+	// Rounds shown in first person on a gun with round mounts (gunsmith::SRoundShow): by default the rounds loaded, the
+	// top one in the chamber when the HUD has one and the rest in the magazine. A script sets what shows for an
+	// animation's span (game_object:set_hud_rounds; not saved): the magazine's count, the chamber and the ejection port
+	// (0 nothing, 1 a round, 2 a fired case), each -1 for the default, and the ammo section of the magazine's rounds
+	// ("": the loaded ones, then the loaded type).
+	void SetHudRounds(int mag, int chamber, int port, LPCSTR section);
+	// Each chamber and port mount (a cylinder's, a double barrel's: the HUD section's gs_round_chamber and
+	// gs_round_port lists), by a digit each: 0 nothing, 1 a round, 2 a fired case, any other character (or past the
+	// end) as SetHudRounds says (game_object:set_hud_round_slots; SetHudRounds(-1, -1, -1) clears these too).
+	void SetHudRoundSlots(LPCSTR chambers, LPCSTR ports);
+
 	// Vanilla readings for scripts. Weight() and Cost() count the fitted parts; these leave them out, as an
 	// unmodded exe's would (old-style addons counted).
 	float GetVanillaWeight() const { return Weight() - m_gs_stats.weight_add; }
@@ -190,6 +201,12 @@ protected:
 	u8 m_gs_jam_type = 0;
 	u8 m_gs_jam_node = 0;
 	bool m_fire_blocked = false;
+	int m_hud_rounds_mag = -1, m_hud_rounds_chamber = -1, m_hud_rounds_port = -1; // SetHudRounds (-1: the default)
+	shared_str m_hud_rounds_sect;
+	xr_string m_hud_round_chambers, m_hud_round_ports; // SetHudRoundSlots
+	gunsmith::SRoundShow m_gs_round_show; // (kept: its section list's memory is reused every frame)
+	// What the rounds show now (SetHudRounds over the rounds loaded) on the HUD's chamber and port mounts.
+	void gs_round_show(gunsmith::SRoundShow& out, u32 chambers, u32 ports) const;
 
 	// Per-shot wear: the weapon_on_shot callback's for this shot when a script took it (CheckForMisfire asks
 	// before the shot), times the wear setting; else the receiver's own (condition_shot_dec, the cartridge's
