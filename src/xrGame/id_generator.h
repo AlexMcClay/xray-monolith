@@ -103,6 +103,18 @@ public:
 		return (tfGetFromBlock(*I, tValueID));
 	}
 
+	// How many ids are free now (every block's free count; at most 256 blocks).
+	IC u32 free_count() const
+	{
+		u32 count = 0;
+		for (u32 j = 0; j < m_tBlockCount; ++j)
+			count += m_tppBlocks[j].m_tCount;
+		return (count);
+	}
+
+	// How many ids there are in all, free or not.
+	static constexpr u32 capacity() { return (u32(tMaxValue - tMinValue) + 1); }
+
 	IC void vfFreeID(VALUE_ID tValueID, TIME_ID tTimeID)
 	{
 		BLOCK_ID l_tBlockID = tfGetBlockByValue(tValueID);

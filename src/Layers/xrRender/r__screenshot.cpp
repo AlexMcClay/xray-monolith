@@ -71,7 +71,8 @@ void CRender::ScreenshotImpl(ScreenshotMode mode, LPCSTR name, CMemoryWriter* me
 			desc.Height = GAMESAVE_SIZE;
 			desc.MipLevels = 1;
 			desc.ArraySize = 1;
-			desc.Format = DXGI_FORMAT_BC1_UNORM;
+			// Uncompressed: D3DX11's BC1 encoder can crash on some frames (an out-of-range palette read)
+			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 			desc.SampleDesc.Count = 1;
 			desc.Usage = D3D_USAGE_DEFAULT;
 			desc.BindFlags = D3D10_BIND_SHADER_RESOURCE;

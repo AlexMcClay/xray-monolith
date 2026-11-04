@@ -328,7 +328,11 @@ void gs_refresh_stats_script()
 // [gunsmith_settings] values that can change while the game runs (gunsmith::set_setting). get: nil if unknown.
 bool gs_set_setting(LPCSTR name, float value)
 {
-	return name && gunsmith::set_setting(name, value);
+	if (!name || !gunsmith::set_setting(name, value))
+		return false;
+	if (!strncmp(name, "icon_", 5))
+		gunsmith::CPreview::instance().redraw_icons();
+	return true;
 }
 
 ::luabind::object gs_get_setting_script(lua_State* L, LPCSTR name)

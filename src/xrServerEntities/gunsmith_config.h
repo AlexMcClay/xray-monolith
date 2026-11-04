@@ -191,8 +191,9 @@ namespace gunsmith
 		// left, turned icon_yaw degrees, 25, the muzzle towards the camera) or side (vanilla's: the right side, the
 		// muzzle to the right, turned icon_yaw, 0); icon_scale of the cell filled (Tarkov's boundsScale, 0.9; a
 		// section's gs_icon_scale, gs_icon_yaw, gs_icon_pitch, gs_icon_roll and gs_icon_offset override); the
-		// halo (icon_halo, true); the preview shader's icon_exposure (1.25), icon_ambient (1.4), icon_specular (1), and
-		// after lighting icon_contrast (1.1) and icon_saturation (1.15).
+		// halo (icon_halo, true); the preview shader's icon_exposure (2.1), icon_ambient (1.4), icon_specular (1), and
+		// after lighting icon_contrast (0.9) and icon_saturation (1.8): matched to the AK-74 as the world shows it
+		// (TEMP-icon-rounds.md). These six can change while the game runs (set_setting; console gs_icon_look).
 		bool icon_tarkov_pose, icon_halo;
 		float icon_yaw, icon_scale, icon_exposure, icon_ambient, icon_specular, icon_contrast, icon_saturation;
 	};

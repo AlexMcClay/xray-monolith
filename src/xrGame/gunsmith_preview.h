@@ -95,6 +95,9 @@ namespace gunsmith
 		// the model files), a few a frame (console gs_icon_bake [filter]). Tarkov Extract Data\tools\gs_icon_bake.py
 		// puts them into the shipped sheets. `filter`: only sections whose name contains it.
 		void bake_start(LPCSTR filter);
+		// Drops every live icon so each is drawn again as it is next asked for (after a look setting changed; the
+		// cache names carry the look, so the new look is drawn, not loaded).
+		void redraw_icons();
 
 		// Workbench view: what it shows, its camera, and view_tick() every frame it is shown.
 		void view_object(u16 id);

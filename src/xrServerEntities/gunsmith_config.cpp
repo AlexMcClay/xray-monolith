@@ -438,10 +438,10 @@ namespace gunsmith
 				s.icon_yaw = READ_IF_EXISTS(pSettings, r_float, sect, "icon_yaw", s.icon_tarkov_pose ? 25.f : 0.f);
 				s.icon_scale = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_scale", 0.9f), 0.2f, 1.5f);
 				s.icon_halo = !!READ_IF_EXISTS(pSettings, r_bool, sect, "icon_halo", true);
-				s.icon_exposure = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_exposure", 1.25f), 0.1f, 4.f);
+				s.icon_exposure = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_exposure", 2.1f), 0.1f, 4.f);
 				s.icon_ambient = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_ambient", 1.4f), 0.f, 4.f);
-				s.icon_contrast = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_contrast", 1.1f), 0.5f, 2.f);
-				s.icon_saturation = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_saturation", 1.15f), 0.f, 2.f);
+				s.icon_contrast = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_contrast", 0.9f), 0.5f, 2.f);
+				s.icon_saturation = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_saturation", 1.8f), 0.f, 2.f);
 				s.icon_specular = clampr(READ_IF_EXISTS(pSettings, r_float, sect, "icon_specular", 1.f), 0.f, 4.f);
 				loaded = true;
 			}
@@ -480,6 +480,18 @@ namespace gunsmith
 			s.npc_devices_distance = _max(value, 0.f);
 		else if (!xr_strcmp(name, "npc_laser_distance"))
 			s.npc_laser_distance = _max(value, 0.f);
+		else if (!xr_strcmp(name, "icon_exposure"))
+			s.icon_exposure = clampr(value, 0.1f, 4.f);
+		else if (!xr_strcmp(name, "icon_ambient"))
+			s.icon_ambient = clampr(value, 0.f, 4.f);
+		else if (!xr_strcmp(name, "icon_specular"))
+			s.icon_specular = clampr(value, 0.f, 4.f);
+		else if (!xr_strcmp(name, "icon_contrast"))
+			s.icon_contrast = clampr(value, 0.5f, 2.f);
+		else if (!xr_strcmp(name, "icon_saturation"))
+			s.icon_saturation = clampr(value, 0.f, 2.f);
+		else if (!xr_strcmp(name, "icon_halo"))
+			s.icon_halo = value != 0.f;
 		else
 			return false;
 		return true;
@@ -516,6 +528,18 @@ namespace gunsmith
 			value = s.npc_laser_distance;
 		else if (!xr_strcmp(name, "icon_tarkov_pose"))
 			value = s.icon_tarkov_pose ? 1.f : 0.f;
+		else if (!xr_strcmp(name, "icon_exposure"))
+			value = s.icon_exposure;
+		else if (!xr_strcmp(name, "icon_ambient"))
+			value = s.icon_ambient;
+		else if (!xr_strcmp(name, "icon_specular"))
+			value = s.icon_specular;
+		else if (!xr_strcmp(name, "icon_contrast"))
+			value = s.icon_contrast;
+		else if (!xr_strcmp(name, "icon_saturation"))
+			value = s.icon_saturation;
+		else if (!xr_strcmp(name, "icon_halo"))
+			value = s.icon_halo ? 1.f : 0.f;
 		else
 			return false;
 		return true;

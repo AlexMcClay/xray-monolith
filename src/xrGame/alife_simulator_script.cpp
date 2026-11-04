@@ -595,6 +595,18 @@ ALife::_OBJECT_ID alife_object_count(const CALifeSimulator* self)
     return self->objects().objects().size();
 }
 
+// Object ids the server can still hand out; at 0 the next spawn stops the game ("Not enough IDs").
+u32 alife_free_id_count(const CALifeSimulator* self)
+{
+	return self->server().FreeIDCount();
+}
+
+// Object ids in all (65535: ids are 16-bit and 0xffff means none).
+u32 alife_id_capacity(const CALifeSimulator* self)
+{
+	return self->server().IDCapacity();
+}
+
 ::luabind::object alife_object_ids(const CALifeSimulator* self, const bool keytable = false, const bool withActor = false)
 {
 	VERIFY(self);
@@ -702,6 +714,8 @@ void CALifeSimulator::script_register(lua_State* L)
 
 		// demonized: iterate alife objects
         .def("object_count", &alife_object_count)
+		.def("free_id_count", &alife_free_id_count)
+		.def("id_capacity", &alife_id_capacity)
 		.def("object_ids", &alife_object_ids)
 		.def("objects", &alife_objects)
 		.def("iterate_objects", &CALifeSimulator__iterate_objects)

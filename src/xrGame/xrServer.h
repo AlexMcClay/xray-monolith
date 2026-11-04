@@ -184,6 +184,10 @@ public:
 		return (m_tID_Generator.vfFreeID(ID, time));
 	}
 
+	// Object ids free now, and in all (a server runs out at "Not enough IDs").
+	IC u32 FreeIDCount() const { return (m_tID_Generator.free_count()); }
+	IC u32 IDCapacity() const { return (id_generator_type::capacity()); }
+
 	void Perform_connect_spawn(CSE_Abstract* E, xrClientData* to, NET_Packet& P);
 	void Perform_transfer(NET_Packet& PR, NET_Packet& PT, CSE_Abstract* what, CSE_Abstract* from, CSE_Abstract* to);
 	void Perform_reject(CSE_Abstract* what, CSE_Abstract* from, int delta);

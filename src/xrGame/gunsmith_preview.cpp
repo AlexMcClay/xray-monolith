@@ -506,6 +506,13 @@ namespace gunsmith
 		m_view_id = id;
 	}
 
+	void CPreview::redraw_icons()
+	{
+		for (u32 i = 0; i < u32(m_cells.size()); ++i)
+			release(i);
+		m_index.clear();
+	}
+
 	void CPreview::view_clear()
 	{
 		m_view_id = u16(-1);
