@@ -1128,6 +1128,8 @@ public:
 	void reset_hud_offsets();
 	void set_hud_recoil(Fvector pos, Fvector rot, Fvector pivot);
 	void reset_hud_recoil();
+	void set_cam_recoil(bool on);
+	bool cam_recoil();
 	bool has_hud_offset(int index);
 	Fvector hud_offset_pos(int index);
 	Fvector hud_offset_rot(int index);

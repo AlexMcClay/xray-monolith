@@ -264,6 +264,8 @@ void CActor::HitSector(CObject* who, CObject* weapon)
 
 void CActor::on_weapon_shot_start(CWeapon* weapon)
 {
+	if (!weapon->m_cam_recoil)
+		return;
 	//CWeaponMagazined* pWM = smart_cast<CWeaponMagazined*> (weapon);
 	CameraRecoil const& base_recoil = (IsZoomAimingMode()) ? weapon->zoom_cam_recoil : weapon->cam_recoil;
 	// Horizontal recoil and the relax speed from the weapon's parts and scripts; the vertical kick takes them

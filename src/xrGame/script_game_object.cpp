@@ -458,6 +458,20 @@ void CScriptGameObject::set_hud_recoil(Fvector pos, Fvector rot, Fvector pivot)
 		item->SetHudRecoil(pos, rot, pivot);
 }
 
+void CScriptGameObject::set_cam_recoil(bool on)
+{
+	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
+		w->m_cam_recoil = on;
+	else
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError, "CGameObject : cannot access class member set_cam_recoil!");
+}
+
+bool CScriptGameObject::cam_recoil()
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return w && w->m_cam_recoil;
+}
+
 void CScriptGameObject::reset_hud_recoil()
 {
 	if (CHudItem* item = get_script_hud_offset_item(this, "reset_hud_recoil", 0))
