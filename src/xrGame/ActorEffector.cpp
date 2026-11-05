@@ -6,6 +6,7 @@
 #include "../xrEngine/ObjectAnimator.h"
 #include "object_broker.h"
 #include "actor.h"
+#include "player_hud.h"
 
 void AddEffector(CActor* A, int type, const shared_str& sect_name)
 {
@@ -463,10 +464,36 @@ bool similar_cam_info(const SCamEffectorInfo& c1, const SCamEffectorInfo& c2)
 		c1.r.similar(c2.r, EPS_L));
 }
 
+// The script camera offset on one camera: rot and pos in the camera's own axes (r, n, d), scaled by k
+static void apply_script_cam_offset(SCamEffectorInfo& info, const Fvector& pos, const Fvector& rot, float k)
+{
+	if (k == 0.f)
+		return;
+	Fmatrix cam, turn;
+	cam.set(info.r, info.n, info.d, info.p);
+	hud_recoil_rotation(turn, Fvector().mul(rot, k));
+	turn.c.mul(pos, k);
+	cam.mulB_43(turn);
+	info.p.set(cam.c);
+	info.d.set(cam.k);
+	info.n.set(cam.j);
+	info.r.set(cam.i);
+}
+
 void CActorCameraManager::UpdateCamEffectors()
 {
 	m_cam_info_hud = m_cam_info;
 	inherited::UpdateCamEffectors();
+
+	if (m_script_offset_on)
+	{
+		apply_script_cam_offset(m_cam_info, m_script_offset_pos, m_script_offset_rot, 1.f);
+		apply_script_cam_offset(m_cam_info_hud, m_script_offset_pos, m_script_offset_rot, m_script_offset_hud);
+		m_cam_info.d.normalize();
+		m_cam_info.n.normalize();
+		m_cam_info.r.crossproduct(m_cam_info.n, m_cam_info.d);
+		m_cam_info.n.crossproduct(m_cam_info.d, m_cam_info.r);
+	}
 
 	m_cam_info_hud.d.normalize();
 	m_cam_info_hud.n.normalize();

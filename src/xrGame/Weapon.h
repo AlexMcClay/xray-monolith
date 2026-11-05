@@ -682,6 +682,9 @@ public:
 public:
 	CameraRecoil cam_recoil; // simple mode (walk, run)
 	CameraRecoil zoom_cam_recoil; // using zoom =(ironsight or scope)
+	// false: the actor's shots with this weapon give no camera kick (game_object:set_cam_recoil), for a script's own
+	// recoil (Gunsmith Docs research/38); the cam_* values and stats stay as they are
+	bool m_cam_recoil = true;
 
 	// Getters
 	float GetCamRelaxSpeed() { return cam_recoil.RelaxSpeed; };

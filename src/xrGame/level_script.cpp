@@ -1021,6 +1021,27 @@ void remove_cam_effector(int id)
 	Actor()->Cameras().RemoveCamEffector((ECamEffectorType)id);
 }
 
+// The actor camera's script offset, set each frame (CActorCameraManager::SetScriptOffset; Gunsmith Docs research/38)
+void set_cam_offset(Fvector pos, Fvector rot, float hud_factor)
+{
+	if (CActor* A = Actor())
+		A->Cameras().SetScriptOffset(pos, rot, hud_factor);
+}
+
+void reset_cam_offset()
+{
+	if (CActor* A = Actor())
+		A->Cameras().ResetScriptOffset();
+}
+
+// tan(HUD FOV / 2) / tan(world FOV / 2), last frame's: a small angle in the HUD's projection shows on screen as
+// angle / ratio would in the world's, and a barrel turned by it fires that far off (Device.hud_to_world)
+float hud_fov_ratio()
+{
+	const float hud = Device.mProjectHud._22;
+	return hud > 0.f ? Device.mProject._22 / hud : 1.f;
+}
+
 void set_cam_effector_factor(int id, float factor)
 {
 	CAnimatorCamEffectorScriptCB* e = smart_cast<CAnimatorCamEffectorScriptCB*>(Actor()->Cameras().GetCamEffector((ECamEffectorType)id));
@@ -2800,6 +2821,9 @@ void CLevel::script_register(lua_State* L)
             // ver; allow changing the speed of cam effectors
             def("add_cam_effector", ((float (*)(LPCSTR, int, bool, LPCSTR, float, bool, float, float))& add_cam_effector)),
 			def("remove_cam_effector", &remove_cam_effector),
+			def("set_cam_offset", &set_cam_offset),
+			def("reset_cam_offset", &reset_cam_offset),
+			def("hud_fov_ratio", &hud_fov_ratio),
 			def("set_cam_effector_factor", &set_cam_effector_factor),
 			def("get_cam_effector_factor", &get_cam_effector_factor),
 			def("get_cam_effector_length", &get_cam_effector_length),

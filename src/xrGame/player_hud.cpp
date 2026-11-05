@@ -1420,6 +1420,50 @@ void player_hud::update(const Fmatrix& cam_trans)
 		}
 	}
 
+	// The main item's script recoil (CHudItem::SetHudRecoil): the hands turned about a pivot in the item's model
+	// space and moved along its axes, as the item hangs on them now (the anchor bone and the item's offset, as
+	// attachable_hud_item::update places it), so the hands and the item move as one. The left arm (the second
+	// model) takes the same move while it holds the item, no item of its own in the left hand: left behind, its
+	// animated hand would leave the grip and the grip IK let go (gunsmith_grip_ik's weight).
+	if (attachable_hud_item* hi = m_attached_items[0])
+	{
+		if (const CHudItem::hud_recoil* rc = hi->m_parent_hud_item->HudRecoil())
+		{
+			Fvector ypr = m_adjust_mode ? m_adjust_obj[1] : hi->offset_value(1, 12);
+			ypr.mul(PI / 180.f);
+			Fmatrix item_offset;
+			item_offset.setHPB(ypr.x, ypr.y, ypr.z);
+			item_offset.translate_over(m_adjust_mode ? m_adjust_obj[0] : hi->offset_value(0, 12));
+
+			Fmatrix pivot;
+			pivot.mul_43(m_model->dcast_PKinematics()->LL_GetTransform(m_ancors[0]), item_offset);
+			Fvector at;
+			pivot.transform_tiny(at, rc->pivot);
+			pivot.c.set(at);
+			Fmatrix pivot_inv;
+			pivot_inv.invert(pivot);
+
+			Fmatrix kick;
+			hud_recoil_rotation(kick, rc->rot);
+			kick.c.set(rc->pos);
+
+			Fmatrix m;
+			m.mul_43(pivot, kick);
+			m.mulB_43(pivot_inv);
+
+			if (!m_attached_items[1])
+			{
+				// the same move in world space: m_transform * m * m_transform^-1
+				Fmatrix world, inv;
+				inv.invert(m_transform);
+				world.mul_43(m_transform, m);
+				world.mulB_43(inv);
+				m_transform_2.mulA_43(world);
+			}
+			m_transform.mulB_43(m);
+		}
+	}
+
 	if (m_attached_items[0])
 		m_attached_items[0]->update(true);
 
@@ -1968,6 +2012,23 @@ bool player_hud::allow_script_anim()
 		return false;
 
 	return true;
+}
+
+void hud_recoil_rotation(Fmatrix& m, const Fvector& rot_deg)
+{
+	const float p = deg2rad(rot_deg.x), y = deg2rad(rot_deg.y), r = deg2rad(rot_deg.z);
+	Fmatrix pitch, yaw, roll;
+	pitch.identity();
+	pitch.j.set(0.f, _cos(p), -_sin(p));
+	pitch.k.set(0.f, _sin(p), _cos(p));
+	yaw.identity();
+	yaw.i.set(_cos(y), 0.f, -_sin(y));
+	yaw.k.set(_sin(y), 0.f, _cos(y));
+	roll.identity();
+	roll.i.set(_cos(r), -_sin(r), 0.f);
+	roll.j.set(_sin(r), _cos(r), 0.f);
+	m.mul_43(yaw, pitch);
+	m.mulB_43(roll);
 }
 
 void player_hud::calc_transform(u16 attach_slot_idx, const Fmatrix& offset, Fmatrix& result, bool leadGun)

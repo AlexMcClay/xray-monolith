@@ -556,3 +556,8 @@ public:
 };
 
 extern player_hud* g_player_hud;
+
+// A rotation from degrees (x pitch, the forward axis up; y yaw, forward to the right; z roll, the up axis to the
+// right), roll first, then pitch, then yaw, in X-Ray's axes (x right, y up, z forward). For CHudItem::SetHudRecoil
+// and the actor camera's script offset (Gunsmith Docs research/38).
+void hud_recoil_rotation(Fmatrix& m, const Fvector& rot_deg);
