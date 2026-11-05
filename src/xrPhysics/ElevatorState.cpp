@@ -5,6 +5,8 @@
 #include "MathUtils.h"
 #include "PHWorld.h"
 #include "../xrengine/device.h"
+#include "../xrcdb/xr_area.h"
+#include "../xrEngine/gamemtllib.h"
 #ifdef DEBUG
 #include "../xrEngine/Statgraph.h"
 #include "debug_output.h"
@@ -30,6 +32,22 @@ static const float force_side_k = 4.f; // sideways centring per metre off the ax
 static const float force_side_max = 0.5f;
 static const float force_into = 0.2f; // what is left of the push into the ladder
 
+// The actor's exit at the top (research/37 section 6): climbing up near the top, rays look for a floor beside the
+// ladder's top that the standing body fits on, with a clear way over the lip; the body is then carried up and over
+// onto it (velocity set each physics step, collision on). Without such a landing vanilla's way stays: gravity back on
+// at the top and the walking step-up over the lip.
+static const float exit_zone = 0.35f; // looked for once the foot centre is this far below the ladder's top
+static const float exit_probe_interval = 0.1f; // seconds between looks
+static const float exit_gap = 0.25f; // the landing's column is this far past the ladder box, beyond the foot radius
+static const float exit_rise_max = 1.6f; // the floor at most this far above the feet ...
+static const float exit_drop_max = 1.0f; // ... and at most this far below them
+static const float exit_lift = 0.06f; // the feet this far above the landing floor
+static const float exit_stand = 1.8f; // the standing body's height
+static const float exit_floor_cos = 0.7f; // the landing floor's slope at most about 45 degrees
+static const float exit_speed = 2.4f; // metres per second along the way
+static const float exit_time_max = 2.f; // seconds before an exit gives up in any case
+static const float exit_stall_max = 0.25f; // seconds of hardly moving (a prop, a door in the way) before it gives up
+
 static bool ladder_actor(CPHCharacter* character)
 {
 	return character && character->RestrictionType() == rtActor;
@@ -42,6 +60,169 @@ CElevatorState::CElevatorState()
 	m_character = NULL;
 	m_step = 0.f;
 	m_strafe_time = 0.f;
+	m_exit = false;
+	m_exit_leg = 0;
+	m_exit_rise.set(0.f, 0.f, 0.f);
+	m_exit_land.set(0.f, 0.f, 0.f);
+	m_exit_time = 0.f;
+	m_exit_probe = 0.f;
+	m_exit_stall = 0.f;
+	m_exit_last.set(0.f, 0.f, 0.f);
+}
+
+// The nearest static hit that isn't passable or a ladder (bushes, ladder rails); its triangle's normal on request
+static bool exit_ray(const Fvector& from, const Fvector& dir, float range, float& dist, Fvector* normal = NULL)
+{
+	CObjectSpace& space = inl_ph_world().ObjectSpace();
+	collide::rq_result R;
+	Fvector pos = from;
+	float left = range, done = 0.f;
+	while (left > EPS_L && space.RayPick(pos, dir, left, collide::rqtStatic, R, NULL))
+	{
+		CDB::TRI* T = space.GetStaticTris() + R.element;
+		SGameMtl* m = GMLibrary().GetMaterialByIdx((u16)T->material);
+		if (!m->Flags.test(SGameMtl::flPassable) && !m->Flags.test(SGameMtl::flClimable))
+		{
+			dist = done + R.range;
+			if (normal)
+			{
+				const Fvector* V = space.GetStaticVerts();
+				Fvector e1, e2;
+				e1.sub(V[T->verts[1]], V[T->verts[0]]);
+				e2.sub(V[T->verts[2]], V[T->verts[0]]);
+				normal->crossproduct(e1, e2).normalize_safe();
+				if (normal->dotproduct(dir) > 0.f) normal->invert();
+			}
+			return true;
+		}
+		const float skip = R.range + EPS_L;
+		pos.mad(dir, skip);
+		left -= skip;
+		done += skip;
+	}
+	return false;
+}
+
+bool CElevatorState::FindExit()
+{
+	Fvector foot, to_upper, axis, side, norm;
+	m_character->GetFootCenter(foot);
+	const float r = m_character->FootRadius();
+	const float to_up = m_ladder->DDUpperP(m_character, to_upper);
+	Fvector upper = Fvector().mad(foot, to_upper, to_up); // the top of the ladder box's front face
+	m_ladder->DDAxis(axis);
+	const float half_side = m_ladder->DDSide(side);
+	const float half_thick = m_ladder->DDNorm(norm);
+	if (norm.dotproduct(Fvector().sub(foot, upper)) < 0.f) norm.invert(); // toward the climber
+	side.y = 0.f;
+	side.normalize_safe();
+	norm.y = 0.f;
+	norm.normalize_safe();
+	const Fvector top = Fvector().mad(upper, norm, -half_thick); // the top of the box's centre line
+	const float feet = foot.y - r;
+	const Fvector up = {0.f, 1.f, 0.f}, down = {0.f, -1.f, 0.f};
+
+	// over the top first, then either side, then out in front (a hatch)
+	struct SCand { Fvector dir; float reach; } cands[4] = {
+		{Fvector().invert(norm), half_thick + r + exit_gap},
+		{side, half_side + r + exit_gap},
+		{Fvector().invert(side), half_side + r + exit_gap},
+		{norm, half_thick + 2.f * r + exit_gap},
+	};
+	for (const SCand& c : cands)
+	{
+		Fvector col = Fvector().mad(top, c.dir, c.reach);
+		// the floor under the column
+		const Fvector start = {col.x, feet + exit_rise_max + 0.3f, col.z};
+		float dist;
+		Fvector n;
+		if (!exit_ray(start, down, exit_rise_max + exit_drop_max + 0.3f, dist, &n) || n.y < exit_floor_cos)
+			continue;
+		const float floor = start.y - dist;
+		if (floor > feet + exit_rise_max || floor < feet - exit_drop_max)
+			continue;
+		// the standing body fits on it
+		bool fits = true;
+		const Fvector offs[5] = {
+			{0.f, 0.f, 0.f}, Fvector().mul(norm, 0.8f * r), Fvector().mul(norm, -0.8f * r),
+			Fvector().mul(side, 0.8f * r), Fvector().mul(side, -0.8f * r)
+		};
+		for (const Fvector& o : offs)
+		{
+			const Fvector from = {col.x + o.x, floor + 0.05f, col.z + o.z};
+			if (exit_ray(from, up, exit_stand, dist))
+			{
+				fits = false;
+				break;
+			}
+		}
+		if (!fits) continue;
+		// the way: up beside the ladder, then across over the lip
+		const float land_y = floor + exit_lift + r; // the foot centre on the landing
+		const float rise = land_y - foot.y;
+		if (rise > 0.f && exit_ray(Fvector().set(foot.x, foot.y + exit_stand - 2.f * r, foot.z), up, rise, dist))
+			continue;
+		Fvector across = {col.x - foot.x, 0.f, col.z - foot.z};
+		const float across_len = across.magnitude();
+		if (across_len < EPS_L) continue;
+		across.div(across_len);
+		const float heights[3] = {exit_lift + 0.1f, 0.9f, exit_stand - 0.2f};
+		bool clear = true;
+		for (float h : heights)
+		{
+			const Fvector from = {foot.x, floor + h, foot.z};
+			if (exit_ray(from, across, across_len, dist))
+			{
+				clear = false;
+				break;
+			}
+		}
+		if (!clear) continue;
+		m_exit_rise.set(foot.x, land_y, foot.z);
+		m_exit_land.set(col.x, land_y, col.z);
+		return true;
+	}
+	return false;
+}
+
+void CElevatorState::UpdateExit()
+{
+	m_exit_time += m_step;
+	Fvector foot;
+	m_character->GetFootCenter(foot);
+	if (m_exit_time > m_step * 1.5f && foot.distance_to(m_exit_last) < exit_speed * m_step * 0.25f)
+		m_exit_stall += m_step;
+	else
+		m_exit_stall = 0.f;
+	m_exit_last.set(foot);
+	const Fvector& goal = m_exit_leg == 0 ? m_exit_rise : m_exit_land;
+	Fvector d = Fvector().sub(goal, foot);
+	const float dist = d.magnitude();
+	if (dist < 0.02f)
+	{
+		if (m_exit_leg == 0)
+		{
+			m_exit_leg = 1;
+			return;
+		}
+		dBodySetLinearVel(m_character->get_body(), 0.f, 0.f, 0.f);
+		m_exit = false;
+		SwitchState(clbNoLadder);
+		return;
+	}
+	if (m_exit_time > exit_time_max || m_exit_stall > exit_stall_max)
+	{
+		// blocked (a prop, a door): vanilla's way from here
+		dBodySetLinearVel(m_character->get_body(), 0.f, 0.f, 0.f);
+		m_exit = false;
+		SwitchState(clbNearUp);
+		return;
+	}
+	// ease in over the first 0.15 s
+	float speed = exit_speed * _min(1.f, 0.3f + m_exit_time / 0.15f);
+	if (m_step > EPS_S) speed = _min(speed, dist / m_step);
+	d.mul(speed / dist);
+	dBodySetLinearVel(m_character->get_body(), d.x, d.y, d.z);
 }
 
 float CElevatorState::ClimbDirection()
@@ -299,6 +480,30 @@ void CElevatorState::UpdateStClimbingUp()
 	VERIFY(m_ladder&&m_character);
 	Fvector d;
 
+	if (m_exit)
+	{
+		UpdateExit();
+		return;
+	}
+	if (ladder_actor(m_character) && ClimbDirection() > 0.f &&
+		m_ladder->AxDistToUpperP(m_character) < exit_zone)
+	{
+		m_exit_probe -= m_step;
+		if (m_exit_probe <= 0.f)
+		{
+			m_exit_probe = exit_probe_interval;
+			if (FindExit())
+			{
+				m_exit = true;
+				m_exit_leg = 0;
+				m_exit_time = 0.f;
+				m_exit_stall = 0.f;
+				UpdateExit();
+				return;
+			}
+		}
+	}
+
 	if (ClimbDirection() < 0.f && m_ladder->BeforeLadder(m_character))
 		SwitchState(clbClimbingDown);
 	float to_ax = m_ladder->DDToAxis(m_character, d);
@@ -426,6 +631,8 @@ void CElevatorState::NewState()
 	m_start_time = inl_ph_world().Device().dwTimeGlobal;
 	m_character->GetFootCenter(m_start_position);
 	m_strafe_time = 0.f;
+	m_exit = false; // any state change (a jump off, a depart) ends an exit
+	m_exit_probe = 0.f;
 }
 
 void CElevatorState::Depart()
@@ -464,6 +671,7 @@ void CElevatorState::GetJumpDir(const Fvector& accel, Fvector& dir)
 
 void CElevatorState::Deactivate()
 {
+	m_exit = false;
 	SwitchState(clbNoLadder);
 	m_state = clbNoLadder;
 	m_ladder = NULL;
@@ -508,6 +716,7 @@ void CElevatorState::NetRelcase(IPhysicsShellHolder* O)
 	if (!O || !m_ladder || O != m_ladder->cast_IPhysicsShellHolder())
 		return;
 
+	m_exit = false;
 	m_state = clbNoLadder;
 	m_ladder = NULL;
 }

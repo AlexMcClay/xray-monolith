@@ -29,6 +29,15 @@ private:
 	u32 m_start_time;
 	float m_step; // the physics step of the last PhTune
 	float m_strafe_time; // how long sideways input has been held (the actor's strafe off the ladder)
+	// The actor's exit at the top: the body carried over the lip onto a landing found by rays
+	bool m_exit;
+	int m_exit_leg; // 0 rising beside the ladder, 1 over onto the landing
+	Fvector m_exit_rise; // foot centre after the rise
+	Fvector m_exit_land; // foot centre on the landing
+	float m_exit_time; // since the exit began
+	float m_exit_probe; // until the next look for a landing
+	float m_exit_stall; // how long the body has hardly moved
+	Fvector m_exit_last; // the foot centre the step before
 public:
 	CElevatorState();
 	void PhTune(float step);
@@ -42,6 +51,7 @@ public:
 	bool NearDown() { return m_state == clbNearDown; }
 	bool NearState() { return m_state == clbNearUp || m_state == clbNearDown; }
 	bool ClimbingState() const { return m_state == clbClimbingUp || m_state == clbClimbingDown; }
+	bool Exiting() const { return m_exit; } // the actor being carried off the top of the ladder
 	void Depart();
 	float ClimbDirection();
 	void Deactivate();
@@ -63,6 +73,8 @@ private:
 	void UpdateDepart();
 	bool StrafeDepart(float to_ax, const Fvector& ca, float control_a);
 	void ClimbForceDir(Fvector& dir, float sign);
+	bool FindExit();
+	void UpdateExit();
 public:
 	void NetRelcase(IPhysicsShellHolder* O);
 };

@@ -39,6 +39,7 @@ IC static void generate_orthonormal_basis1(const Fvector& dir, Fvector& updir, F
 
 
 static const u32 ladder_hold_ms = 500; // Gunsmith Docs research/37
+static const float ladder_slide_speed = 3.f; // m/s down a ladder with crouch held
 
 void CActor::g_cl_ValidateMState(float dt, u32 mstate_wf)
 {
@@ -200,6 +201,15 @@ void CActor::g_cl_CheckControls(u32 mstate_wf, Fvector& vControlAccel, float& Ju
 	if (mstate_wf & mcLStrafe) mstate_wf & mcSprint ? vControlAccel.x += -0.5 : vControlAccel.x += -1;
 	if (mstate_wf & mcRStrafe) mstate_wf & mcSprint ? vControlAccel.x += 0.5 : vControlAccel.x += 1;
 
+	// Slide down a ladder while crouch is held (crouch itself is refused on ladders); W still climbs (research/37)
+	const bool ladder_slide = (mstate_real & mcClimb) && (mstate_wf & mcCrouch) && !(mstate_wf & mcFwd);
+	if (ladder_slide)
+	{
+		vControlAccel.set(0.f, 0.f, -1.f);
+		mstate_wf &= ~(mcLStrafe | mcRStrafe);
+		mstate_wf |= mcBack;
+	}
+
 	CPHMovementControl::EEnvironment curr_env = character_physics_support()->movement()->Environment();
 	if (curr_env == CPHMovementControl::peOnGround || curr_env == CPHMovementControl::peAtWall)
 	{
@@ -318,6 +328,8 @@ void CActor::g_cl_CheckControls(u32 mstate_wf, Fvector& vControlAccel, float& Ju
 				}
 
 				vControlAccel.mul(scale);
+				if (ladder_slide)
+					vControlAccel.mul(ladder_slide_speed * 10.f / vControlAccel.magnitude()); // top speed is accel / 10
 				cam_eff_factor = scale;
 			} //scale>EPS
 		} //(mstate_real&mcAnyMove)

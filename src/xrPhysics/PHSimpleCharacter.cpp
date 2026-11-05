@@ -681,7 +681,7 @@ void CPHSimpleCharacter::PhTune(dReal step)
 	{
 		b_side_contact = false;
 		m_friction_factor = 1.f;
-		if (b_stop_control)
+		if (b_stop_control && !m_elevator_state.Exiting())
 			dBodySetLinearVel(m_body, 0.f, 0.f, 0.f);
 	}
 
@@ -757,7 +757,7 @@ void CPHSimpleCharacter::PhTune(dReal step)
 	//else
 	dMass m;
 	dBodyGetMass(m_body, &m);
-	if (is_control)
+	if (is_control && !m_elevator_state.Exiting())
 	{
 		dVector3 sidedir;
 		dVector3 y = {0., 1., 0.};
@@ -1065,6 +1065,8 @@ void CPHSimpleCharacter::ApplyAcceleration()
 
 
 	dVector3 accel = {m_acceleration.x, 0.f, m_acceleration.z};
+	if (m_elevator_state.Exiting())
+		return; // the ladder's top exit sets the body's velocity itself
 	if (m_elevator_state.Active())
 	{
 		if (m_elevator_state.NearState())m_elevator_state.GetControlDir(*(Fvector*)accel);
@@ -1332,7 +1334,7 @@ void CPHSimpleCharacter::SafeAndLimitVelocity()
 			linear_velocity[2]); //;
 		//limit velocity
 		dReal l_limit;
-		if (is_control && !b_lose_control)
+		if (is_control && !b_lose_control && !m_elevator_state.Exiting())
 			l_limit = m_max_velocity / phTimefactor;
 		else
 			l_limit = default_l_limit;
