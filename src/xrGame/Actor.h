@@ -368,6 +368,9 @@ protected:
 	void camUpdateLadder(float dt);
 	void cam_SetLadder();
 	void cam_UnsetLadder();
+	bool m_ladder_hidden = false; // weapons hidden for a ladder
+	bool m_ladder_cam = false; // the ladder's camera limits are on
+	u32 m_ladder_left_time = 0; // when the actor was last climbing
 	void camUpdateFreelook(float dt);
 	void cam_SetFreelook();
 	void cam_UnsetFreelook();

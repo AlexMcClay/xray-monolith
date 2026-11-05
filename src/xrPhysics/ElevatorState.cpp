@@ -20,11 +20,30 @@ static const float look_angle_cosine = 0.9238795f; //22.5
 static const float lookup_angle_sine = 0.34202014f; //20
 extern class CPHWorld* ph_world;
 
+// Ladder quick wins (Gunsmith Docs research/37): console switches, on by default (0 = vanilla), for the actor only
+BOOL g_ladder_fix_input = TRUE; // W climbs up and S down, wherever the camera looks
+BOOL g_ladder_fix_pitch = TRUE; // vanilla's look-pitch rule with a dead band: no up/down flicker at -20 degrees
+BOOL g_ladder_fix_strafe = TRUE; // only near-pure sideways input, held a moment, steps off the ladder
+BOOL g_ladder_fix_force = TRUE; // the climb force along the ladder, not 45 degrees into its box
+static const float pitch_band = 0.15f; // sine units: up turns down below about -29 degrees, down turns up above about -11
+static const float strafe_depart_cosine = 0.34202014f; // input within 20 degrees of the ladder's plane
+static const float strafe_depart_time = 0.25f; // seconds
+static const float force_side_k = 4.f; // sideways centring per metre off the axis
+static const float force_side_max = 0.5f;
+static const float force_into = 0.2f; // what is left of the push into the ladder
+
+static bool ladder_fix(BOOL flag, CPHCharacter* character)
+{
+	return flag && character && character->RestrictionType() == rtActor;
+}
+
 CElevatorState::CElevatorState()
 {
 	m_state = clbNoLadder;
 	m_ladder = NULL;
 	m_character = NULL;
+	m_step = 0.f;
+	m_strafe_time = 0.f;
 }
 
 float CElevatorState::ClimbDirection()
@@ -33,8 +52,56 @@ float CElevatorState::ClimbDirection()
 	Fvector d;
 	m_ladder->DToPlain(m_character, d);
 	float dir = m_character->ControlAccel().dotproduct(d);
-	if (dir > EPS_L)dir *= (m_character->CamDir().y + lookup_angle_sine);
+	if (dir > EPS_L && !ladder_fix(g_ladder_fix_input, m_character))
+	{
+		float look = m_character->CamDir().y + lookup_angle_sine;
+		if (ladder_fix(g_ladder_fix_pitch, m_character))
+		{
+			if (m_state == clbClimbingUp) look += pitch_band;
+			else if (m_state == clbClimbingDown) look -= pitch_band;
+		}
+		dir *= look;
+	}
 	return dir;
+}
+
+bool CElevatorState::StrafeDepart(float to_ax, const Fvector& ca, float control_a)
+{
+	if (fis_zero(to_ax) || fis_zero(control_a))
+	{
+		m_strafe_time = 0.f;
+		return false;
+	}
+	float into = _abs(-ca.dotproduct(Fvector(m_ladder->Norm()).normalize()));
+	if (!ladder_fix(g_ladder_fix_strafe, m_character))
+		return into < M_SQRT1_2;
+	if (into >= strafe_depart_cosine)
+	{
+		m_strafe_time = 0.f;
+		return false;
+	}
+	m_strafe_time += m_step;
+	return m_strafe_time >= strafe_depart_time;
+}
+
+void CElevatorState::ClimbForceDir(Fvector& dir, float sign)
+{
+	// Along the axis, a pull back onto the axis sideways, and a little push into the ladder
+	Fvector axis, side, norm, to_axis;
+	m_ladder->DDAxis(axis);
+	m_ladder->DDSide(side);
+	m_ladder->DDNorm(norm);
+	float to_ax = m_ladder->DDToAxis(m_character, to_axis);
+	to_axis.mul(to_ax);
+	Fvector pull;
+	pull.mul(side, side.dotproduct(to_axis) * force_side_k);
+	float pull_mag = pull.magnitude();
+	if (pull_mag > force_side_max) pull.mul(force_side_max / pull_mag);
+	float into = norm.dotproduct(to_axis);
+	dir.mul(axis, sign);
+	dir.add(pull);
+	dir.mad(norm, into > 0.f ? force_into : -force_into);
+	dir.normalize();
 }
 
 extern bool g_actor_allow_ladder;
@@ -42,6 +109,7 @@ extern bool g_actor_allow_ladder;
 void CElevatorState::PhTune(float step)
 {
 	VERIFY(m_character&&m_character->b_exist&&m_character->is_active());
+	m_step = step;
 	if (!m_ladder) return;
 
 	if ((!g_actor_allow_ladder && m_character->RestrictionType() == rtActor) || m_character->RestrictionType() == rtMonsterMedium)
@@ -218,8 +286,7 @@ void CElevatorState::UpdateStClimbingDown()
 	Fvector ca;
 	ca.set(m_character->ControlAccel());
 	float control_a = to_mag_and_dir(ca);
-	if (!fis_zero(to_ax) && !fis_zero(control_a) && abs(-ca.dotproduct(Fvector(m_ladder->Norm()).normalize())) <
-		M_SQRT1_2)SwitchState(clbDepart);
+	if (StrafeDepart(to_ax, ca, control_a))SwitchState(clbDepart);
 	if (m_ladder->AxDistToLowerP(m_character) - m_character->FootRadius() < stop_climbing_dist)
 		SwitchState(clbNearDown);
 	UpdateClimbingCommon(d, to_ax, ca, control_a);
@@ -249,8 +316,7 @@ void CElevatorState::UpdateStClimbingUp()
 	Fvector ca;
 	ca.set(m_character->ControlAccel());
 	float control_a = to_mag_and_dir(ca);
-	if (!fis_zero(to_ax) && !fis_zero(control_a) && abs(-ca.dotproduct(Fvector(m_ladder->Norm()).normalize())) <
-		M_SQRT1_2)SwitchState(clbDepart);
+	if (StrafeDepart(to_ax, ca, control_a))SwitchState(clbDepart);
 	if (m_ladder->AxDistToUpperP(m_character) + m_character->FootRadius() < stop_climbing_dist)
 		SwitchState(clbNearUp);
 
@@ -267,7 +333,7 @@ void CElevatorState::UpdateClimbingCommon(const Fvector& d_to_ax, float to_ax, c
 	VERIFY(m_ladder&&m_character);
 	if (to_ax - m_character->FootRadius() > out_dist)
 		SwitchState((clbNoLadder));
-	if (fis_zero(ca) && d_to_ax.dotproduct(m_ladder->Norm()) < 0.f)
+	if (fis_zero(ca) && d_to_ax.dotproduct(m_ladder->Norm()) < 0.f && !ladder_fix(g_ladder_fix_force, m_character))
 	{
 #ifdef DEBUG
 		if(debug_output().ph_dbg_draw_mask().test(phDbgLadder))
@@ -301,13 +367,23 @@ bool CElevatorState::GetControlDir(Fvector& dir)
 			!fis_zero(dist, EPS_L) && m_character->ControlAccel().dotproduct(d) > 0.f)
 			dir.set(d);
 		break;
-	case clbClimbingUp: m_ladder->DDAxis(dir);
+	case clbClimbingUp:
+		if (ladder_fix(g_ladder_fix_force, m_character))
+		{
+			ClimbForceDir(dir, 1.f);
+			break;
+		}
+		m_ladder->DDAxis(dir);
 		m_ladder->DDToAxis(m_character, d);
 		dir.add(d);
 		dir.normalize();
 		break;
 	case clbClimbingDown: m_ladder->DDToAxis(m_character, d);
-		if (m_ladder->BeforeLadder(m_character) || d.dotproduct(dir) > 0.f)
+		if (ladder_fix(g_ladder_fix_force, m_character))
+		{
+			ClimbForceDir(dir, -1.f);
+		}
+		else if (m_ladder->BeforeLadder(m_character) || d.dotproduct(dir) > 0.f)
 		{
 			m_ladder->DDAxis(dir);
 			dir.invert();
@@ -360,6 +436,7 @@ void CElevatorState::NewState()
 	VERIFY(m_character);
 	m_start_time = inl_ph_world().Device().dwTimeGlobal;
 	m_character->GetFootCenter(m_start_position);
+	m_strafe_time = 0.f;
 }
 
 void CElevatorState::Depart()

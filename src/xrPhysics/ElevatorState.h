@@ -27,6 +27,8 @@ private:
 	CPHCharacter* m_character;
 	Fvector m_start_position; //for depart state
 	u32 m_start_time;
+	float m_step; // the physics step of the last PhTune
+	float m_strafe_time; // how long sideways input has been held (g_ladder_fix_strafe)
 public:
 	CElevatorState();
 	void PhTune(float step);
@@ -59,6 +61,8 @@ private:
 	void UpdateStClimbingDown();
 	void UpdateClimbingCommon(const Fvector& d_to_ax, float to_ax, const Fvector& control_accel, float ca);
 	void UpdateDepart();
+	bool StrafeDepart(float to_ax, const Fvector& ca, float control_a);
+	void ClimbForceDir(Fvector& dir, float sign);
 public:
 	void NetRelcase(IPhysicsShellHolder* O);
 };

@@ -38,6 +38,9 @@ IC static void generate_orthonormal_basis1(const Fvector& dir, Fvector& updir, F
 }
 
 
+BOOL g_ladder_fix_weapon = TRUE; // research/37
+static const u32 ladder_hold_ms = 500;
+
 void CActor::g_cl_ValidateMState(float dt, u32 mstate_wf)
 {
 	// Lookout
@@ -116,22 +119,25 @@ void CActor::g_cl_ValidateMState(float dt, u32 mstate_wf)
 			m_fJumpTime = s_fJumpTime;
 		}
 	}
+	// g_ladder_fix_weapon: the weapons and the ladder camera stay as they are through a short drop off the
+	// ladder state (its ends flip between climbing and near), instead of a holster and draw at every flip
+	const bool ladder_hold = g_ladder_fix_weapon && Device.dwTimeGlobal - m_ladder_left_time < ladder_hold_ms;
 	if (character_physics_support()->movement()->Environment() == CPHMovementControl::peAtWall)
 	{
 		if (!(mstate_real & mcClimb))
 		{
 			mstate_real |= mcClimb;
 			mstate_real &= ~mcSprint;
-			cam_SetLadder();
+			if (!m_ladder_cam)
+				cam_SetLadder();
 		}
+		m_ladder_left_time = Device.dwTimeGlobal;
 	}
 	else
 	{
-		if (mstate_real & mcClimb)
-		{
-			cam_UnsetLadder();
-		}
 		mstate_real &= ~mcClimb;
+		if (m_ladder_cam && !ladder_hold)
+			cam_UnsetLadder();
 	};
 
 	if (mstate_wf != mstate_real)
@@ -152,12 +158,12 @@ void CActor::g_cl_ValidateMState(float dt, u32 mstate_wf)
 
 	if (this == Level().CurrentControlEntity())
 	{
-		bool bOnClimbNow = !!(mstate_real & mcClimb);
-		bool bOnClimbOld = !!(mstate_old & mcClimb);
+		bool hide = !!(mstate_real & mcClimb) || (m_ladder_hidden && ladder_hold);
 
-		if (bOnClimbNow != bOnClimbOld)
+		if (hide != m_ladder_hidden)
 		{
-			SetWeaponHideState(/*INV_STATE_LADDER*/ INV_STATE_BLOCK_ALL, bOnClimbNow);
+			SetWeaponHideState(/*INV_STATE_LADDER*/ INV_STATE_BLOCK_ALL, hide);
+			m_ladder_hidden = hide;
 		};
 	};
 };

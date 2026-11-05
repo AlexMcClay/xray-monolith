@@ -31,6 +31,7 @@
 #include "ph_valid_ode.h"
 
 BOOL fun_allowed = FALSE;
+BOOL g_ladder_fix_physics = TRUE; // research/37: a climber who lost control stays on the ladder
 
 IC bool PhOutOfBoundaries(const Fvector& v)
 {
@@ -1264,6 +1265,12 @@ void CPHSimpleCharacter::OnRender(){
 EEnvironment CPHSimpleCharacter::CheckInvironment()
 {
 	//if(b_on_ground||(is_control&&!b_lose_control))
+	// g_ladder_fix_physics: the rest of IX-Ray's ebdbcb39 (the PhTune half is already here)
+	if (g_ladder_fix_physics && m_elevator_state.ClimbingState() && CastActorCharacter())
+	{
+		b_lose_control = false;
+		return peAtWall;
+	}
 	if (b_lose_control)
 		return peInAir;
 		//else									 return peAtWall;

@@ -50,6 +50,7 @@ float f_Freelook_cam_limit_p = .75f;
 void CActor::cam_SetLadder()
 {
 	CCameraBase* C = cameras[eacFirstEye];
+	m_ladder_cam = true;
 	g_LadderOrient();
 	float yaw = (-XFORM().k.getH());
 	float& cam_yaw = C->yaw;
@@ -105,6 +106,7 @@ void CActor::camUpdateLadder(float dt)
 void CActor::cam_UnsetLadder()
 {
 	CCameraBase* C = cameras[eacFirstEye];
+	m_ladder_cam = false;
 	C->lim_yaw.set(0, 0);
 	C->bClampYaw = false;
 }
@@ -476,6 +478,43 @@ float offsetZ = 0;
 float viewportNearOffset = 0;
 float firstPersonDeathHeadScale = 3.f;
 
+// Ladder camera (Gunsmith Docs research/37). On a ladder the face is a few cm from the rungs and the wall, and the
+// first-person camera's collision box, built along the view, pushes the camera out of them anew each frame: looking
+// up or down it catches every rung (reported 5 Nov 2026: jitter grows with the pitch, none looking level, little in
+// third person). g_ladder_fix_camera tests the box level while on a ladder (cam_Update) and eases what push is left
+// in and out; ladder_debug 1 logs a line per frame on a ladder.
+BOOL g_ladder_fix_camera = TRUE;
+BOOL g_ladder_debug = FALSE;
+static const float ladder_push_speed = 6.f; // per second
+static Fvector ladder_push = {0.f, 0.f, 0.f};
+
+static void ladder_camera_push(CActor* actor, CCameraBase* C, bool on_ladder, const Fvector& cam_free, float dt)
+{
+	const u32 mstate = actor->MovingState();
+	const bool climbing = !!(mstate & mcClimb);
+	const Fvector push = Fvector().sub(C->vPosition, cam_free);
+	if (g_ladder_fix_camera && on_ladder)
+	{
+		ladder_push.lerp(ladder_push, push, _min(dt * ladder_push_speed, 1.f));
+		C->vPosition.add(cam_free, ladder_push);
+	}
+	else
+		ladder_push.set(push);
+
+	if (g_ladder_debug && on_ladder)
+	{
+		CPHMovementControl* mc = actor->character_physics_support()->movement();
+		IElevatorState* es = mc->ElevatorState();
+		Fvector vel;
+		mc->GetCharacterVelocity(vel);
+		Msg("[ladder] t=%u dt=%.4f state=%d env=%d climb=%d move=%d pitch=%.3f foot_y=%.4f cam_y=%.4f push=%.4f,%.4f,%.4f used=%.4f vel=%.3f,%.3f,%.3f",
+			Device.dwTimeGlobal, dt, es ? (int)es->State() : -1,
+			(int)mc->Environment(), climbing ? 1 : 0,
+			(mstate & mcAnyMove) ? 1 : 0, C->vDirection.y, actor->Position().y, C->vPosition.y, push.x, push.y, push.z,
+			Fvector().sub(C->vPosition, cam_free).magnitude(), vel.x, vel.y, vel.z);
+	}
+}
+
 void CActor::cam_Update(float dt, float fFOV)
 {
 	if (m_holder) return;
@@ -597,7 +636,28 @@ void CActor::cam_Update(float dt, float fFOV)
 	}
 	if (Level().CurrentEntity() == this)
 	{
-		collide_camera(*cameras[eacFirstEye], _viewport_near, this);
+		CCameraBase* eye = cameras[eacFirstEye];
+		const Fvector cam_free = eye->vPosition;
+		const bool on_ladder = (mstate_real & mcClimb) || m_ladder_cam;
+		if (g_ladder_fix_camera && on_ladder)
+		{
+			// The collision box is built along the view: looking up or down tips its top or bottom edge into the
+			// rungs. On a ladder test it level, facing where the camera faces (the body's facing when looking
+			// straight up or down), then put the view back.
+			const Fvector dir = eye->vDirection, up = eye->vNormal;
+			Fvector level = Fvector().set(dir.x, 0.f, dir.z);
+			if (level.square_magnitude() < EPS_L)
+				level.set(XFORM().k.x, 0.f, XFORM().k.z);
+			level.normalize_safe();
+			eye->vDirection.set(level);
+			eye->vNormal.set(0.f, 1.f, 0.f);
+			collide_camera(*eye, _viewport_near, this);
+			eye->vDirection.set(dir);
+			eye->vNormal.set(up);
+		}
+		else
+			collide_camera(*eye, _viewport_near, this);
+		ladder_camera_push(this, eye, on_ladder, cam_free, dt);
 	}
 
     static bool firstPersonDeathDied = false;
