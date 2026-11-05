@@ -28,7 +28,7 @@ private:
 	Fvector m_start_position; //for depart state
 	u32 m_start_time;
 	float m_step; // the physics step of the last PhTune
-	float m_strafe_time; // how long sideways input has been held (g_ladder_fix_strafe)
+	float m_strafe_time; // how long sideways input has been held (the actor's strafe off the ladder)
 public:
 	CElevatorState();
 	void PhTune(float step);

@@ -178,8 +178,6 @@ extern int g_nearwall;
 extern int g_nearwall_trace;
 extern BOOL drawPickupItemNames;
 extern BOOL fun_allowed;
-extern BOOL g_ladder_fix_physics, g_ladder_fix_input, g_ladder_fix_pitch, g_ladder_fix_strafe, g_ladder_fix_force,
-            g_ladder_fix_weapon, g_ladder_fix_camera, g_ladder_debug;
 extern BOOL progressiveStaminaCost;
 extern BOOL NPCsLookAtActor;
 extern float NPCsLookAtActorMinDistance;
@@ -3174,15 +3172,6 @@ void CCC_RegisterCommands()
 
 	// demonized: Restores fun physics bugs like lift
 	CMD4(CCC_Integer, "fun_allowed", &fun_allowed, 0, 1);
-	// Ladder quick wins (Gunsmith Docs research/37), on by default; 0 = vanilla
-	CMD4(CCC_Integer, "ladder_fix_physics", &g_ladder_fix_physics, 0, 1);
-	CMD4(CCC_Integer, "ladder_fix_weapon", &g_ladder_fix_weapon, 0, 1);
-	CMD4(CCC_Integer, "ladder_fix_input", &g_ladder_fix_input, 0, 1);
-	CMD4(CCC_Integer, "ladder_fix_pitch", &g_ladder_fix_pitch, 0, 1);
-	CMD4(CCC_Integer, "ladder_fix_strafe", &g_ladder_fix_strafe, 0, 1);
-	CMD4(CCC_Integer, "ladder_fix_force", &g_ladder_fix_force, 0, 1);
-	CMD4(CCC_Integer, "ladder_fix_camera", &g_ladder_fix_camera, 0, 1);
-	CMD4(CCC_Integer, "ladder_debug", &g_ladder_debug, 0, 1);
 
 #ifdef DEBUG
 	//extern BOOL g_use_new_ballistics;

@@ -38,8 +38,7 @@ IC static void generate_orthonormal_basis1(const Fvector& dir, Fvector& updir, F
 }
 
 
-BOOL g_ladder_fix_weapon = TRUE; // research/37
-static const u32 ladder_hold_ms = 500;
+static const u32 ladder_hold_ms = 500; // Gunsmith Docs research/37
 
 void CActor::g_cl_ValidateMState(float dt, u32 mstate_wf)
 {
@@ -119,9 +118,9 @@ void CActor::g_cl_ValidateMState(float dt, u32 mstate_wf)
 			m_fJumpTime = s_fJumpTime;
 		}
 	}
-	// g_ladder_fix_weapon: the weapons and the ladder camera stay as they are through a short drop off the
+	// The weapons and the ladder camera stay as they are through a short drop off the
 	// ladder state (its ends flip between climbing and near), instead of a holster and draw at every flip
-	const bool ladder_hold = g_ladder_fix_weapon && Device.dwTimeGlobal - m_ladder_left_time < ladder_hold_ms;
+	const bool ladder_hold = Device.dwTimeGlobal - m_ladder_left_time < ladder_hold_ms;
 	if (character_physics_support()->movement()->Environment() == CPHMovementControl::peAtWall)
 	{
 		if (!(mstate_real & mcClimb))

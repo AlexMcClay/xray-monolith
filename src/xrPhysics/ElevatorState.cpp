@@ -20,21 +20,19 @@ static const float look_angle_cosine = 0.9238795f; //22.5
 static const float lookup_angle_sine = 0.34202014f; //20
 extern class CPHWorld* ph_world;
 
-// Ladder quick wins (Gunsmith Docs research/37): console switches, on by default (0 = vanilla), for the actor only
-BOOL g_ladder_fix_input = TRUE; // W climbs up and S down, wherever the camera looks
-BOOL g_ladder_fix_pitch = TRUE; // vanilla's look-pitch rule with a dead band: no up/down flicker at -20 degrees
-BOOL g_ladder_fix_strafe = TRUE; // only near-pure sideways input, held a moment, steps off the ladder
-BOOL g_ladder_fix_force = TRUE; // the climb force along the ladder, not 45 degrees into its box
-static const float pitch_band = 0.15f; // sine units: up turns down below about -29 degrees, down turns up above about -11
+// Ladder fixes for the actor (Gunsmith Docs research/37); stalkers and monsters keep vanilla's rules:
+// - W climbs up and S down, wherever the camera looks (vanilla: W climbs down looking 20 degrees below level);
+// - only near-pure sideways input, held a moment, steps off the ladder (vanilla: 45 degrees off, at once);
+// - the climb force runs along the ladder (vanilla: 45 degrees into its box), with no idle pull into it.
 static const float strafe_depart_cosine = 0.34202014f; // input within 20 degrees of the ladder's plane
 static const float strafe_depart_time = 0.25f; // seconds
 static const float force_side_k = 4.f; // sideways centring per metre off the axis
 static const float force_side_max = 0.5f;
 static const float force_into = 0.2f; // what is left of the push into the ladder
 
-static bool ladder_fix(BOOL flag, CPHCharacter* character)
+static bool ladder_actor(CPHCharacter* character)
 {
-	return flag && character && character->RestrictionType() == rtActor;
+	return character && character->RestrictionType() == rtActor;
 }
 
 CElevatorState::CElevatorState()
@@ -52,16 +50,7 @@ float CElevatorState::ClimbDirection()
 	Fvector d;
 	m_ladder->DToPlain(m_character, d);
 	float dir = m_character->ControlAccel().dotproduct(d);
-	if (dir > EPS_L && !ladder_fix(g_ladder_fix_input, m_character))
-	{
-		float look = m_character->CamDir().y + lookup_angle_sine;
-		if (ladder_fix(g_ladder_fix_pitch, m_character))
-		{
-			if (m_state == clbClimbingUp) look += pitch_band;
-			else if (m_state == clbClimbingDown) look -= pitch_band;
-		}
-		dir *= look;
-	}
+	if (dir > EPS_L && !ladder_actor(m_character))dir *= (m_character->CamDir().y + lookup_angle_sine);
 	return dir;
 }
 
@@ -73,7 +62,7 @@ bool CElevatorState::StrafeDepart(float to_ax, const Fvector& ca, float control_
 		return false;
 	}
 	float into = _abs(-ca.dotproduct(Fvector(m_ladder->Norm()).normalize()));
-	if (!ladder_fix(g_ladder_fix_strafe, m_character))
+	if (!ladder_actor(m_character))
 		return into < M_SQRT1_2;
 	if (into >= strafe_depart_cosine)
 	{
@@ -333,7 +322,7 @@ void CElevatorState::UpdateClimbingCommon(const Fvector& d_to_ax, float to_ax, c
 	VERIFY(m_ladder&&m_character);
 	if (to_ax - m_character->FootRadius() > out_dist)
 		SwitchState((clbNoLadder));
-	if (fis_zero(ca) && d_to_ax.dotproduct(m_ladder->Norm()) < 0.f && !ladder_fix(g_ladder_fix_force, m_character))
+	if (fis_zero(ca) && d_to_ax.dotproduct(m_ladder->Norm()) < 0.f && !ladder_actor(m_character))
 	{
 #ifdef DEBUG
 		if(debug_output().ph_dbg_draw_mask().test(phDbgLadder))
@@ -368,7 +357,7 @@ bool CElevatorState::GetControlDir(Fvector& dir)
 			dir.set(d);
 		break;
 	case clbClimbingUp:
-		if (ladder_fix(g_ladder_fix_force, m_character))
+		if (ladder_actor(m_character))
 		{
 			ClimbForceDir(dir, 1.f);
 			break;
@@ -379,7 +368,7 @@ bool CElevatorState::GetControlDir(Fvector& dir)
 		dir.normalize();
 		break;
 	case clbClimbingDown: m_ladder->DDToAxis(m_character, d);
-		if (ladder_fix(g_ladder_fix_force, m_character))
+		if (ladder_actor(m_character))
 		{
 			ClimbForceDir(dir, -1.f);
 		}
