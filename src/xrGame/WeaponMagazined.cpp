@@ -121,13 +121,27 @@ void CWeaponMagazined::Load(LPCSTR section)
 	                                      "snd_shoot_actor_exclusive", false);
 
 	//Alundaio: LAYERED_SND_SHOOT
-	m_sounds.LoadSound(section, "snd_shoot", "sndShot", false, m_eSoundShot);
+	// (the third-person shot too: a gun's HUD section may give all its shot sounds, so the guns sharing it share them)
+	m_sounds.LoadSound(actor_sect("snd_shoot"), "snd_shoot", "sndShot", false, m_eSoundShot);
 	if (WeaponSoundExist(actor_sect("snd_shoot_actor"), "snd_shoot_actor"))
 		m_sounds.LoadSound(actor_sect("snd_shoot_actor"), "snd_shoot_actor", "sndShotActor", shot_excl, m_eSoundShot);
 	//-Alundaio
 	// Cyclic fire sounds
 	if (WeaponSoundExist(actor_sect("snd_shoot_actor_first"), "snd_shoot_actor_first"))
 		m_sounds.LoadSound(actor_sect("snd_shoot_actor_first"), "snd_shoot_actor_first", "sndShotActorFirst", shot_excl, m_eSoundShot);
+
+	// Firing loops and their tails (SShotLoop), from the HUD section first as the actor keys
+	auto load_loop = [&](LPCSTR sect, LPCSTR line, LPCSTR alias)
+	{
+		if (pSettings->line_exist(sect, line))
+			m_sounds.LoadSound(sect, line, alias, true, m_eSoundShot);
+	};
+	load_loop(actor_sect("snd_shoot_loop"), "snd_shoot_loop", "sndShotLoop");
+	load_loop(actor_sect("snd_shoot_tail"), "snd_shoot_tail", "sndShotTail");
+	load_loop(actor_sect("snd_shoot_actor_loop"), "snd_shoot_actor_loop", "sndShotActorLoop");
+	load_loop(actor_sect("snd_shoot_actor_tail"), "snd_shoot_actor_tail", "sndShotActorTail");
+	m_shot_loop_rpm = m_shot_loop_rpm_actor = READ_IF_EXISTS(pSettings, r_float, actor_sect("snd_shoot_loop_rpm"), "snd_shoot_loop_rpm", 0.f);
+	m_shot_pitch_random = READ_IF_EXISTS(pSettings, r_float, actor_sect("snd_shoot_pitch_random"), "snd_shoot_pitch_random", 0.f);
 
 	//misfire shot
 	if (WeaponSoundExist(section, "snd_shot_misfire"))
@@ -168,7 +182,7 @@ void CWeaponMagazined::Load(LPCSTR section)
 	//звуки и партиклы глушителя, еслит такой есть
 	// (also for guns without a silencer addon that may take a suppressor part)
 	if (m_eSilencerStatus == ALife::eAddonAttachable || m_eSilencerStatus == ALife::eAddonPermanent ||
-		(pSettings->line_exist(section, "gs_slots") && WeaponSoundExist(section, "snd_silncer_shot")))
+		(pSettings->line_exist(section, "gs_slots") && WeaponSoundExist(actor_sect("snd_silncer_shot"), "snd_silncer_shot")))
 	{
 		if (pSettings->line_exist(section, "silencer_flame_particles"))
 			m_sSilencerFlameParticles = pSettings->r_string(section, "silencer_flame_particles");
@@ -176,7 +190,7 @@ void CWeaponMagazined::Load(LPCSTR section)
 			m_sSilencerSmokeParticles = pSettings->r_string(section, "silencer_smoke_particles");
 
 		//Alundaio: LAYERED_SND_SHOOT Silencer
-		m_sounds.LoadSound(section, "snd_silncer_shot", "sndSilencerShot", false, m_eSoundShot);
+		m_sounds.LoadSound(actor_sect("snd_silncer_shot"), "snd_silncer_shot", "sndSilencerShot", false, m_eSoundShot);
 		if (WeaponSoundExist(actor_sect("snd_silncer_shot_actor"), "snd_silncer_shot_actor"))
 			m_sounds.LoadSound(actor_sect("snd_silncer_shot_actor"), "snd_silncer_shot_actor", "sndSilencerShotActor", shot_excl, m_eSoundShot);
 		//-Alundaio
@@ -184,6 +198,11 @@ void CWeaponMagazined::Load(LPCSTR section)
 		// Cyclic fire sounds w/ silencer
 		if (WeaponSoundExist(actor_sect("snd_silncer_shoot_actor_first"), "snd_silncer_shoot_actor_first"))
 			m_sounds.LoadSound(actor_sect("snd_silncer_shoot_actor_first"), "snd_silncer_shoot_actor_first", "sndSilencerShotActorFirst", shot_excl, m_eSoundShot);
+
+		load_loop(actor_sect("snd_silncer_shot_loop"), "snd_silncer_shot_loop", "sndSilencerShotLoop");
+		load_loop(actor_sect("snd_silncer_shot_tail"), "snd_silncer_shot_tail", "sndSilencerShotTail");
+		load_loop(actor_sect("snd_silncer_shot_actor_loop"), "snd_silncer_shot_actor_loop", "sndSilencerShotActorLoop");
+		load_loop(actor_sect("snd_silncer_shot_actor_tail"), "snd_silncer_shot_actor_tail", "sndSilencerShotActorTail");
 
 		//misfire shot
 		if (WeaponSoundExist(section, "snd_silncer_shot_misfire"))
@@ -703,6 +722,7 @@ void CWeaponMagazined::UpdateCL()
 		}
 	}
 
+	UpdateShotLoop();
 	UpdateSounds();
 }
 
@@ -866,8 +886,92 @@ void CWeaponMagazined::SetDefaults()
 	CWeapon::SetDefaults();
 }
 
+// A queue of shots on a gun with a firing loop, as Tarkov's WeaponSoundPlayer plays automatic fire: the loop (a
+// recording of automatic fire, its beats at snd_shoot_loop_rpm) starts from its beginning on the first shot and plays
+// at its own pace, whatever the gun's rate; the later shots play nothing. UpdateShotLoop ends it. Single fire, and a
+// misfire shot with a sound of its own, play a sound per shot as before.
+bool CWeaponMagazined::PlayShotLoop(bool actor)
+{
+	if (m_iQueueSize == 1)
+		return false;
+	if (bMisfire)
+	{
+		string128 mf;
+		strconcat(sizeof(mf), mf, m_sSndShotCurrent.c_str(), actor ? "MisfireActor" : "Misfire");
+		if (m_sounds.FindSoundItem(mf, false))
+			return false;
+	}
+	string128 loop, tail;
+	strconcat(sizeof(loop), loop, m_sSndShotCurrent.c_str(), actor ? "ActorLoop" : "Loop");
+	strconcat(sizeof(tail), tail, m_sSndShotCurrent.c_str(), actor ? "ActorTail" : "Tail");
+	const float rpm = actor ? m_shot_loop_rpm_actor : m_shot_loop_rpm;
+	if (rpm <= 0.f || !m_sounds.FindSoundItem(loop, false))
+		return false;
+
+	if (m_shot_loop.loop.size() && m_shot_loop.base == loop && m_sounds.IsPlaying(m_shot_loop.loop.c_str()))
+	{
+		m_shot_loop.end_at = 0.f;       // (a shot after all: the loop carries on)
+		return true;
+	}
+	if (m_shot_loop.loop.size())
+		UpdateShotLoop(true);
+	m_shot_loop.base = loop;
+	m_shot_loop.tail = m_sounds.FindSoundItem(tail, false) ? tail : "";
+	m_shot_loop.beat = 60.f / rpm;
+	m_shot_loop.start = Device.fTimeGlobal;
+	m_shot_loop.end_at = 0.f;
+	m_shot_loop.hud = !!GetHUDmode();
+	// (the alias that played: a script may have swapped in another sound, on_before_play_hud_sound)
+	m_shot_loop.loop = m_sounds.PlaySound(loop, get_LastFP(), H_Root(), m_shot_loop.hud, true, (u8)-1);
+	if (!m_shot_loop.loop.size())
+		m_shot_loop.loop = loop;
+	return true;
+}
+
+// Once no more shots will come (the trigger let go, the queue or the magazine done, a jam), the loop is cut on its
+// next beat and the tail plays from there (Tarkov's StopFiringLoop: n = floor(elapsed / beat) + 1, no crossfade). It
+// is checked each frame, so the cut comes up to a frame early rather than letting the next beat's shot through.
+void CWeaponMagazined::UpdateShotLoop(bool force_end)
+{
+	if (!m_shot_loop.loop.size())
+		return;
+	if (!m_sounds.IsPlaying(m_shot_loop.loop.c_str()))
+	{
+		m_shot_loop.loop = nullptr;     // stopped by someone else (hidden, dropped)
+		return;
+	}
+	if (!force_end)
+	{
+		const bool more = GetState() == eFire && IsWorking() && iAmmoElapsed > 0 && !bMisfire &&
+			(m_iQueueSize < 0 || m_iShotNum < m_iQueueSize);
+		if (more)
+			return;
+		if (m_shot_loop.end_at <= 0.f)
+		{
+			const float elapsed = Device.fTimeGlobal - m_shot_loop.start;
+			m_shot_loop.end_at = m_shot_loop.start + (floorf(elapsed / m_shot_loop.beat) + 1.f) * m_shot_loop.beat;
+		}
+		if (Device.fTimeGlobal + Device.fTimeDelta < m_shot_loop.end_at)
+			return;
+	}
+	m_sounds.StopSound(m_shot_loop.loop.c_str());
+	if (m_shot_loop.tail.size())
+		m_sounds.PlaySound(m_shot_loop.tail.c_str(), get_LastFP(), H_Root(), m_shot_loop.hud, false, (u8)-1);
+	m_shot_loop.loop = nullptr;
+}
+
+// A single shot's pitch: Tarkov varies it by up to 3% (snd_shoot_pitch_random), not in automatic fire
+float CWeaponMagazined::ShotPitch() const
+{
+	return m_shot_pitch_random > 0.f ? 1.f + ::Random.randF(-m_shot_pitch_random, m_shot_pitch_random) : 1.f;
+}
+
 void CWeaponMagazined::PlaySoundShot()
 {
+	if (PlayShotLoop(ParentIsActor()))
+		return;
+	const float pitch = ShotPitch();
+
 	if (ParentIsActor())
 	{
 		if (bMisfire)
@@ -876,7 +980,7 @@ void CWeaponMagazined::PlaySoundShot()
 			strconcat(sizeof(sndNameMisfire), sndNameMisfire, m_sSndShotCurrent.c_str(), "MisfireActor");
 			if (m_sounds.FindSoundItem(sndNameMisfire, false))
 			{
-				m_sounds.PlaySound(sndNameMisfire, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+				m_sounds.PlaySound(sndNameMisfire, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
 				return;
 			}
 		}
@@ -885,7 +989,7 @@ void CWeaponMagazined::PlaySoundShot()
 		strconcat(sizeof(sndNameFirst), sndNameFirst, m_sSndShotCurrent.c_str(), "ActorFirst");
 		if (m_iShotNum == 1 && m_sounds.FindSoundItem(sndNameFirst, false))
 		{
-			m_sounds.PlaySound(sndNameFirst, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+			m_sounds.PlaySound(sndNameFirst, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
 			return;
 		}
 
@@ -893,7 +997,7 @@ void CWeaponMagazined::PlaySoundShot()
 		strconcat(sizeof(sndName), sndName, m_sSndShotCurrent.c_str(), "Actor");
 		if (m_sounds.FindSoundItem(sndName, false))
 		{
-			m_sounds.PlaySound(sndName, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+			m_sounds.PlaySound(sndName, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
 			return;
 		}
 	}
@@ -904,12 +1008,12 @@ void CWeaponMagazined::PlaySoundShot()
 		strconcat(sizeof(sndNameMisfire), sndNameMisfire, m_sSndShotCurrent.c_str(), "Misfire");
 		if (m_sounds.FindSoundItem(sndNameMisfire, false))
 		{
-			m_sounds.PlaySound(sndNameMisfire, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+			m_sounds.PlaySound(sndNameMisfire, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
 			return;
 		}
 	}
 
-	m_sounds.PlaySound(m_sSndShotCurrent.c_str(), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+	m_sounds.PlaySound(m_sSndShotCurrent.c_str(), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
 }
 
 void CWeaponMagazined::OnShot()

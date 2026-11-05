@@ -307,12 +307,13 @@ void HUD_SOUND_COLLECTION_LAYERED::UpdateAllSoundsPositions(const Fvector& P)
 	}
 }
 
-void HUD_SOUND_COLLECTION_LAYERED::PlaySound(LPCSTR alias, const Fvector& position, const CObject* parent,
+shared_str HUD_SOUND_COLLECTION_LAYERED::PlaySound(LPCSTR alias, const Fvector& position, const CObject* parent,
                                              bool hud_mode, bool looped, u8 index, float volume_mult, float frequency,
                                              float delay_mult)
 {
 	PROF_EVENT("HUD_SOUND_COLLECTION_LAYERED::PlaySound");
 	LPCSTR alias_to_play = alias;
+	xr_string new_alias; // (outlives the override block: alias_to_play may point into it)
 	::luabind::functor<::luabind::object> funct;
 	if (ai().script_engine().functor("_G.COnBeforePlayHudSound", funct))
 	{
@@ -363,7 +364,7 @@ void HUD_SOUND_COLLECTION_LAYERED::PlaySound(LPCSTR alias, const Fvector& positi
 				}
 				else
 				{
-					xr_string new_alias = xr_string(section) + "|" + line;
+					new_alias = xr_string(section) + "|" + line;
 					if (!FindSoundItem(new_alias.c_str(), false))
 					{
 						auto old_sound = FindSoundItem(alias, false);
@@ -393,13 +394,43 @@ void HUD_SOUND_COLLECTION_LAYERED::PlaySound(LPCSTR alias, const Fvector& positi
 	xr_vector<HUD_SOUND_COLLECTION>::iterator it = m_sound_items.begin();
 	xr_vector<HUD_SOUND_COLLECTION>::iterator it_e = m_sound_items.end();
 
+	const float dist = Device.vCameraPosition.distance_to(position);
 	for (; it != it_e; ++it)
 	{
-		if (it->m_alias == alias_to_play && volume_mult > EPS_S)
-			it->PlaySound(alias_to_play, position, parent, hud_mode, looped, index, volume_mult, frequency, delay_mult);
+		if (!(it->m_alias == alias_to_play))
+			continue;
+		const float w = (it->m_has_blend && !hud_mode) ? it->blend_weight(dist) : 1.f;
+		if (volume_mult * w > EPS_S)
+			it->PlaySound(alias_to_play, position, parent, hud_mode, looped, index, volume_mult * w, frequency, delay_mult);
 	}
+	return shared_str(alias_to_play);
 }
 
+
+float HUD_SOUND_COLLECTION::blend_weight(float dist) const
+{
+	if (dist < m_blend[0] || dist >= m_blend[3])
+		return 0.f;
+	if (dist < m_blend[1])
+		return (dist - m_blend[0]) / _max(m_blend[1] - m_blend[0], EPS_L);
+	if (dist <= m_blend[2])
+		return 1.f;
+	return (m_blend[3] - dist) / _max(m_blend[3] - m_blend[2], EPS_L);
+}
+
+bool HUD_SOUND_COLLECTION_LAYERED::IsPlaying(LPCSTR alias)
+{
+	for (auto& c : m_sound_items)
+	{
+		if (!(c.m_alias == alias))
+			continue;
+		for (auto& i : c.m_sound_items)
+			for (auto& s : i.sounds)
+				if (s.snd._feedback())
+					return true;
+	}
+	return false;
+}
 
 HUD_SOUND_ITEM* HUD_SOUND_COLLECTION_LAYERED::FindSoundItem(LPCSTR alias, bool b_assert)
 {
@@ -444,6 +475,16 @@ void HUD_SOUND_COLLECTION_LAYERED::LoadSound(CInifile const* ini, LPCSTR section
 			HUD_SOUND_COLLECTION& snd_item = m_sound_items.back();
 			snd_item.LoadSound(buf_str, sound_line, alias, exclusive, type);
 			snd_item.m_alias = alias;
+			string256 blend_line;
+			xr_sprintf(blend_line, "%s_blend", sound_line);
+			if (ini->line_exist(buf_str, blend_line))
+			{
+				LPCSTR b = ini->r_string(buf_str, blend_line);
+				string64 v;
+				for (int i = 0; i < 4 && i < _GetItemCount(b); ++i)
+					snd_item.m_blend[i] = (float)atof(_GetItem(b, i, v));
+				snd_item.m_has_blend = true;
+			}
 			xr_sprintf(sound_line, "snd_%d_layer", ++k);
 		}
 	}

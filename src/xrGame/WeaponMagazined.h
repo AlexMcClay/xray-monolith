@@ -19,6 +19,24 @@ protected:
 	//звук текущего выстрела
 	shared_str m_sSndShotCurrent;
 
+	// A firing loop (snd_shoot_loop, snd_shoot_actor_loop and the silencer's), as Tarkov plays automatic fire: a
+	// recording of automatic fire played looped while a queue of shots lasts, cut on its next beat (its beats at
+	// snd_shoot_loop_rpm) once the shots stop, and its tail (snd_*_tail) from there, instead of a sound per shot.
+	struct SShotLoop
+	{
+		shared_str base;        // the loop's alias (sndShotActorLoop, ...)
+		shared_str loop, tail;  // the alias playing (a script may swap the sound), its tail's
+		float start = 0.f;      // Device.fTimeGlobal it started at
+		float beat = 0.f;       // the recording's shot period
+		float end_at = 0.f;     // when it is cut, once known
+		bool hud = false;
+	} m_shot_loop;
+	float m_shot_loop_rpm = 0.f, m_shot_loop_rpm_actor = 0.f;
+	float m_shot_pitch_random = 0.f;    // a single shot's pitch varies by up to this (snd_shoot_pitch_random)
+	bool PlayShotLoop(bool actor);
+	void UpdateShotLoop(bool force_end = false);
+	float ShotPitch() const;
+
 	//дополнительная информация о глушителе
 	LPCSTR m_sSilencerFlameParticles;
 	LPCSTR m_sSilencerSmokeParticles;

@@ -72,6 +72,11 @@ public:
 	~HUD_SOUND_COLLECTION();
 	shared_str m_alias; //Alundaio: For use when it's part of a layered Collection
 	xr_vector<HUD_SOUND_ITEM> m_sound_items; //Alundaio: made public
+	// a layer's distance window (snd_<n>_layer_blend = fade in from, full from, full to, faded out at; metres from
+	// the camera, read when a 3D sound starts): distant and far layers that take over from the close one
+	float m_blend[4] = {0.f, 0.f, flt_max, flt_max};
+	bool m_has_blend = false;
+	float blend_weight(float dist) const;
 
 	HUD_SOUND_ITEM* FindSoundItem(LPCSTR alias, bool b_assert); //AVO: made public to check if sound is loaded
 	void PlaySound(LPCSTR alias, const Fvector& position, const CObject* parent, bool hud_mode, bool looped = false,
@@ -92,7 +97,8 @@ class HUD_SOUND_COLLECTION_LAYERED
 public:
 	~HUD_SOUND_COLLECTION_LAYERED();
 	HUD_SOUND_ITEM* FindSoundItem(LPCSTR alias, bool b_assert);
-	void PlaySound(LPCSTR alias, const Fvector& position, const CObject* parent, bool hud_mode, bool looped = false,
+	// returns the alias that played (a script's on_before_play_hud_sound may swap in another sound)
+	shared_str PlaySound(LPCSTR alias, const Fvector& position, const CObject* parent, bool hud_mode, bool looped = false,
 	               u8 index = u8(-1), float volume_mult = 1.f, float frequency = 1.f, float delay_mult = 1.f);
 	void StopSound(LPCSTR alias);
 	void StopAllSounds();
@@ -101,5 +107,6 @@ public:
 	               int type = sg_SourceType);
 	void SetPosition(LPCSTR alias, const Fvector& pos);
 	void UpdateAllSoundsPositions(const Fvector& P);
+	bool IsPlaying(LPCSTR alias); // any layer of it still sounding (2D ones too, unlike HUD_SOUND_ITEM::playing)
 };
 //-Alundaio
