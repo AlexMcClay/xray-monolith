@@ -430,6 +430,12 @@ bool CBulletManager::ObjectHit(SBullet_Hit* hit_res, SBullet* bullet, const Fvec
 
 	//коэффициент уменьшение силы с падением скорости
 	float speed_factor = bullet->speed / bullet->max_speed;
+	// Gunsmith: [bullet_manager] damage_degradation, Tarkov's rule (EftBulletClass): r + (1 - r) x coefficient
+	if (m_fDamageDegradation > 0.f)
+	{
+		clamp(speed_factor, 0.f, 1.f);
+		speed_factor += (1.f - speed_factor) * m_fDamageDegradation;
+	}
 	//получить силу хита выстрела с учетом патрона
 	*hit_res = bullet->hit_param; //default param
 

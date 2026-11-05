@@ -34,6 +34,10 @@ float const CBulletManager::parent_ignore_distance = 3.f;
 static float const air_resistance_epsilon = .1f;
 #endif // #ifdef DEBUG
 float g_bullet_time_factor = 1.f;
+// Gunsmith: [bullet_manager] trajectory_velocity_fix. trajectory_velocity switched from the slowing (parabolic) part
+// to the falling part at 2/k, trajectory_position at 1/k: past 1/k the speed kept (damage, direction) wasn't the
+// speed the bullet moved at. On, both switch at 1/k.
+static bool g_bullet_velocity_fix = false;
 
 SBullet::SBullet()
 {
@@ -174,6 +178,8 @@ CBulletManager::CBulletManager()
 {
 	m_Bullets.clear();
 	m_Bullets.reserve(100);
+	m_bPerAmmoAirResistance = false;
+	m_fDamageDegradation = 0.f;
 }
 
 CBulletManager::~CBulletManager()
@@ -207,6 +213,11 @@ void CBulletManager::Load()
 	{
 		g_bullet_time_factor = pSettings->r_float(bullet_manager_sect, "bullet_velocity_time_factor");
 	}
+
+	m_bPerAmmoAirResistance = !!READ_IF_EXISTS(pSettings, r_bool, bullet_manager_sect, "per_ammo_air_resistance", FALSE);
+	m_fDamageDegradation = READ_IF_EXISTS(pSettings, r_float, bullet_manager_sect, "damage_degradation", 0.f);
+	clamp(m_fDamageDegradation, 0.f, 1.f);
+	g_bullet_velocity_fix = !!READ_IF_EXISTS(pSettings, r_bool, bullet_manager_sect, "trajectory_velocity_fix", FALSE);
 
 
 	LPCSTR whine_sounds = pSettings->r_string(bullet_manager_sect, "whine_sounds");
@@ -365,7 +376,7 @@ static Fvector trajectory_velocity(
 	float const time
 )
 {
-	float const parabolic_time = _max(0.f, 2.f / air_resistance - air_resistance_epsilon);
+	float const parabolic_time = _max(0.f, (g_bullet_velocity_fix ? 1.f : 2.f) / air_resistance - air_resistance_epsilon);
 	float const fall_down_time = time - parabolic_time;
 	//	float const fake_velocity	= start_velocity*2.f;
 	if (fall_down_time < 0.f)
@@ -824,11 +835,8 @@ BOOL CBulletManager::firetrace_callback(collide::rq_result& result, LPVOID param
 	Fvector& collide_position = data.collide_position;
 	collide_position = Fvector().mad(bullet.bullet_pos, bullet.dir, result.range);
 
-	float const air_resistance = (GameID() == eGameIDSingle)
-		                             ? Level().BulletManager().m_fAirResistanceK
-		                             : bullet.air_resistance;
-
 	CBulletManager& bullet_manager = Level().BulletManager();
+	float const air_resistance = bullet_manager.air_resistance_of(bullet);
 	Fvector const gravity = {0.f, -bullet_manager.m_fGravityConst, 0.f};
 	update_bullet(bullet, data, gravity, air_resistance);
 	if (fis_zero(bullet.speed))
@@ -999,12 +1007,17 @@ static bool try_update_bullet(SBullet& bullet, Fvector const& gravity, float con
 }
 
 
+float CBulletManager::air_resistance_of(SBullet const& bullet) const
+{
+	return (GameID() == eGameIDSingle && !m_bPerAmmoAirResistance) ? m_fAirResistanceK : bullet.air_resistance;
+}
+
 bool CBulletManager::process_bullet(collide::rq_results& storage, SBullet& bullet, u32 const delta_time)
 {
 	float const time_delta = float(delta_time) / 1000.f;
 	Fvector const gravity = Fvector().set(0.f, -m_fGravityConst, 0.f);
 
-	float const air_resistance = (GameID() == eGameIDSingle) ? m_fAirResistanceK : bullet.air_resistance;
+	float const air_resistance = air_resistance_of(bullet);
 	bullet.tracer_start_position = bullet.bullet_pos;
 
 #if 0//def DEBUG

@@ -175,6 +175,14 @@ protected:
 	//сопротивление воздуха, процент, который отнимается от скорости
 	//полета пули
 	float m_fAirResistanceK;
+	// Gunsmith ballistics ([bullet_manager] keys; without them the game plays as vanilla):
+	// per_ammo_air_resistance: single player flies each bullet with its own air resistance (the round's
+	// k_air_resistance x the gun's air_resistance_factor), as multiplayer does, instead of air_resistance_k for all
+	bool m_bPerAmmoAirResistance;
+	// damage_degradation (0..1): hit power and impulse scale by r + (1 - r) x this, r = speed / launch speed
+	// (Tarkov's GlobalDamageDegradationCoefficient, 0.5); 0 keeps vanilla's r
+	float m_fDamageDegradation;
+	float air_resistance_of(SBullet const& bullet) const;
 	//cколько процентов энергии потеряет пуля при столкновении с материалом (при падении под прямым углом)
 	float m_fCollisionEnergyMin;
 	//сколькол процентов энергии устанется у пули при любом столкновении
