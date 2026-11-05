@@ -40,10 +40,24 @@ namespace gunsmith
 		float dot_intensity = 1.f;
 		float dot_light_range = 0.2f, dot_light_intensity = 3.1f;
 		float dot_cone_close = deg2rad(15.f), dot_cone_far = deg2rad(119.f);
-		// the lens while lit: a glow facing the camera, brighter as the device points at it
+		// the lens while lit: a glow facing the camera, brighter as the device points at it (without flares)
 		shared_str lens_visual;
 		float lens_size = 0.f, lens_intensity = 1.f;
 		float lens_angle_min = 0.6f; // cosine: the flare shows from this angle to the device's axis
+		// Tarkov's lens flare (MultiFlare): sprites of a constant size on screen at the lens, fading in as the device
+		// turns to the camera (from lens_angle_min, at flare_speed per second), with the distance, and near the
+		// screen's edges; hidden while something is between. Keys: flare_count, flare_<i>, flare_speed, flare_scale.
+		struct SFlare
+		{
+			shared_str visual; // a quad model on one atlas element
+			float scale = 0.f; // half-size, as a share of the distance (an angle)
+			float scale_far = 1.f, alpha_far = 1.f; // x scale and x brightness at dist_far (from 1 at dist_near)
+			float alpha = 1.f;
+			float dist_near = 0.1f, dist_far = 30.f;
+			Fvector color;
+		};
+		xr_vector<SFlare> flares;
+		float flare_speed = 2.f, flare_scale = 1.f;
 
 		void load(LPCSTR section);
 	};
@@ -98,6 +112,12 @@ namespace gunsmith
 			Fmatrix beam_xform, dot_xform, lens_xform[eLensCount];
 			bool beam_on = false, dot_on = false;
 			int lens_ctx[eLensCount] = { -1, -1 }; // the context each lens was placed for this frame, -1 none
+			// lens flares (world only): one visual and transform per sprite of the definition
+			xr_vector<IRenderVisual*> flare_vis[eLensCount];
+			xr_vector<Fmatrix> flare_xform[eLensCount];
+			float flare_alpha[eLensCount] = {}; // Tarkov's flare controller: follows the angle at flare_speed
+			float flare_seen[eLensCount] = {}; // nothing between the camera and the lens, smoothed
+			bool flare_on[eLensCount] = {};
 		};
 
 		xr_vector<SDevice> m_devices;
@@ -109,5 +129,7 @@ namespace gunsmith
 		void setup_mode(SDevice& d, u8 mode);
 		void free_device(SDevice& d);
 		void device_off(SDevice& d);
+		void load_flares(SDevice& d, int kind, const SLightDesc* def);
+		void place_flares(SDevice& d, int kind, const SLightDesc& def, const Fvector& at, const Fvector& dir, CObject* holder);
 	};
 }

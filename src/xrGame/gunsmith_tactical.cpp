@@ -128,10 +128,46 @@ namespace gunsmith
 				to_cam.invert(dir);
 			else
 				to_cam.div(dist);
-			const float a = dim ? 0.f : clampr((dir.dotproduct(to_cam) - def.lens_angle_min) / _max(1.f - def.lens_angle_min, EPS_L), 0.f, 1.f);
+			// with its own flares the lens is only Tarkov's disc: they do the flaring
+			const float a = dim || !def.flares.empty() ? 0.f :
+				clampr((dir.dotproduct(to_cam) - def.lens_angle_min) / _max(1.f - def.lens_angle_min, EPS_L), 0.f, 1.f);
 			Fvector c;
 			c.mad(at, to_cam, 0.002f);
 			facing_xform(M, c, to_cam, def.lens_size * (1.f + 1.5f * a), def.lens_intensity * (0.35f + 0.65f * a) * (dim ? IR_LENS_DIM : 1.f));
+		}
+
+		// Tarkov's MultiFlare (multiFlare shader, its batch job and SingleFlareController)
+		const float FLARE_INTENSITY = 0.6f; // the flare material's _Intensity
+		const float FLARE_EDGE = 18.f; // _FallofStrength: fades out over the last 1/18 of the screen to each edge
+		const float FLARE_SEEN_SPEED = 10.f; // our visibility ray, smoothed (Tarkov tests 23 depth samples a frame)
+		const float FLARE_RAY_SHORT = 0.15f; // the ray stops this far before the lens (the device itself)
+
+		float move_towards(float v, float to, float step)
+		{
+			return v < to ? _min(v + step, to) : _max(v - step, to);
+		}
+
+		// Nothing between the camera and the lens: static geometry or an object other than the holder, the viewer and
+		// what they hold.
+		bool flare_seen(const Fvector& at, CObject* holder)
+		{
+			Fvector d;
+			d.sub(at, Device.vCameraPosition);
+			const float len = d.magnitude();
+			if (len <= FLARE_RAY_SHORT + EPS_L)
+				return true;
+			d.div(len);
+			CObject* viewer = Level().CurrentViewEntity();
+			xr_vector<CObject*> ignore;
+			if (holder)
+				ignore.push_back(holder);
+			if (viewer)
+				ignore.push_back(viewer);
+			collide::rq_result R;
+			if (!Level().ObjectSpace.RayPick(Device.vCameraPosition, d, len - FLARE_RAY_SHORT, collide::rqtBoth, R, ignore))
+				return true;
+			CObject* parent = R.O ? R.O->H_Parent() : nullptr;
+			return parent && (parent == holder || parent == viewer);
 		}
 	}
 
@@ -182,6 +218,38 @@ namespace gunsmith
 		lens_size = READ_IF_EXISTS(pSettings, r_float, section, "lens_size", 0.f);
 		lens_intensity = READ_IF_EXISTS(pSettings, r_float, section, "lens_intensity", 1.f);
 		lens_angle_min = READ_IF_EXISTS(pSettings, r_float, section, "lens_angle_min", 0.6f);
+
+		// flare_<i> = visual, scale, scale_far, alpha, alpha_far, dist_near, dist_far, r, g, b
+		flares.clear();
+		flare_speed = READ_IF_EXISTS(pSettings, r_float, section, "flare_speed", 2.f);
+		flare_scale = READ_IF_EXISTS(pSettings, r_float, section, "flare_scale", 1.f);
+		const u32 n = READ_IF_EXISTS(pSettings, r_u32, section, "flare_count", 0);
+		for (u32 i = 0; i < n; ++i)
+		{
+			xr_sprintf(buf, "flare_%u", i);
+			if (!pSettings->line_exist(section, buf))
+				continue;
+			LPCSTR v = pSettings->r_string(section, buf);
+			if (_GetItemCount(v) < 10)
+			{
+				Msg("! [gunsmith] [%s] %s: needs visual, scale, scale_far, alpha, alpha_far, dist_near, dist_far, r, g, b", section, buf);
+				continue;
+			}
+			string_path item;
+			SFlare f;
+			f.visual = _GetItem(v, 0, item);
+			float x[9];
+			for (int k = 0; k < 9; ++k)
+				x[k] = float(atof(_GetItem(v, k + 1, item)));
+			f.scale = x[0];
+			f.scale_far = x[1];
+			f.alpha = x[2];
+			f.alpha_far = x[3];
+			f.dist_near = x[4];
+			f.dist_far = _max(x[5], x[4] + EPS_L);
+			f.color.set(x[6], x[7], x[8]);
+			flares.push_back(f);
+		}
 	}
 
 	const SLightDesc& light_desc(const shared_str& section)
@@ -205,6 +273,78 @@ namespace gunsmith
 		for (auto& l : d.lens)
 			for (IRenderVisual*& v : l)
 				free_visual(v);
+		for (int k = 0; k < eLensCount; ++k)
+			load_flares(d, k, nullptr);
+	}
+
+	// The flare sprites' visuals for `def` (null: none).
+	void CTacticalDevices::load_flares(SDevice& d, int kind, const SLightDesc* def)
+	{
+		for (IRenderVisual*& v : d.flare_vis[kind])
+			free_visual(v);
+		d.flare_vis[kind].clear();
+		d.flare_xform[kind].clear();
+		d.flare_on[kind] = false;
+		d.flare_alpha[kind] = d.flare_seen[kind] = 0.f;
+		if (!def)
+			return;
+		for (const SLightDesc::SFlare& f : def->flares)
+			d.flare_vis[kind].push_back(load_visual(f.visual, false));
+		d.flare_xform[kind].resize(def->flares.size());
+	}
+
+	// The flare at a lit lens `at`, the device shining along `dir`, as Tarkov's MultiFlare: each sprite's half-size is
+	// its scale times the view depth (so its size on screen stays), its colour saturate(colour x alpha); both change
+	// from dist_near to dist_far; all fade with the angle (the controller's alpha, eased), near the screen's edges, and
+	// while the lens is hidden. The sprites face the screen; the colour rides in the transform's z axis (gs_tac_flare.vs).
+	void CTacticalDevices::place_flares(SDevice& d, int kind, const SLightDesc& def, const Fvector& at, const Fvector& dir, CObject* holder)
+	{
+		const SSettings& gs = settings();
+		d.flare_on[kind] = false;
+		Fvector to_cam;
+		to_cam.sub(Device.vCameraPosition, at);
+		const float dist = to_cam.magnitude();
+		if (dist < EPS_L || d.flare_vis[kind].size() != def.flares.size())
+			return;
+		to_cam.div(dist);
+		// Tarkov leaves the target unclamped below, so a flare that turned away stays out for seconds: ours stops at 0
+		const float target = clampr((dir.dotproduct(to_cam) - def.lens_angle_min) / _max(1.f - def.lens_angle_min, EPS_L), 0.f, 1.f);
+		float& a = d.flare_alpha[kind];
+		a = move_towards(a, target, def.flare_speed * Device.fTimeDelta);
+		if (a < 0.01f)
+			return;
+		// on screen (Tarkov drops flares off it), and the fade near its edges
+		Fvector4 clip;
+		Device.mFullTransform.transform(clip, at);
+		if (clip.w <= EPS_L)
+			return;
+		const float nx = clip.x / clip.w, ny = clip.y / clip.w;
+		const float edge = clampr((1.f - _abs(nx)) * FLARE_EDGE, 0.f, 1.f) * clampr((1.f - _abs(ny)) * FLARE_EDGE, 0.f, 1.f);
+		if (edge <= 0.f)
+			return;
+		float& seen = d.flare_seen[kind];
+		seen = move_towards(seen, flare_seen(at, holder) ? 1.f : 0.f, FLARE_SEEN_SPEED * Device.fTimeDelta);
+		const float k = a * edge * seen * FLARE_INTENSITY * gs.flare_bright_k;
+		if (k < 0.002f)
+			return;
+		const float depth = _max(clip.w, R_VIEWPORT_NEAR);
+		for (u32 i = 0; i < def.flares.size(); ++i)
+		{
+			const SLightDesc::SFlare& f = def.flares[i];
+			Fmatrix& M = d.flare_xform[kind][i];
+			const float t = clampr((dist - f.dist_near) / (f.dist_far - f.dist_near), 0.f, 1.f);
+			const float size = f.scale * def.flare_scale * (1.f + (f.scale_far - 1.f) * t) * depth * gs.flare_size_k;
+			const float al = a * f.alpha;
+			Fvector col;
+			col.set(clampr(f.color.x * al, 0.f, 1.f), clampr(f.color.y * al, 0.f, 1.f), clampr(f.color.z * al, 0.f, 1.f));
+			col.mul(k * _max(1.f + (f.alpha_far - 1.f) * t, 0.f));
+			M.identity();
+			M.i.mul(Device.vCameraRight, size);
+			M.j.mul(Device.vCameraTop, size);
+			M.k = size > 0.f ? col : Fvector().set(0.f, 0.f, 0.f); // a zero colour: not drawn (render_world)
+			M.c = at;
+		}
+		d.flare_on[kind] = true;
 	}
 
 	void CTacticalDevices::clear()
@@ -256,6 +396,7 @@ namespace gunsmith
 			}
 			else
 				d.light.destroy();
+			load_flares(d, eLensLight, light);
 		}
 
 		if (laser != d.laser_def)
@@ -282,6 +423,7 @@ namespace gunsmith
 			}
 			else
 				d.dot.destroy();
+			load_flares(d, eLensLaser, laser);
 		}
 	}
 
@@ -329,6 +471,11 @@ namespace gunsmith
 		d.beam_on = d.dot_on = false;
 		for (int& c : d.lens_ctx)
 			c = -1;
+		for (int k = 0; k < eLensCount; ++k)
+		{
+			d.flare_on[k] = false;
+			d.flare_alpha[k] = d.flare_seen[k] = 0.f;
+		}
 	}
 
 	void CTacticalDevices::off()
@@ -397,11 +544,22 @@ namespace gunsmith
 					place_lens(d.lens_xform[eLensLight], *L, lp, dir);
 					d.lens_ctx[eLensLight] = ctx;
 				}
+				// the flare: in the world only (the player's own lights in first person point away)
+				if (!hud && !L->flares.empty())
+				{
+					Fvector lp;
+					M.transform_tiny(lp, md.light_lens);
+					place_flares(d, eLensLight, *L, lp, dir, ignore);
+				}
+				else
+					d.flare_on[eLensLight] = false;
 			}
 			else
 			{
 				if (d.light)
 					d.light->set_active(false);
+				d.flare_on[eLensLight] = false;
+				d.flare_alpha[eLensLight] = 0.f;
 				// an infrared light without night vision: its lens only, faintly (Tarkov's dim IR lens)
 				if (L && L->ir && d.lens[eLensLight][ctx] && L->lens_size > 0.f)
 				{
@@ -501,12 +659,22 @@ namespace gunsmith
 					place_lens(d.lens_xform[eLensLaser], *Z, lp, dir);
 					d.lens_ctx[eLensLaser] = ctx;
 				}
+				if (!hud && !Z->flares.empty())
+				{
+					Fvector lp;
+					M.transform_tiny(lp, md.laser_lens);
+					place_flares(d, eLensLaser, *Z, lp, dir, ignore);
+				}
+				else
+					d.flare_on[eLensLaser] = false;
 			}
 			else
 			{
 				if (d.dot)
 					d.dot->set_active(false);
 				d.beam_on = d.dot_on = false;
+				d.flare_on[eLensLaser] = false;
+				d.flare_alpha[eLensLaser] = 0.f;
 				// an infrared laser without night vision: its lens only, faintly
 				if (Z && Z->ir && d.lens[eLensLaser][ctx] && Z->lens_size > 0.f)
 				{
@@ -555,6 +723,17 @@ namespace gunsmith
 			{
 				::Render->set_Transform(&d.dot_xform);
 				::Render->add_Visual(d.dot_vis);
+			}
+			for (int k = 0; k < eLensCount; ++k)
+			{
+				if (!d.flare_on[k])
+					continue;
+				for (u32 i = 0; i < d.flare_vis[k].size(); ++i)
+					if (d.flare_vis[k][i] && d.flare_xform[k][i].k.square_magnitude() > 0.f)
+					{
+						::Render->set_Transform(&d.flare_xform[k][i]);
+						::Render->add_Visual(d.flare_vis[k][i]);
+					}
 			}
 		}
 	}
