@@ -15,6 +15,9 @@ float psSpeedOfSound = 1.f;
 int psSoundTargets = 1024;
 Flags32 psSoundFlags = {ss_Hardware | ss_EFX};
 float psSoundOcclusionScale = 0.5f;
+// Gunsmith (roadmap So5): an occluded sound is muffled as well as quieter, as Tarkov's occlusion low-pass (its
+// occluded gunshots through 1200 Hz; OpenAL's low-pass is a shelf at 5 kHz, where a 1200 Hz one is about -12 dB)
+float psSoundOcclusionHF = 0.25f;
 float psSoundCull = 0.01f;
 float psSoundRolloff = 0.75f;
 u32 psSoundModel = 0;

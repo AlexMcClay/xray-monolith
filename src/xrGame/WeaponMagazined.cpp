@@ -209,7 +209,59 @@ void CWeaponMagazined::Load(LPCSTR section)
 			m_sounds.LoadSound(section, "snd_silncer_shot_misfire", "sndSilencerShotMisfire", false, m_eSoundShot);
 		if (WeaponSoundExist(actor_sect("snd_silncer_shot_misfire_actor"), "snd_silncer_shot_misfire_actor"))
 			m_sounds.LoadSound(actor_sect("snd_silncer_shot_misfire_actor"), "snd_silncer_shot_misfire_actor", "sndSilencerShotMisfireActor", shot_excl, m_eSoundShot);
-		
+
+	}
+
+	// Tarkov's indoor shots: each shot key's <key>_indoor, as alias <alias>Indoor (ShotAlias picks them)
+	static const struct { LPCSTR line, alias; bool loop; } indoor_keys[] = {
+		{"snd_shoot", "sndShot", false}, {"snd_shoot_actor", "sndShotActor", false},
+		{"snd_shoot_loop", "sndShotLoop", true}, {"snd_shoot_tail", "sndShotTail", true},
+		{"snd_shoot_actor_loop", "sndShotActorLoop", true}, {"snd_shoot_actor_tail", "sndShotActorTail", true},
+		{"snd_silncer_shot", "sndSilencerShot", false}, {"snd_silncer_shot_actor", "sndSilencerShotActor", false},
+		{"snd_silncer_shot_loop", "sndSilencerShotLoop", true}, {"snd_silncer_shot_tail", "sndSilencerShotTail", true},
+		{"snd_silncer_shot_actor_loop", "sndSilencerShotActorLoop", true},
+		{"snd_silncer_shot_actor_tail", "sndSilencerShotActorTail", true},
+	};
+	m_shot_has_indoor = false;
+	for (const auto& k : indoor_keys)
+	{
+		string128 line, alias;
+		strconcat(sizeof(line), line, k.line, "_indoor");
+		strconcat(sizeof(alias), alias, k.alias, "Indoor");
+		LPCSTR sect = actor_sect(line);
+		if (!pSettings->line_exist(sect, line))
+			continue;
+		// (as the outdoor key: the loops exclusive, the first-person shot as snd_shoot_actor_exclusive, NPCs' not)
+		const bool excl = k.loop || (strstr(k.line, "_actor") && shot_excl);
+		m_sounds.LoadSound(sect, line, alias, excl, m_eSoundShot);
+		m_shot_has_indoor = true;
+	}
+
+	// Tarkov's sonic crack (PlayBulletCrack)
+	m_has_crack = false;
+	m_crack = SBulletCrack();
+	if (pSettings->line_exist(actor_sect("snd_bullet_crack"), "snd_bullet_crack"))
+	{
+		LPCSTR cs = actor_sect("snd_bullet_crack");
+		m_sounds.LoadSound(cs, "snd_bullet_crack", "sndBulletCrack", false, SOUND_TYPE_NO_SOUND);
+		m_has_crack = true;
+		m_crack.speed = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_speed", m_crack.speed);
+		m_crack.min_dist = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_min_dist", m_crack.min_dist);
+		m_crack.cone = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_cone", m_crack.cone);
+		m_crack.rolloff = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_rolloff", 0.f);
+		m_crack.rolloff_silencer = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_rolloff_silencer",
+		                                          m_crack.rolloff);
+		auto read_curve = [&](LPCSTR line, xr_vector<Fvector2>& out)
+		{
+			if (!pSettings->line_exist(cs, line))
+				return;
+			LPCSTR c = pSettings->r_string(cs, line);
+			string64 x, v;
+			for (int i = 0; i + 1 < _GetItemCount(c); i += 2)
+				out.push_back(Fvector2().set((float)atof(_GetItem(c, i, x)), (float)atof(_GetItem(c, i + 1, v))));
+		};
+		read_curve("snd_bullet_crack_curve", m_crack.curve);
+		read_curve("snd_bullet_crack_rolloff_curve", m_crack.rolloff_curve);
 	}
 
 	m_iBaseDispersionedBulletsCount = READ_IF_EXISTS(pSettings, r_u8, section, "base_dispersioned_bullets_count", 0);
@@ -901,12 +953,14 @@ bool CWeaponMagazined::PlayShotLoop(bool actor)
 		if (m_sounds.FindSoundItem(mf, false))
 			return false;
 	}
-	string128 loop, tail;
-	strconcat(sizeof(loop), loop, m_sSndShotCurrent.c_str(), actor ? "ActorLoop" : "Loop");
-	strconcat(sizeof(tail), tail, m_sSndShotCurrent.c_str(), actor ? "ActorTail" : "Tail");
+	string128 loop_o, tail_o, loop_i, tail_i;
+	strconcat(sizeof(loop_o), loop_o, m_sSndShotCurrent.c_str(), actor ? "ActorLoop" : "Loop");
+	strconcat(sizeof(tail_o), tail_o, m_sSndShotCurrent.c_str(), actor ? "ActorTail" : "Tail");
 	const float rpm = actor ? m_shot_loop_rpm_actor : m_shot_loop_rpm;
-	if (rpm <= 0.f || !m_sounds.FindSoundItem(loop, false))
+	if (rpm <= 0.f || !m_sounds.FindSoundItem(loop_o, false))
 		return false;
+	LPCSTR loop = ShotAlias(loop_o, loop_i);
+	LPCSTR tail = ShotAlias(tail_o, tail_i);
 
 	if (m_shot_loop.loop.size() && m_shot_loop.base == loop && m_sounds.IsPlaying(m_shot_loop.loop.c_str()))
 	{
@@ -966,11 +1020,51 @@ float CWeaponMagazined::ShotPitch() const
 	return m_shot_pitch_random > 0.f ? 1.f + ::Random.randF(-m_shot_pitch_random, m_shot_pitch_random) : 1.f;
 }
 
+// Is the shooter under a roof? Tarkov picks a shot's indoor clips by the shooter's environment (volumes placed by hand
+// in its levels); X-Ray has none, so: five rays from the fire point, straight up and four at 45 degrees, indoors when at
+// least four hit the level's static geometry within 25 m (a doorway or a porch counts as outdoors). Kept for a second
+// while the gun stays within a metre.
+bool CWeaponMagazined::ShotIndoors()
+{
+	const Fvector p = get_LastFP();
+	if (m_indoor_time >= 0.f && Device.fTimeGlobal - m_indoor_time < 1.f && p.similar(m_indoor_pos, 1.f))
+		return m_indoor_last;
+	Fvector dirs[5];
+	dirs[0].set(0.f, 1.f, 0.f);
+	dirs[1].set(0.7071f, 0.7071f, 0.f);
+	dirs[2].set(-0.7071f, 0.7071f, 0.f);
+	dirs[3].set(0.f, 0.7071f, 0.7071f);
+	dirs[4].set(0.f, 0.7071f, -0.7071f);
+	int hits = 0;
+	for (const Fvector& d : dirs)
+	{
+		collide::rq_result R;
+		if (Level().ObjectSpace.RayPick(p, d, 25.f, collide::rqtStatic, R, nullptr))
+			++hits;
+	}
+	m_indoor_last = hits >= 4;
+	m_indoor_time = Device.fTimeGlobal;
+	m_indoor_pos = p;
+	return m_indoor_last;
+}
+
+// A shot sound's indoor version (<alias>Indoor) when this shot is indoors and the gun has one; else the alias
+LPCSTR CWeaponMagazined::ShotAlias(LPCSTR alias, string128& buf)
+{
+	if (!m_shot_indoor)
+		return alias;
+	strconcat(sizeof(buf), buf, alias, "Indoor");
+	return m_sounds.FindSoundItem(buf, false) ? buf : alias;
+}
+
 void CWeaponMagazined::PlaySoundShot()
 {
+	if (m_iShotNum <= 1)        // (once per queue, so a burst doesn't change its loop midway)
+		m_shot_indoor = m_shot_has_indoor && ShotIndoors();
 	if (PlayShotLoop(ParentIsActor()))
 		return;
 	const float pitch = ShotPitch();
+	string128 indoor;
 
 	if (ParentIsActor())
 	{
@@ -997,7 +1091,7 @@ void CWeaponMagazined::PlaySoundShot()
 		strconcat(sizeof(sndName), sndName, m_sSndShotCurrent.c_str(), "Actor");
 		if (m_sounds.FindSoundItem(sndName, false))
 		{
-			m_sounds.PlaySound(sndName, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
+			m_sounds.PlaySound(ShotAlias(sndName, indoor), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
 			return;
 		}
 	}
@@ -1013,7 +1107,7 @@ void CWeaponMagazined::PlaySoundShot()
 		}
 	}
 
-	m_sounds.PlaySound(m_sSndShotCurrent.c_str(), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
+	m_sounds.PlaySound(ShotAlias(m_sSndShotCurrent.c_str(), indoor), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
 }
 
 void CWeaponMagazined::OnShot()
@@ -2434,4 +2528,65 @@ void CWeaponMagazined::FireBullet(const Fvector& pos,
 	}
 
 	inherited::FireBullet(pos, shot_dir, fire_disp, cartridge, parent_id, weapon_id, send_hit, GetAmmoElapsed());
+
+	if (m_has_crack && cartridge.param_s.buckShot <= 1)     // (Tarkov: single-projectile rounds only)
+		PlayBulletCrack(m_vCurrentShootPos, m_vCurrentShootDir, m_fLastBulletSpeed);
+}
+
+// A curve of (x, y) pairs, linear between them and flat past its ends (empty: 1)
+static float crack_curve(const xr_vector<Fvector2>& c, float x)
+{
+	if (c.empty())
+		return 1.f;
+	if (x <= c.front().x)
+		return c.front().y;
+	for (u32 i = 1; i < c.size(); ++i)
+		if (x <= c[i].x)
+			return c[i - 1].y + (c[i].y - c[i - 1].y) * (x - c[i - 1].x) / _max(c[i].x - c[i - 1].x, EPS_L);
+	return c.back().y;
+}
+
+// Tarkov's sonic crack (SonicBulletSoundPlayer.FireBullet; Gunsmith Docs research/35-tarkov-gunshots.md): a shot by
+// someone else whose bullet is supersonic and passes within cone x the shooter's distance of the camera, from a shooter
+// at least min_dist away and not behind geometry; an automatic gun's only on a burst's first shot (Tarkov's firing loop
+// skips it). The crack plays at the shot, with the shot (X-Ray delays both by distance), its volume by the curve over
+// how close the bullet passes (0 through the camera, 1 at the cone's edge) and by its reach. (Tarkov's bullet line has
+// no start, so it also cracks for someone behind the shooter; here only ahead.)
+void CWeaponMagazined::PlayBulletCrack(const Fvector& pos, const Fvector& dir, float speed)
+{
+	if (speed < m_crack.speed || !H_Parent() || Level().CurrentViewEntity() == H_Parent())
+		return;
+	if (m_iShotNum > 1 && m_shot_loop.loop.size())
+		return;
+	const Fvector& cam = Device.vCameraPosition;
+	const float dist = cam.distance_to(pos);
+	if (dist < _max(m_crack.min_dist, EPS_L))
+		return;
+	float reach_gain = 1.f;
+	const float rolloff = IsSilencerAttached() ? m_crack.rolloff_silencer : m_crack.rolloff;
+	if (rolloff > 0.f)
+	{
+		const float max_dist = 2000.f + (rolloff - 2000.f) * dist / rolloff;
+		if (dist > max_dist || max_dist <= 0.f)
+			return;
+		reach_gain = crack_curve(m_crack.rolloff_curve, dist / max_dist);
+	}
+	Fvector to_cam;
+	to_cam.sub(cam, pos);
+	const float t = to_cam.dotproduct(dir);
+	if (t <= 0.f)
+		return;                     // (going away)
+	Fvector closest;
+	closest.mad(pos, dir, t);
+	const float edge = m_crack.cone * dist;
+	const float miss = cam.distance_to(closest);
+	if (miss > edge)
+		return;
+	Fvector back;
+	back.sub(pos, cam).normalize_safe();
+	if (Level().ObjectSpace.RayTest(cam, back, dist - 0.5f, collide::rqtStatic, nullptr, nullptr))
+		return;                     // (the shooter behind geometry: Tarkov's occluded shots have no crack)
+	const float vol = crack_curve(m_crack.curve, miss / edge) * reach_gain;
+	if (vol > EPS_S)
+		m_sounds.PlaySound("sndBulletCrack", pos, H_Root(), false, false, (u8)-1, vol);
 }

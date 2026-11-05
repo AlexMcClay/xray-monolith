@@ -37,6 +37,33 @@ protected:
 	void UpdateShotLoop(bool force_end = false);
 	float ShotPitch() const;
 
+	// Tarkov's indoor shots (each shot key's <key>_indoor, alias <alias>Indoor): played when the shooter is under a
+	// roof (ShotIndoors), chosen on a queue's first shot
+	bool m_shot_has_indoor = false;
+	bool m_shot_indoor = false;
+	bool m_indoor_last = false;     // ShotIndoors' last answer, its time and place
+	float m_indoor_time = -1.f;
+	Fvector m_indoor_pos = {0.f, 0.f, 0.f};
+	bool ShotIndoors();
+	LPCSTR ShotAlias(LPCSTR alias, string128& buf);
+
+	// Tarkov's sonic crack (snd_bullet_crack): another's supersonic bullet passing close to the camera, played at the
+	// shot with the shot (so after the same distance delay), its volume by how close the bullet passes
+	struct SBulletCrack
+	{
+		float speed = 340.29f;      // snd_bullet_crack_speed: the slowest bullet that cracks (m/s)
+		float min_dist = 1.5f;      // snd_bullet_crack_min_dist: no crack from a shooter closer than this
+		float cone = 0.125f;        // snd_bullet_crack_cone: passing within this share of the shooter's distance
+		xr_vector<Fvector2> curve;  // snd_bullet_crack_curve: (miss / (cone x distance), volume) pairs, linear between
+		// its reach (snd_bullet_crack_rolloff, _silencer: the gun's fire bank's Rolloff; 0 no limit): Tarkov plays it
+		// to maxDistance = lerp(2000, rolloff, distance / rolloff) and fades it by snd_bullet_crack_rolloff_curve
+		// (distance / maxDistance, volume)
+		float rolloff = 0.f, rolloff_silencer = 0.f;
+		xr_vector<Fvector2> rolloff_curve;
+	} m_crack;
+	bool m_has_crack = false;
+	void PlayBulletCrack(const Fvector& pos, const Fvector& dir, float speed);
+
 	//дополнительная информация о глушителе
 	LPCSTR m_sSilencerFlameParticles;
 	LPCSTR m_sSilencerSmokeParticles;

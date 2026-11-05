@@ -30,7 +30,7 @@ public:
 	BOOL bPresent;
 	BOOL bUserEnvironment;
 	BOOL bReady;
-	bool m_is_supported; // Boolean variable to indicate presence of EFX Extension
+	bool m_is_supported = false; // Boolean variable to indicate presence of EFX Extension
 
 	CTimer Timer;
 	float fTimer_Value;

@@ -83,6 +83,11 @@ public:
 	void LoadEffect();
 	void DestroyEffect();
 
+	// a source's direct-path low-pass (0 without EFX): the occlusion's muffling
+	ALuint create_lowpass();
+	void set_lowpass(ALuint filter, ALuint source, float gain_hf);
+	void destroy_filter(ALuint filter);
+
 public:
 	CSoundRender_CoreA();
 	virtual ~CSoundRender_CoreA();

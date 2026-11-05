@@ -546,6 +546,7 @@ void CShootingObject::FireBullet(const Fvector& pos,
 	l_fHitPower *= cur_silencer_koef.hit_power;
 	float l_fImpulse = fHitImpulse * cur_silencer_koef.hit_impulse;
 	gs_modify_bullet(l_fSpeed, l_fHitPower, l_fImpulse);
+	m_fLastBulletSpeed = l_fSpeed * cartridge.param_s.kBulletSpeed;
 
 	Level().BulletManager().AddBullet(pos,
 	                                  dir,

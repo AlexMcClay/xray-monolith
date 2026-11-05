@@ -81,6 +81,7 @@ protected:
 
 	//скорость вылета пули из ствола
 	float m_fStartBulletSpeed;
+	float m_fLastBulletSpeed = 0.f; // the last bullet's speed as fired (after the silencer, parts and the cartridge)
 	//максимальное расстояние стрельбы
 	float fireDistance;
 

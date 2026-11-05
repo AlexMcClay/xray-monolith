@@ -16,6 +16,8 @@ public:
 	float cache_gain;
 	float cache_pitch;
 	ALuint Slot;
+	ALuint pFilter = 0;      // the occlusion's low-pass (0 without EFX)
+	float cache_hf = 1.f;
 
 	ALuint buf_block;
 private:

@@ -33,6 +33,13 @@ namespace gunsmith
 		Fvector fire_point;
 		bool has_fire2; // `fire_point2`: a launcher part's muzzle (the weapon's second fire point), on the part's root
 		Fvector fire_point2;
+		// `aim_point2`, `aim_dir2`: a launcher part's own sight (its eye point and line, as aim_point and aim_dir), on
+		// the part's root: aimed along in the weapon's grenade mode
+		bool has_aim2;
+		Fvector aim_point2, aim_fwd2, aim_up2;
+		// `gs_follow_bones`: bones of the part's model that move as the root model's (the receiver's) bones of the
+		// same names: a launcher's tube, trigger and leaf sight, its grenade, played by the gun's motions
+		xr_vector<shared_str> follow_bones;
 		float magnification, magnification_min, zoom_factor;
 		u32 zoom_steps;
 		shared_str scope_texture;
@@ -181,6 +188,14 @@ namespace gunsmith
 		// HUD: the fitted sight's line (aim_dir: forward and up, unit) in the receiver model's space.
 		bool sight_dir(IKinematics* root, Fvector& fwd, Fvector& up);
 
+		// HUD: a bone of the fitted parts' first-person models shown or hidden (all parts with a bone of that name;
+		// kept for parts fitted later): the Framework's launcher grenade, in the hand or gone
+		void set_hud_bone_hidden(const shared_str& bone, bool hidden);
+
+		// HUD: the launcher's own sight (the last part with an aim_point2) in the receiver model's space: its eye
+		// point, its line (unit) and a key for it (mode 0x80).
+		bool sight2(IKinematics* root, Fvector& point, Fvector& fwd, Fvector& up, SSightKey& key);
+
 		// A drawn part's frame in the root model's space, its bone's current pose included: points
 		// on the part (light_point, ...) map through it. False when that node isn't drawn.
 		bool part_frame(int ctx, IKinematics* root, u8 node, Fmatrix& out);
@@ -226,6 +241,17 @@ namespace gunsmith
 			shared_str path;    // the model asked for (visual: it, or null when it didn't load)
 			Fmatrix xform;      // handed to the renderer; must outlive the frame
 		};
+		struct SContext;
+		// A part bone moving as a root bone (gs_follow_bones): the root bone's motion relative to its parent (the
+		// part's mount moves with that), turned about the part bone's own pivot (a GP-25 on clips made for a GP-34)
+		struct SFollow
+		{
+			SContext* c;
+			u8 node;          // the part's node (its child is found by it: the children vector moves)
+			IKinematics* root;
+			u16 root_bone, root_parent;
+			Fvector root_pivot; // the root bone's rest position in the root model's space
+		};
 		struct SChild
 		{
 			u8 node;
@@ -240,6 +266,7 @@ namespace gunsmith
 			u16 aim_bone, fire_bone;
 			xr_vector<u16> mode_bones; // per mode (BI_NONE: not in the model)
 			u8 shown_mode;             // the mode whose bone is shown (0xff: none set yet)
+			xr_vector<SFollow*> follow; // owned (freed by clear); a callback's parameter must not move
 		};
 
 		struct SSig
@@ -274,6 +301,9 @@ namespace gunsmith
 		};
 
 		SContext m_ctx[2];
+		xr_vector<shared_str> m_hud_hidden; // set_hud_bone_hidden
+		void apply_hidden(SChild& ch);
+		static void follow_callback(CBoneInstance* B);
 		u8 m_sight_node = 0; // the node the gun aims through (sight_node), set by ensure()
 		u8 m_sight_mode = 0; // that node's mode (its sight and mode), set by ensure()
 		u32 m_sight_rev = 0; // the tree's state revision m_sight_node and m_sight_mode were read for

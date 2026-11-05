@@ -1215,14 +1215,19 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 	const bool placed = m_gs_hud_placed;
 	m_gs_hud_placed = true;
 
-	// Only aiming (offset index 1) a full-mode gun without modular attachments, in the main hand.
-	if (!(idx == 1 && !m_modular_attachments && m_gs_full_mode) || !placed || hi != g_player_hud->attached_item(0))
+	// Only aiming (offset index 1, or 2 with a launcher part: its own sight, else the gun's) a full-mode gun without
+	// modular attachments, in the main hand.
+	const bool launcher = idx == 2 && m_gs_launcher;
+	if (!((idx == 1 || launcher) && !m_modular_attachments && m_gs_full_mode) || !placed || hi != g_player_hud->attached_item(0))
 		return;
 
-	Fvector sight;
+	Fvector sight, line_fwd, line_up;
 	gunsmith::CVisuals::SSightKey key;
-	if (!m_gs_visuals.sight_point(hi->m_model, sight, key))
+	const bool own2 = launcher && m_gs_visuals.sight2(hi->m_model, sight, line_fwd, line_up, key);
+	if (!own2 && !m_gs_visuals.sight_point(hi->m_model, sight, key))
 		return;
+	if (launcher)
+		key.mode |= 0x80; // another base offset (gl_hud_offset): another target
 
 	// The receiver in the aim offset's frame as the animation holds it (last frame's pose): the hands' offset
 	// times the animated anchor bone and the item's offset. player_hud's m_transform is the camera with all the
@@ -1264,8 +1269,8 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 	float turn = 0.f, roll = 0.f;
 	Fmatrix aimed;
 	aimed.mul_43(offset_xform(curr_aim_rot, curr_rot, curr_offs), hands);
-	Fvector fwd, up;
-	if (m_gs_visuals.sight_dir(hi->m_model, fwd, up))
+	Fvector fwd = line_fwd, up = line_up;
+	if (own2 || m_gs_visuals.sight_dir(hi->m_model, fwd, up))
 	{
 		Fvector f, u;
 		aimed.transform_dir(f, fwd);
@@ -1292,7 +1297,7 @@ void CWeapon::gs_update_aim(attachable_hud_item* hi, const Fmatrix& trans, u8 id
 	Fvector d = {-s.x, -s.y, 0.f};
 	Fvector eye;
 	bool has_eye;
-	const gunsmith::SPartVisual* pv = m_gs_visuals.sight_eye(hi->m_model, eye, has_eye);
+	const gunsmith::SPartVisual* pv = own2 ? nullptr : m_gs_visuals.sight_eye(hi->m_model, eye, has_eye);
 	if (pv && pv->is_optic() && has_eye)
 	{
 		aimed.transform_tiny(eye);

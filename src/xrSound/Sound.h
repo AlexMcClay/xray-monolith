@@ -39,6 +39,7 @@ XRSOUND_API extern float psSoundRolloff;
 XRSOUND_API extern float psSoundMaxDistanceMultiplier;
 XRSOUND_API extern float psSoundMaxAIDistanceMultiplier;
 XRSOUND_API extern float psSoundOcclusionScale;
+XRSOUND_API extern float psSoundOcclusionHF; // a fully occluded 3D sound's high frequencies (EFX low-pass gain HF; 1 off)
 XRSOUND_API extern Flags32 psSoundFlags;
 XRSOUND_API extern int psSoundTargets;
 XRSOUND_API extern float snd_efx_environment_change_time;

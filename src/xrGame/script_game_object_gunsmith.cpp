@@ -356,6 +356,15 @@ void set_hud_round_slots_script(CScriptGameObject* self, LPCSTR chambers, LPCSTR
 	return ::luabind::object(L, weapon ? weapon->gs_devices_set_on(on) : false);
 }
 
+// A bone of the fitted parts' first-person models shown or hidden (CVisuals::set_hud_bone_hidden): a launcher's
+// grenade in the hand, gone when fired.
+void gs_hud_bone_visible_script(CScriptGameObject* self, LPCSTR bone, bool visible)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_hud_bone_visible");
+	if (weapon && bone)
+		weapon->gs_visuals().set_hud_bone_hidden(shared_str(bone), !visible);
+}
+
 // One device's mode (0-based index into its modes); false if node isn't a device or mode is out of range.
 ::luabind::object gs_tactical_set_mode_script(lua_State* L, CScriptGameObject* self, u8 node, u8 mode)
 {
@@ -467,6 +476,7 @@ void set_hud_round_slots_script(CScriptGameObject* self, LPCSTR chambers, LPCSTR
 		.def("gs_sight_node", &gs_sight_node_script, raw<1>())
 		.def("gs_sight_set", &gs_sight_set_script, raw<1>())
 		.def("gs_tactical_set_on", &gs_tactical_set_on_script, raw<1>())
+		.def("gs_hud_bone_visible", &gs_hud_bone_visible_script)
 		.def("gs_tactical_state", &gs_tactical_state_script, raw<1>())
 		.def("gs_tactical_set_mode", &gs_tactical_set_mode_script, raw<1>());
 #else

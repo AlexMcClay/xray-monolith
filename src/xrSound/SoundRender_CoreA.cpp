@@ -79,6 +79,40 @@ void CSoundRender_CoreA::DestroyEffect()
 	}
 }
 
+ALuint CSoundRender_CoreA::create_lowpass()
+{
+	if (!m_is_supported || !alGenFilters)
+		return 0;
+	ALuint f = 0;
+	alGetError();
+	alGenFilters(1, &f);
+	if (alGetError() != AL_NO_ERROR)
+		return 0;
+	alFilteri(f, AL_FILTER_TYPE, AL_FILTER_LOWPASS);
+	if (alGetError() != AL_NO_ERROR)
+	{
+		alDeleteFilters(1, &f);
+		return 0;
+	}
+	alFilterf(f, AL_LOWPASS_GAIN, 1.f);
+	alFilterf(f, AL_LOWPASS_GAINHF, 1.f);
+	return f;
+}
+
+void CSoundRender_CoreA::set_lowpass(ALuint filter, ALuint source, float gain_hf)
+{
+	if (!filter)
+		return;
+	A_CHK(alFilterf(filter, AL_LOWPASS_GAINHF, gain_hf));
+	A_CHK(alSourcei(source, AL_DIRECT_FILTER, filter)); // (a source copies the filter's values when given it)
+}
+
+void CSoundRender_CoreA::destroy_filter(ALuint filter)
+{
+	if (filter && alDeleteFilters)
+		alDeleteFilters(1, &filter);
+}
+
 void CSoundRender_CoreA::LoadEffect()
 {
 	alGenEffects(1, &effect);

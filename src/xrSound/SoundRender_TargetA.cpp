@@ -39,6 +39,8 @@ BOOL CSoundRender_TargetA::_initialize()
 		A_CHK(alSourcef (pSource, AL_MAX_GAIN, 1.f));
 		A_CHK(alSourcef (pSource, AL_GAIN, cache_gain));
 		A_CHK(alSourcef (pSource, AL_PITCH, cache_pitch));
+		pFilter = SoundRenderA ? SoundRenderA->create_lowpass() : 0;
+		cache_hf = 1.f;
 		return TRUE;
 	}
 	else
@@ -53,6 +55,9 @@ void CSoundRender_TargetA::_destroy()
 	// clean up target
 	if (alIsSource(pSource))
 		alDeleteSources(1, &pSource);
+	if (pFilter && SoundRenderA)
+		SoundRenderA->destroy_filter(pFilter);
+	pFilter = 0;
 	A_CHK(alDeleteBuffers (sdef_target_count, pBuffers));
 	inherited::_destroy();
 }
@@ -179,6 +184,24 @@ void CSoundRender_TargetA::fill_parameters()
 	A_CHK(alSourcei (pSource, AL_SOURCE_RELATIVE, m_pEmitter->b2D));
 
 	A_CHK(alSourcef (pSource, AL_ROLLOFF_FACTOR, psSoundRolloff));
+
+	// Gunsmith (roadmap So5): an occluded 3D sound loses its highs as it loses volume (occluder_volume goes from 1
+	// to psSoundOcclusionScale behind geometry, smoothed), down to psSoundOcclusionHF fully occluded
+	if (pFilter)
+	{
+		float hf = 1.f;
+		if (!m_pEmitter->b2D && psSoundOcclusionScale < 1.f)
+		{
+			float f = (1.f - m_pEmitter->occluder_volume) / (1.f - psSoundOcclusionScale);
+			clamp(f, 0.f, 1.f);
+			hf = 1.f - f * (1.f - psSoundOcclusionHF);
+		}
+		if (!fsimilar(hf, cache_hf, 0.01f))
+		{
+			cache_hf = hf;
+			SoundRenderA->set_lowpass(pFilter, pSource, hf);
+		}
+	}
 
 	VERIFY2(m_pEmitter, SE->source()->file_name());
 	float _gain = m_pEmitter->smooth_volume;

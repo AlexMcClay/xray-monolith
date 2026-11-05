@@ -100,6 +100,16 @@ namespace gunsmith
 		v.fire_point = read_vec(section, "fire_point");
 		v.has_fire2 = section && pSettings->line_exist(section, "fire_point2");
 		v.fire_point2 = read_vec(section, "fire_point2");
+		if (section && pSettings->line_exist(section, "gs_follow_bones"))
+		{
+			LPCSTR fb = pSettings->r_string(section, "gs_follow_bones");
+			string128 item;
+			for (int k = 0, n = _GetItemCount(fb); k < n; ++k)
+				v.follow_bones.push_back(shared_str(_Trim(_GetItem(fb, k, item))));
+		}
+		v.has_aim2 = section && pSettings->line_exist(section, "aim_point2");
+		v.aim_point2 = read_vec(section, "aim_point2");
+		read_dir("aim_dir2", v.aim_fwd2, v.aim_up2);
 		v.magnification = section ? READ_IF_EXISTS(pSettings, r_float, section, "magnification", 0.f) : 0.f;
 		v.magnification_min = section ? READ_IF_EXISTS(pSettings, r_float, section, "magnification_min", 0.f) : 0.f;
 		v.zoom_factor = section ? READ_IF_EXISTS(pSettings, r_float, section, "scope_zoom_factor", 0.f) : 0.f;
@@ -324,8 +334,12 @@ namespace gunsmith
 	{
 		SContext& c = m_ctx[ctx];
 		for (SChild& ch : c.children)
+		{
+			for (SFollow* f : ch.follow)
+				xr_delete(f);
 			if (ch.visual)
 				::Render->model_Delete(ch.visual);
+		}
 		for (xr_vector<SRoundSlot>* v : { &c.mag_rounds, &c.round_chambers, &c.round_ports })
 			for (SRoundSlot& s : *v)
 				if (s.visual)
@@ -517,6 +531,27 @@ namespace gunsmith
 					warn_once(n.section.c_str(), "has no sight mode bone", b.c_str());
 				ch.mode_bones.push_back(id);
 			}
+			// bones that move as the receiver's (HUD: the first-person receiver has them, the world model doesn't)
+			for (const shared_str& b : pv.follow_bones)
+			{
+				const u16 id = K->LL_BoneID(b);
+				const u16 rb = root->LL_BoneID(b);
+				if (id == BI_NONE || rb == BI_NONE || rb == root->LL_GetBoneRoot())
+					continue;
+				SFollow* f = xr_new<SFollow>();
+				f->c = &c;
+				f->node = u8(i);
+				f->root = root;
+				f->root_bone = rb;
+				f->root_parent = root->LL_GetData(rb).GetParentID();
+				Fmatrix rest;
+				rest.invert(root->LL_GetData(rb).m2b_transform);
+				f->root_pivot = rest.c;
+				K->LL_GetBoneInstance(id).set_callback(bctCustom, follow_callback, f, FALSE);
+				ch.follow.push_back(f);
+			}
+			if (ctx == eHud)
+				apply_hidden(ch);
 			child_of[i] = int(c.children.size());
 			c.children.push_back(ch);
 		}
@@ -565,6 +600,87 @@ namespace gunsmith
 		}
 	}
 
+	// A followed bone (SFollow): its rest pose (already in mTransform) moved as the root bone moves on its parent, in
+	// the part model's space, about the part bone's own pivot.
+	void CVisuals::follow_callback(CBoneInstance* B)
+	{
+		const SFollow* f = static_cast<const SFollow*>(B->callback_param());
+		const SChild* ch = nullptr;
+		for (const SChild& x : f->c->children)
+			if (x.node == f->node)
+				ch = &x;
+		if (!ch)
+			return;
+		// the root bone's motion on its parent (model space, from the rest pose)
+		const Fmatrix& D = f->root->LL_GetTransform_R(f->root_bone);
+		Fmatrix Pm, P_inv, rel, local_inv, C;
+		if (f->root_parent != BI_NONE)
+			Pm.set(f->root->LL_GetTransform_R(f->root_parent));
+		else
+			Pm.identity();
+		P_inv.invert(Pm);
+		rel.mul_43(P_inv, D);                 // the bone's own motion, with its parent's taken out
+		local_inv.invert(ch->local);
+		// in the part's space (the part rides on its mount, which carries the parent's motion): parent * rel * parent^-1
+		Fmatrix rel_now;
+		rel_now.mul_43(Pm, rel);
+		rel_now.mulB_43(P_inv);
+		C.mul_43(local_inv, rel_now);
+		C.mulB_43(ch->local);
+		// the same turn about the part bone's pivot, which moves as the root bone's pivot does
+		Fvector rest_now, rp, rp_now;
+		Pm.transform_tiny(rest_now, f->root_pivot);   // the root bone's rest pivot, carried by its parent
+		local_inv.transform_tiny(rp, rest_now);
+		C.transform_tiny(rp_now, rp);
+		const Fvector pp = B->mTransform.c;
+		Fmatrix R = C;
+		R.c.set(0.f, 0.f, 0.f);
+		Fvector turned;
+		R.transform_tiny(turned, pp);
+		R.c.sub(pp, turned);
+		R.c.add(Fvector().sub(rp_now, rp));
+		B->mTransform.mulA_43(R);
+	}
+
+	void CVisuals::apply_hidden(SChild& ch)
+	{
+		bool changed = false;
+		for (const shared_str& b : m_hud_hidden)
+		{
+			const u16 id = ch.K->LL_BoneID(b);
+			if (id != BI_NONE && ch.K->LL_GetBoneVisible(id))
+			{
+				ch.K->LL_SetBoneVisible(id, FALSE, TRUE);
+				changed = true;
+			}
+		}
+		if (changed)
+		{
+			ch.K->CalculateBones_Invalidate();
+			ch.K->CalculateBones(TRUE);
+		}
+	}
+
+	void CVisuals::set_hud_bone_hidden(const shared_str& bone, bool hidden)
+	{
+		auto it = std::find(m_hud_hidden.begin(), m_hud_hidden.end(), bone);
+		if (hidden == (it != m_hud_hidden.end()))
+			return;
+		if (hidden)
+			m_hud_hidden.push_back(bone);
+		else
+			m_hud_hidden.erase(it);
+		for (SChild& ch : m_ctx[eHud].children)
+		{
+			const u16 id = ch.K->LL_BoneID(bone);
+			if (id == BI_NONE)
+				continue;
+			ch.K->LL_SetBoneVisible(id, hidden ? FALSE : TRUE, TRUE);
+			ch.K->CalculateBones_Invalidate();
+			ch.K->CalculateBones(TRUE);
+		}
+	}
+
 	void CVisuals::render(int ctx, IKinematics* root, const Fmatrix& root_xform)
 	{
 		SContext& c = m_ctx[ctx];
@@ -575,8 +691,9 @@ namespace gunsmith
 		{
 			IKinematicsAnimated* ka = ch.visual->dcast_PKinematicsAnimated();
 			if (ka)
-			{
 				ka->UpdateTracks();
+			if (ka || !ch.follow.empty())
+			{
 				ch.K->CalculateBones_Invalidate();
 				ch.K->CalculateBones(TRUE);
 			}
@@ -697,6 +814,31 @@ namespace gunsmith
 		launcher->K->LL_GetTransform_R(launcher->K->LL_GetBoneRoot()).transform_tiny(p, launcher->pv->fire_point2);
 		launcher->local.transform_tiny(p);
 		root_xform.transform_tiny(pos, p);
+		return true;
+	}
+
+	bool CVisuals::sight2(IKinematics* root, Fvector& point, Fvector& fwd, Fvector& up, SSightKey& key)
+	{
+		SContext& c = m_ctx[eHud];
+		if (c.children.empty() || c.root != root)
+			return false;
+		const SChild* launcher = nullptr;
+		for (const SChild& ch : c.children)
+			if (ch.pv->has_aim2)
+				launcher = &ch;
+		if (!launcher)
+			return false;
+		update_local(c, root);
+		Fmatrix m;
+		m.mul_43(launcher->local, launcher->K->LL_GetTransform_R(launcher->K->LL_GetBoneRoot()));
+		m.transform_tiny(point, launcher->pv->aim_point2);
+		m.transform_dir(fwd, launcher->pv->aim_fwd2);
+		m.transform_dir(up, launcher->pv->aim_up2);
+		fwd.normalize_safe();
+		up.normalize_safe();
+		key.node = launcher->node;
+		key.section = c.sig[launcher->node].section;
+		key.mode = 0x80;
 		return true;
 	}
 
