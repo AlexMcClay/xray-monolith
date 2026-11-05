@@ -1422,7 +1422,9 @@ void player_hud::update(const Fmatrix& cam_trans)
 
 	// The main item's script recoil (CHudItem::SetHudRecoil): the hands turned about a pivot in the item's model
 	// space and moved along its axes, as the item hangs on them now (the anchor bone and the item's offset, as
-	// attachable_hud_item::update places it), so the hands and the item move as one.
+	// attachable_hud_item::update places it), so the hands and the item move as one. The left arm (the second
+	// model) takes the same move while it holds the item, no item of its own in the left hand: left behind, its
+	// animated hand would leave the grip and the grip IK let go (gunsmith_grip_ik's weight).
 	if (attachable_hud_item* hi = m_attached_items[0])
 	{
 		if (const CHudItem::hud_recoil* rc = hi->m_parent_hud_item->HudRecoil())
@@ -1448,6 +1450,16 @@ void player_hud::update(const Fmatrix& cam_trans)
 			Fmatrix m;
 			m.mul_43(pivot, kick);
 			m.mulB_43(pivot_inv);
+
+			if (!m_attached_items[1])
+			{
+				// the same move in world space: m_transform * m * m_transform^-1
+				Fmatrix world, inv;
+				inv.invert(m_transform);
+				world.mul_43(m_transform, m);
+				world.mulB_43(inv);
+				m_transform_2.mulA_43(world);
+			}
 			m_transform.mulB_43(m);
 		}
 	}
