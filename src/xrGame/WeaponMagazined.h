@@ -20,8 +20,9 @@ protected:
 	shared_str m_sSndShotCurrent;
 
 	// A firing loop (snd_shoot_loop, snd_shoot_actor_loop and the silencer's), as Tarkov plays automatic fire: a
-	// recording of automatic fire played looped while a queue of shots lasts, cut on its next beat (its beats at
-	// snd_shoot_loop_rpm) once the shots stop, and its tail (snd_*_tail) from there, instead of a sound per shot.
+	// recording of automatic fire played looped while a queue of shots lasts, cut on its next beat (its length / 16;
+	// snd_shoot_loop_rpm marks a gun as having one) with a few ms fade once the shots stop, and its tail (snd_*_tail)
+	// from there, instead of a sound per shot.
 	struct SShotLoop
 	{
 		shared_str base;        // the loop's alias (sndShotActorLoop, ...)

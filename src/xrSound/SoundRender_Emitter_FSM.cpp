@@ -298,7 +298,8 @@ void CSoundRender_Emitter::update(float dt)
 #endif
 
 	// if deffered stop active and volume==0 -> physically stop sound
-	if (bStopping && fis_zero(fade_volume))
+	// (stop_fade: once the zero gain has gone out to its voice, the update after reaching zero)
+	if (bStopping && fis_zero(fade_volume) && (!bFadeHold || !target || ++fade_zero_updates > 1))
 		i_stop();
 
 	VERIFY2(!!(owner_data) || (!(owner_data)&&(m_current_state==stStopped)), "owner");
@@ -350,11 +351,12 @@ BOOL CSoundRender_Emitter::update_culling(float dt)
 {
 	PROF_EVENT("CSoundRender_Emitter::update_culling");
 	float volume_att = 1.f;
+	const float fade_speed = bStopping ? fade_rate : 10.f;
 
 	if (b2D)
 	{
 		occluder_volume = 1.f;
-		fade_volume += dt * 10.f * (bStopping ? -1.f : 1.f);
+		fade_volume += dt * fade_speed * (bStopping ? -1.f : 1.f);
 		volume_att = p_source.volume;
 	}
 	else
@@ -374,7 +376,7 @@ BOOL CSoundRender_Emitter::update_culling(float dt)
 		clamp(volume_att, 0.f, p_source.volume);
 
 		float fade_scale = bStopping || (p_source.base_volume * p_source.volume * (owner_data->s_type == st_Effect ? psSoundVEffects * psSoundVFactor : psSoundVMusic * psSoundVMusicFactor) < psSoundCull) ? -1.f : 1.f;
-		fade_volume += dt * 10.f * fade_scale;
+		fade_volume += dt * fade_speed * fade_scale;
 		//LostAlphaRus out
 
 		//v2v3v4 in
@@ -395,7 +397,7 @@ BOOL CSoundRender_Emitter::update_culling(float dt)
 	//LostAlphaRus out
 
 	if (smooth_volume < psSoundCull)
-		return FALSE;	// allow volume to go up
+		return (bStopping && bFadeHold && target) ? TRUE : FALSE;	// allow volume to go up (stop_fade: keep the voice)
 
 	// Here we has enought "PRIORITY" to be soundable
 	// If we are playing already, return OK

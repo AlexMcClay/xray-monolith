@@ -39,6 +39,9 @@ CSoundRender_Emitter::CSoundRender_Emitter(void)
 	bMoved = TRUE;
 	b2D = FALSE;
 	bStopping = FALSE;
+	fade_rate = 10.f;
+	bFadeHold = FALSE;
+	fade_zero_updates = 0;
 	bRewind = FALSE;
 	iPaused = 0;
 	fTimeStarted = 0.0f;

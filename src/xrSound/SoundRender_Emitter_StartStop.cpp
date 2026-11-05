@@ -32,6 +32,9 @@ void CSoundRender_Emitter::start(ref_sound* _owner, BOOL _loop, float delay)
 		fTimeToPropagade = SoundRender->Timer.GetElapsed_sec();
 	}
 	bStopping = FALSE;
+	fade_rate = 10.f;
+	bFadeHold = FALSE;
+	fade_zero_updates = 0;
 	bRewind = FALSE;
 }
 
@@ -55,9 +58,24 @@ void CSoundRender_Emitter::stop(BOOL bDeffered)
 	else i_stop();
 }
 
+// A deferred stop with its own fade time: the volume falls to zero over `seconds` (at least one update), the voice
+// is kept while it does, gets the zero gain once (OpenAL ramps a gain change within its mix block, so the sound
+// ends on silence, not mid-wave), and is released the update after (update(), update_culling())
+void CSoundRender_Emitter::stop_fade(float seconds)
+{
+	if (m_current_state == stStopped)
+		return;
+	bStopping = TRUE;
+	fade_rate = seconds > EPS_L ? 1.f / seconds : 1000.f;
+	bFadeHold = TRUE;
+	fade_zero_updates = 0;
+}
+
 void CSoundRender_Emitter::rewind()
 {
 	bStopping = FALSE;
+	bFadeHold = FALSE;
+	fade_rate = 10.f;
 
 	float fTime = SoundRender->Timer.GetElapsed_sec();
 	float fDiff = fTime - fTimeStarted;

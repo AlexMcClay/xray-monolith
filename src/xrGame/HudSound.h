@@ -2,7 +2,7 @@
 
 struct HUD_SOUND_ITEM
 {
-	HUD_SOUND_ITEM() : m_activeSnd(NULL), m_b_exclusive(false)
+	HUD_SOUND_ITEM() : m_activeSnd(NULL), m_b_exclusive(false), m_b_tracked(false)
 	{
 	}
 
@@ -29,7 +29,8 @@ struct HUD_SOUND_ITEM
 						  float frequency = 1.f,
 						  float delay_mult = 1.f);
 
-	static void StopSound(HUD_SOUND_ITEM& snd);
+	// fade > 0: a fade-out over that many seconds first (ref_sound::stop_fade)
+	static void StopSound(HUD_SOUND_ITEM& snd, float fade = 0.f);
 
 	ICF BOOL playing()
 	{
@@ -57,6 +58,9 @@ struct HUD_SOUND_ITEM
 	shared_str m_alias;
 	SSnd* m_activeSnd;
 	bool m_b_exclusive;
+	// tracked: played with feedback as an exclusive sound (it can be stopped and checked), but other sounds of the
+	// collection starting don't stop it (a firing loop)
+	bool m_b_tracked;
 	int m_type;
 	xr_vector<SSnd> sounds;
 
@@ -82,7 +86,7 @@ public:
 	void PlaySound(LPCSTR alias, const Fvector& position, const CObject* parent, bool hud_mode, bool looped = false,
 	               u8 index = u8(-1), float volume_mult = 1.f, float frequency = 1.f, float delay_mult = 1.f);
 
-	void StopSound(LPCSTR alias);
+	void StopSound(LPCSTR alias, float fade = 0.f);
 
 	void LoadSound(LPCSTR section, LPCSTR line, LPCSTR alias, bool exclusive = false, int type = sg_SourceType);
 
@@ -100,9 +104,10 @@ public:
 	// returns the alias that played (a script's on_before_play_hud_sound may swap in another sound)
 	shared_str PlaySound(LPCSTR alias, const Fvector& position, const CObject* parent, bool hud_mode, bool looped = false,
 	               u8 index = u8(-1), float volume_mult = 1.f, float frequency = 1.f, float delay_mult = 1.f);
-	void StopSound(LPCSTR alias);
+	void StopSound(LPCSTR alias, float fade = 0.f);
 	void StopAllSounds();
 	void LoadSound(LPCSTR section, LPCSTR line, LPCSTR alias, bool exclusive = false, int type = sg_SourceType);
+	void SetTracked(LPCSTR alias, bool tracked = true); // every layer's item of the alias (HUD_SOUND_ITEM::m_b_tracked)
 	void LoadSound(CInifile const* ini, LPCSTR section, LPCSTR line, LPCSTR alias, bool exclusive = false,
 	               int type = sg_SourceType);
 	void SetPosition(LPCSTR alias, const Fvector& pos);

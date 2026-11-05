@@ -215,6 +215,8 @@ public:
 
 	IC void stop();
 	IC void stop_deffered();
+	// stops after fading out over `seconds` (a few ms: no click), keeping its voice until the zero gain is out
+	IC void stop_fade(float seconds);
 	IC void set_position(const Fvector& pos);
 	IC void set_frequency(float freq);
 	IC void set_range(float min, float max);
@@ -333,6 +335,7 @@ public:
 	virtual void set_volume(float vol) = 0;
 	virtual void set_priority(float vol) = 0;
 	virtual void stop(BOOL bDeffered) = 0;
+	virtual void stop_fade(float seconds) = 0;
 	virtual const CSound_params* get_params() = 0;
 	virtual u32 play_time() = 0;
 };
@@ -547,6 +550,12 @@ IC void ref_sound::stop_deffered()
 {
 	VERIFY(!::Sound->i_locked());
 	if (_feedback()) _feedback()->stop(TRUE);
+}
+
+IC void ref_sound::stop_fade(float seconds)
+{
+	VERIFY(!::Sound->i_locked());
+	if (_feedback()) _feedback()->stop_fade(seconds);
 }
 
 IC const CSound_params* ref_sound::get_params()

@@ -130,11 +130,16 @@ void CWeaponMagazined::Load(LPCSTR section)
 	if (WeaponSoundExist(actor_sect("snd_shoot_actor_first"), "snd_shoot_actor_first"))
 		m_sounds.LoadSound(actor_sect("snd_shoot_actor_first"), "snd_shoot_actor_first", "sndShotActorFirst", shot_excl, m_eSoundShot);
 
-	// Firing loops and their tails (SShotLoop), from the HUD section first as the actor keys
+	// Firing loops and their tails (SShotLoop), from the HUD section first as the actor keys. Neither is exclusive (an
+	// exclusive sound is cut by any other sound of the gun, mid-wave): a loop is tracked (UpdateShotLoop stops it), a
+	// tail plays on its own, so the next burst's tail doesn't cut the last one
 	auto load_loop = [&](LPCSTR sect, LPCSTR line, LPCSTR alias)
 	{
-		if (pSettings->line_exist(sect, line))
-			m_sounds.LoadSound(sect, line, alias, true, m_eSoundShot);
+		if (!pSettings->line_exist(sect, line))
+			return;
+		m_sounds.LoadSound(sect, line, alias, false, m_eSoundShot);
+		if (strstr(alias, "Loop"))
+			m_sounds.SetTracked(alias);
 	};
 	load_loop(actor_sect("snd_shoot_loop"), "snd_shoot_loop", "sndShotLoop");
 	load_loop(actor_sect("snd_shoot_tail"), "snd_shoot_tail", "sndShotTail");
@@ -231,9 +236,12 @@ void CWeaponMagazined::Load(LPCSTR section)
 		LPCSTR sect = actor_sect(line);
 		if (!pSettings->line_exist(sect, line))
 			continue;
-		// (as the outdoor key: the loops exclusive, the first-person shot as snd_shoot_actor_exclusive, NPCs' not)
-		const bool excl = k.loop || (strstr(k.line, "_actor") && shot_excl);
+		// (as the outdoor key: loops tracked and tails on their own (load_loop), the first-person shot as
+		// snd_shoot_actor_exclusive, NPCs' not)
+		const bool excl = !k.loop && strstr(k.line, "_actor") && shot_excl;
 		m_sounds.LoadSound(sect, line, alias, excl, m_eSoundShot);
+		if (k.loop && strstr(k.alias, "Loop"))
+			m_sounds.SetTracked(alias);
 		m_shot_has_indoor = true;
 	}
 
@@ -939,9 +947,14 @@ void CWeaponMagazined::SetDefaults()
 }
 
 // A queue of shots on a gun with a firing loop, as Tarkov's WeaponSoundPlayer plays automatic fire: the loop (a
-// recording of automatic fire, its beats at snd_shoot_loop_rpm) starts from its beginning on the first shot and plays
-// at its own pace, whatever the gun's rate; the later shots play nothing. UpdateShotLoop ends it. Single fire, and a
-// misfire shot with a sound of its own, play a sound per shot as before.
+// recording of SHOT_LOOP_BEATS shots of automatic fire) starts from its beginning on the first shot and plays at its
+// own pace, whatever the gun's rate; the later shots play nothing. UpdateShotLoop ends it. Single fire, and a misfire
+// shot with a sound of its own, play a sound per shot as before. The beat is the playing recording's own: its length /
+// SHOT_LOOP_BEATS (Tarkov times every loop on its outdoor bank's beat, but the AK-74's indoor loop is 1.6 s, 100 ms
+// beats, against 92.6: cut on that, it was cut inside a shot); snd_shoot_loop_rpm when the length isn't known.
+static const float SHOT_LOOP_BEATS = 16.f;
+static const float SHOT_LOOP_FADE = 0.005f;     // seconds: the loop's fade-out at its cut (ref_sound::stop_fade)
+
 bool CWeaponMagazined::PlayShotLoop(bool actor)
 {
 	if (m_iQueueSize == 1)
@@ -979,12 +992,20 @@ bool CWeaponMagazined::PlayShotLoop(bool actor)
 	m_shot_loop.loop = m_sounds.PlaySound(loop, get_LastFP(), H_Root(), m_shot_loop.hud, true, (u8)-1);
 	if (!m_shot_loop.loop.size())
 		m_shot_loop.loop = loop;
+	// the beat of the recording that plays (of its variants, the one picked)
+	if (const HUD_SOUND_ITEM* item = m_sounds.FindSoundItem(m_shot_loop.loop.c_str(), false))
+	{
+		const float length = item->m_activeSnd ? item->m_activeSnd->snd.get_length_sec() : 0.f;
+		if (length > 0.f)
+			m_shot_loop.beat = length / SHOT_LOOP_BEATS;
+	}
 	return true;
 }
 
 // Once no more shots will come (the trigger let go, the queue or the magazine done, a jam), the loop is cut on its
 // next beat and the tail plays from there (Tarkov's StopFiringLoop: n = floor(elapsed / beat) + 1, no crossfade). It
-// is checked each frame, so the cut comes up to a frame early rather than letting the next beat's shot through.
+// is checked each frame, so the cut comes up to a frame early rather than letting the next beat's shot through. The
+// cut fades over SHOT_LOOP_FADE (a hard stop clicks mid-wave).
 void CWeaponMagazined::UpdateShotLoop(bool force_end)
 {
 	if (!m_shot_loop.loop.size())
@@ -1008,7 +1029,7 @@ void CWeaponMagazined::UpdateShotLoop(bool force_end)
 		if (Device.fTimeGlobal + Device.fTimeDelta < m_shot_loop.end_at)
 			return;
 	}
-	m_sounds.StopSound(m_shot_loop.loop.c_str());
+	m_sounds.StopSound(m_shot_loop.loop.c_str(), SHOT_LOOP_FADE);
 	if (m_shot_loop.tail.size())
 		m_sounds.PlaySound(m_shot_loop.tail.c_str(), get_LastFP(), H_Root(), m_shot_loop.hud, false, (u8)-1);
 	m_shot_loop.loop = nullptr;

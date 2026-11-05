@@ -120,7 +120,7 @@ void HUD_SOUND_ITEM::PlaySound(HUD_SOUND_ITEM& hud_snd,
 
 	const float delay = hud_snd.m_activeSnd->delay * delay_mult;
 
-	if (hud_snd.m_b_exclusive)
+	if (hud_snd.m_b_exclusive || hud_snd.m_b_tracked)
 	{
 		hud_snd.m_activeSnd->snd.play_at_pos(const_cast<CObject*>(parent),
 		                                     flags & sm_2D ? Fvector().set(0, 0, 0) : position,
@@ -143,15 +143,20 @@ void HUD_SOUND_ITEM::PlaySound(HUD_SOUND_ITEM& hud_snd,
 	//hud_snd.m_activeSnd->snd.set_volume		(hud_snd.m_activeSnd->volume * b_hud_mode?psHUDSoundVolume:1.0f);
 	hud_snd.m_activeSnd->snd.set_volume(hud_snd.m_activeSnd->volume * (b_hud_mode ? psHUDSoundVolume : 1.0f) * volume_mult);
 
-	if (hud_snd.m_b_exclusive && frequency != 1.f)
+	if ((hud_snd.m_b_exclusive || hud_snd.m_b_tracked) && frequency != 1.f)
 		hud_snd.m_activeSnd->snd.set_frequency(frequency);
 }
 
-void HUD_SOUND_ITEM::StopSound(HUD_SOUND_ITEM& hud_snd)
+void HUD_SOUND_ITEM::StopSound(HUD_SOUND_ITEM& hud_snd, float fade)
 {
 	xr_vector<SSnd>::iterator it = hud_snd.sounds.begin();
 	for (; it != hud_snd.sounds.end(); ++it)
-		(*it).snd.stop();
+	{
+		if (fade > 0.f)
+			(*it).snd.stop_fade(fade);
+		else
+			(*it).snd.stop();
+	}
 	hud_snd.m_activeSnd = NULL;
 }
 
@@ -206,10 +211,10 @@ void HUD_SOUND_COLLECTION::PlaySound(LPCSTR alias,
 		HUD_SOUND_ITEM::PlaySound(*snd_item, position, parent, hud_mode, looped, index, volume_mult, frequency, delay_mult);
 }
 
-void HUD_SOUND_COLLECTION::StopSound(LPCSTR alias)
+void HUD_SOUND_COLLECTION::StopSound(LPCSTR alias, float fade)
 {
 	HUD_SOUND_ITEM* snd_item = FindSoundItem(alias, true);
-	HUD_SOUND_ITEM::StopSound(*snd_item);
+	HUD_SOUND_ITEM::StopSound(*snd_item, fade);
 }
 
 void HUD_SOUND_COLLECTION::SetPosition(LPCSTR alias, const Fvector& pos)
@@ -272,7 +277,7 @@ void HUD_SOUND_COLLECTION_LAYERED::StopAllSounds()
 	}
 }
 
-void HUD_SOUND_COLLECTION_LAYERED::StopSound(LPCSTR alias)
+void HUD_SOUND_COLLECTION_LAYERED::StopSound(LPCSTR alias, float fade)
 {
 	xr_vector<HUD_SOUND_COLLECTION>::iterator it = m_sound_items.begin();
 	xr_vector<HUD_SOUND_COLLECTION>::iterator it_e = m_sound_items.end();
@@ -280,7 +285,18 @@ void HUD_SOUND_COLLECTION_LAYERED::StopSound(LPCSTR alias)
 	for (; it != it_e; ++it)
 	{
 		if (it->m_alias == alias)
-			it->StopSound(alias);
+			it->StopSound(alias, fade);
+	}
+}
+
+void HUD_SOUND_COLLECTION_LAYERED::SetTracked(LPCSTR alias, bool tracked)
+{
+	for (auto& c : m_sound_items)
+	{
+		if (!(c.m_alias == alias))
+			continue;
+		if (HUD_SOUND_ITEM* item = c.FindSoundItem(alias, false))
+			item->m_b_tracked = tracked;
 	}
 }
 

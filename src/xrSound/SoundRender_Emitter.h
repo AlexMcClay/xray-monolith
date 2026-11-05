@@ -60,6 +60,11 @@ public:
 	BOOL b2D;
 	bool bIntro;
 	BOOL bStopping;
+	// stop_fade: the fade-out's speed (fade_volume per second; 10 for a deferred stop), and its voice kept below the
+	// cull volume until the zero gain has reached the target once (fade_zero_updates), so it ends on silence
+	float fade_rate;
+	BOOL bFadeHold;
+	u32 fade_zero_updates;
 	BOOL bRewind;
 	float fTimeStarted; // time of "Start"
 	float fTimeToStop; // time to "Stop"
@@ -123,6 +128,7 @@ public:
 	void update_environment(float dt);
 	void rewind();
 	virtual void stop(BOOL bDeffered);
+	virtual void stop_fade(float seconds);
 	void pause(BOOL bVal, int id);
 
 	virtual u32 play_time();
