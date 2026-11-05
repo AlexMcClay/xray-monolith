@@ -333,6 +333,8 @@ void CWeaponAutomaticShotgun::OnMotionMark(u32 state, const motion_marks& M)
     if (m_bGsClearJam)
         return; // Gunsmith: clearing a misfire adds no shell
     inherited::OnMotionMark(state, M);
+    if (!m_bTriStateReload)
+        return; // Gunsmith: loading by magazine (a magazine part's tri_state_reload = false), the magazine's reload
     
     if (state == eIdle)
     {

@@ -124,6 +124,8 @@ void CWeapon::gs_rebuild_stats(bool notify)
 		m_gs_applied_mag_size = -1;
 		gs_apply_mag_size(m_gs_base_mag_size, notify);
 	}
+	gs_apply_tri_state();
+	gs_set_launcher(m_gs_stats.launcher, notify);
 
 	if (notify && was_suppressed != IsSuppressorFitted())
 		gs_on_suppression_changed();
@@ -828,9 +830,11 @@ void CWeapon::SetHudRoundSlots(LPCSTR chambers, LPCSTR ports)
 // default), the others nothing; SetHudRoundSlots' digits override each.
 void CWeapon::gs_round_show(gunsmith::SRoundShow& s, u32 chambers, u32 ports) const
 {
-	const int n = int(m_magazine.size());
-	const shared_str loaded_type = m_ammoType < m_ammoTypes.size() ? m_ammoTypes[m_ammoType] : shared_str();
-	const shared_str& top = n ? m_magazine.back().m_ammoSect : loaded_type;
+	// (the rifle's rounds: in a grenade launcher's mode its magazine holds the grenades, gs_round_magazine)
+	shared_str loaded_type;
+	const xr_vector<CCartridge>& mag = gs_round_magazine(loaded_type);
+	const int n = int(mag.size());
+	const shared_str& top = n ? mag.back().m_ammoSect : loaded_type;
 	auto slots = [](xr_vector<u8>& out, u32 count, u8 first, const xr_string& digits) {
 		out.assign(count, gunsmith::SRoundShow::eNone);
 		if (count)
@@ -853,7 +857,7 @@ void CWeapon::gs_round_show(gunsmith::SRoundShow& s, u32 chambers, u32 ports) co
 		for (u32 i = 0; i < s.mag && i < 128; ++i)
 		{
 			const int idx = n - 1 - in_chamber - int(i);
-			s.mag_sect.push_back(idx >= 0 ? m_magazine[idx].m_ammoSect : loaded_type);
+			s.mag_sect.push_back(idx >= 0 ? mag[idx].m_ammoSect : loaded_type);
 		}
 }
 
@@ -994,6 +998,9 @@ void CWeapon::gs_world_fire_point(const Fmatrix& parent)
 			m_current_firedeps.vLastFP = gs_fp;
 			m_current_firedeps.vLastFPSilencer = gs_fp;
 		}
+		// and a launcher part's muzzle the grenades
+		if (m_gs_launcher && m_gs_visuals.fire_point2(gunsmith::CVisuals::eWorld, K, parent, gs_fp))
+			m_current_firedeps.vLastFP2 = gs_fp;
 	}
 }
 
@@ -1095,6 +1102,75 @@ bool CWeapon::gs_fire_blocked()
 		return true;
 	}
 	return false;
+}
+
+void CWeapon::gs_apply_tri_state()
+{
+	// Only guns whose section says how they load (the shotgun classes read tri_state_reload), and not mid-reload: the
+	// reload's sub-states belong to the kind it started as.
+	if (!pSettings->line_exist(cNameSect(), "tri_state_reload") || GetState() == eReload)
+		return;
+	const bool own = !!pSettings->r_bool(cNameSect(), "tri_state_reload");
+	m_bTriStateReload = m_gs_stats.tri_state_reload >= 0 ? m_gs_stats.tri_state_reload != 0 : own;
+}
+
+bool CWeapon::hud_fire_point2(IKinematics* model, const Fmatrix& xform, Fvector& pos)
+{
+	if (!m_gs_full_mode || !model || !m_gs_launcher)
+		return false;
+	m_gs_visuals.ensure(gunsmith::CVisuals::eHud, model, m_gs_tree, cNameSect().c_str(), HudSection().c_str(), true);
+	return m_gs_visuals.fire_point2(gunsmith::CVisuals::eHud, model, xform, pos);
+}
+
+// Launcher parts (CWeaponMagazinedWGrenade).
+
+void CWeaponMagazinedWGrenade::gs_set_launcher(const shared_str& part, bool live)
+{
+	const bool fitted = !!part.size();
+	if (fitted)
+	{
+		// its launch speed: the part's, else the weapon's launcher addon's (vanilla's InitAddons reads it there)
+		float vel = gunsmith::part_data(part).grenade_vel;
+		if (vel <= 0.f && m_sGrenadeLauncherName.size() && pSettings->section_exist(m_sGrenadeLauncherName))
+			vel = READ_IF_EXISTS(pSettings, r_float, m_sGrenadeLauncherName, "grenade_vel", 0.f);
+		if (vel > 0.f)
+			CRocketLauncher::m_fLaunchSpeed = vel;
+	}
+	if (fitted == m_gs_launcher)
+		return;
+
+	if (!fitted && live)
+	{
+		// as vanilla's Detach: its grenades back to the inventory, the gun in rifle mode
+		if (!m_bGrenadeMode)
+			PerformSwitchGL();
+		UnloadMagazine();
+		PerformSwitchGL();
+	}
+	else if (!fitted && m_bGrenadeMode)
+		PerformSwitchGL();
+	m_gs_launcher = fitted;
+	if (live && GetState() == eIdle)
+		PlayAnimIdle();
+	m_BriefInfo_CalcFrame = 0;
+}
+
+bool CWeaponMagazinedWGrenade::gs_grip_ik_allowed() const
+{
+	return !(m_bGrenadeMode && IsGrenadeLauncherAttached());
+}
+
+const xr_vector<CCartridge>& CWeaponMagazinedWGrenade::gs_round_magazine(shared_str& loaded_type) const
+{
+	if (!m_bGrenadeMode)
+		return inherited::gs_round_magazine(loaded_type);
+	loaded_type = m_ammoType2 < m_ammoTypes2.size() ? m_ammoTypes2[m_ammoType2] : shared_str();
+	return m_magazine2;
+}
+
+bool CWeaponMagazinedWGrenade::gs_gl_rifle_anims()
+{
+	return IsGrenadeLauncherAttached() && !(m_gs_launcher && !HudAnimationExist("anm_idle_w_gl"));
 }
 
 // Magazine parts (CWeaponMagazined, CWeaponMagazinedWGrenade).

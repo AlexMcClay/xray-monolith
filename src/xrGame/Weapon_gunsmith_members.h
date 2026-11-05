@@ -182,6 +182,24 @@ protected:
 	int m_gs_applied_mag_size = -1;
 	virtual void gs_apply_mag_size(int size, bool live) { iMagazineSize = size; }
 
+	// A part's `tri_state_reload` sets how a gun with that weapon key loads while fitted (a detachable magazine on a
+	// gun loaded round by round); the section's own comes back without one. Not changed mid-reload.
+	void gs_apply_tri_state();
+
+	// Launcher parts (`grenade_launcher = true`): on a gun of the grenade launcher class the launcher is attached
+	// (IsGrenadeLauncherAttached) while one is fitted. gs_set_launcher: the fitted launcher part (empty: none);
+	// `live`: a change in play (its grenades come out when it goes).
+	bool m_gs_launcher = false;
+	virtual void gs_set_launcher(const shared_str& part, bool live) {}
+
+public:
+	// The left hand may take the fitted grip (grip IK; the grenade launcher's mode lets the animation have it).
+	virtual bool gs_grip_ik_allowed() const { return true; }
+	// The second fire point (the grenade launcher's): the fitted launcher part's `fire_point2`, if any.
+	virtual bool hud_fire_point2(IKinematics* model, const Fmatrix& xform, Fvector& pos);
+
+protected:
+
 protected:
 	bool m_gs_api_detach = false; // gs_detach_part fires the detach callback itself
 	// Why `section` can't go into `slot` of node `parent` through the Lua API or the inventory (not an addon slot),
@@ -207,6 +225,12 @@ protected:
 	gunsmith::SRoundShow m_gs_round_show; // (kept: its section list's memory is reused every frame)
 	// What the rounds show now (SetHudRounds over the rounds loaded) on the HUD's chamber and port mounts.
 	void gs_round_show(gunsmith::SRoundShow& out, u32 chambers, u32 ports) const;
+	// The rounds the gun shows and their loaded type (a grenade launcher's mode: the rifle's, not the grenades).
+	virtual const xr_vector<CCartridge>& gs_round_magazine(shared_str& loaded_type) const
+	{
+		loaded_type = m_ammoType < m_ammoTypes.size() ? m_ammoTypes[m_ammoType] : shared_str();
+		return m_magazine;
+	}
 
 	// Per-shot wear: the weapon_on_shot callback's for this shot when a script took it (CheckForMisfire asks
 	// before the shot), times the wear setting; else the receiver's own (condition_shot_dec, the cartridge's

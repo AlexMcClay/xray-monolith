@@ -31,6 +31,8 @@ namespace gunsmith
 		bool has_fire;
 		shared_str fire_bone;
 		Fvector fire_point;
+		bool has_fire2; // `fire_point2`: a launcher part's muzzle (the weapon's second fire point), on the part's root
+		Fvector fire_point2;
 		float magnification, magnification_min, zoom_factor;
 		u32 zoom_steps;
 		shared_str scope_texture;
@@ -160,6 +162,8 @@ namespace gunsmith
 
 		// Where shots leave the gun: the fire point of the last muzzle-chain part, if any.
 		bool fire_point(int ctx, IKinematics* root, const Fmatrix& root_xform, Fvector& pos);
+		// The second fire point (grenades): the last part with a `fire_point2`, if any.
+		bool fire_point2(int ctx, IKinematics* root, const Fmatrix& root_xform, Fvector& pos);
 
 		// Which sight sight_point measured: its node (0 for the receiver's own sight line), section and mode.
 		struct SSightKey

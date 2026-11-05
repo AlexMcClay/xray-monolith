@@ -245,6 +245,7 @@ public:
 	// own fire point when it has one (a weapon's part on the muzzle chain).
 	virtual void render_hud_attachments(IKinematics* model, const Fmatrix& xform) {}
 	virtual bool hud_fire_point(IKinematics* model, const Fmatrix& xform, Fvector& pos) { return false; }
+	virtual bool hud_fire_point2(IKinematics* model, const Fmatrix& xform, Fvector& pos) { return false; }
 	virtual bool need_renderable() { return true; };
 
 	virtual void render_item_3d_ui();

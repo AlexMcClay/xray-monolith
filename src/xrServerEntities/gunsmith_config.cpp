@@ -355,6 +355,10 @@ namespace gunsmith
 
 			d.suppressor = exists && d.declared && !!READ_IF_EXISTS(pSettings, r_bool, section, "suppressor", FALSE);
 			d.ammo_mag_size = exists && d.declared ? READ_IF_EXISTS(pSettings, r_s32, section, "ammo_mag_size", -1) : -1;
+			d.tri_state_reload = exists && d.declared && pSettings->line_exist(section, "tri_state_reload")
+				? (pSettings->r_bool(section, "tri_state_reload") ? 1 : 0) : -1;
+			d.grenade_launcher = exists && d.declared && !!READ_IF_EXISTS(pSettings, r_bool, section, "grenade_launcher", FALSE);
+			d.grenade_vel = d.grenade_launcher ? READ_IF_EXISTS(pSettings, r_float, section, "grenade_vel", 0.f) : 0.f;
 		}
 	}
 

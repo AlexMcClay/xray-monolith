@@ -98,6 +98,8 @@ namespace gunsmith
 		v.has_fire = section && (pSettings->line_exist(section, "fire_bone") || pSettings->line_exist(section, "fire_point"));
 		v.fire_bone = read_str(section, "fire_bone");
 		v.fire_point = read_vec(section, "fire_point");
+		v.has_fire2 = section && pSettings->line_exist(section, "fire_point2");
+		v.fire_point2 = read_vec(section, "fire_point2");
 		v.magnification = section ? READ_IF_EXISTS(pSettings, r_float, section, "magnification", 0.f) : 0.f;
 		v.magnification_min = section ? READ_IF_EXISTS(pSettings, r_float, section, "magnification_min", 0.f) : 0.f;
 		v.zoom_factor = section ? READ_IF_EXISTS(pSettings, r_float, section, "scope_zoom_factor", 0.f) : 0.f;
@@ -675,6 +677,25 @@ namespace gunsmith
 		Fvector p;
 		muzzle->K->LL_GetTransform_R(muzzle->fire_bone).transform_tiny(p, muzzle->pv->fire_point);
 		muzzle->local.transform_tiny(p);
+		root_xform.transform_tiny(pos, p);
+		return true;
+	}
+
+	bool CVisuals::fire_point2(int ctx, IKinematics* root, const Fmatrix& root_xform, Fvector& pos)
+	{
+		SContext& c = m_ctx[ctx];
+		if (c.children.empty() || c.root != root)
+			return false;
+		const SChild* launcher = nullptr;
+		for (const SChild& ch : c.children)
+			if (ch.pv->has_fire2)
+				launcher = &ch;
+		if (!launcher)
+			return false;
+		update_local(c, root);
+		Fvector p;
+		launcher->K->LL_GetTransform_R(launcher->K->LL_GetBoneRoot()).transform_tiny(p, launcher->pv->fire_point2);
+		launcher->local.transform_tiny(p);
 		root_xform.transform_tiny(pos, p);
 		return true;
 	}

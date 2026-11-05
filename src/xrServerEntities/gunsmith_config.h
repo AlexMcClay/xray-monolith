@@ -145,6 +145,14 @@ namespace gunsmith
 		// Need part_kind set:
 		bool suppressor; // `suppressor = true`: the gun is suppressed while this part is fitted, as with a silencer addon
 		int ammo_mag_size; // `ammo_mag_size`: the gun's magazine size while this part is fitted, -1 if unset
+		// `tri_state_reload`: how the gun loads while this part is fitted, as the weapon key (a detachable magazine on a
+		// gun that otherwise loads round by round: false); -1 if unset
+		int tri_state_reload;
+		// `grenade_launcher = true`: an underbarrel launcher; a gun of the grenade launcher class (WP_AK74) has its
+		// launcher while this part is fitted, as with the launcher addon. `grenade_vel`: its launch speed (0: the
+		// weapon's grenade_launcher_name section's)
+		bool grenade_launcher;
+		float grenade_vel;
 	};
 
 	const SPartData& part_data(const shared_str& section);

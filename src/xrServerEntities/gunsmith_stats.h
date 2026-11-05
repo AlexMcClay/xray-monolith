@@ -47,6 +47,8 @@ namespace gunsmith
 		bool can_fire; // every required slot is filled
 		bool suppressor_part; // a part with `suppressor = true` is fitted
 		int mag_size; // magazine size from the fitted magazine part (`ammo_mag_size`), -1 if none
+		int tri_state_reload; // a fitted part's `tri_state_reload` (1 on, 0 off), -1 if none
+		shared_str launcher; // the fitted part with `grenade_launcher = true`, empty if none
 
 		SWeaponStats() { reset(); }
 		void reset();

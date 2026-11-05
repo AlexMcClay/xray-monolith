@@ -1878,7 +1878,7 @@ bool CWeapon::IsGrenadeLauncherAttached() const
 {
 	return (ALife::eAddonAttachable == m_eGrenadeLauncherStatus &&
 			0 != (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonGrenadeLauncher)) ||
-		ALife::eAddonPermanent == m_eGrenadeLauncherStatus;
+		ALife::eAddonPermanent == m_eGrenadeLauncherStatus || m_gs_launcher; // (Gunsmith: a launcher part)
 }
 
 bool CWeapon::IsScopeAttached() const

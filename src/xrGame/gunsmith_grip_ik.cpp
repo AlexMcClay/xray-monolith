@@ -92,12 +92,14 @@ namespace gunsmith
 		const Fmatrix ha0 = hands->LL_GetTransform(ik.hand_bone());
 
 		const float d = ha0.c.distance_to(idle.c);
-		const float to = ease(1.f - (d - NEAR_DIST) / (FAR_DIST - NEAR_DIST));
-		// falls with the animation, rises at most RISE a second (from 0 after a frame without a grip)
+		const bool allowed = wpn->gs_grip_ik_allowed();
+		const float to = allowed ? ease(1.f - (d - NEAR_DIST) / (FAR_DIST - NEAR_DIST)) : 0.f;
+		// falls with the animation, rises at most RISE a second (from 0 after a frame without a grip); held off by
+		// the weapon (a grenade launcher's mode), it lets go at the same rate
 		if (m_weight_frame + 1 < Device.dwFrame)
 			m_weight = 0.f;
 		if (m_weight_frame != Device.dwFrame)
-			m_weight = _min(to, m_weight + RISE * Device.fTimeDelta);
+			m_weight = allowed ? _min(to, m_weight + RISE * Device.fTimeDelta) : _max(0.f, m_weight - RISE * Device.fTimeDelta);
 		m_weight_frame = Device.dwFrame;
 		const float weight = m_weight;
 		if (g_gs_debug & eGsDebugGrip)

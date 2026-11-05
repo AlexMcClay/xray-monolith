@@ -157,7 +157,7 @@ void CWeaponMagazinedWGrenade::OnShot()
 
 void CWeaponMagazinedWGrenade::PlayAnimFireModeSwitch()
 {
-	if (IsGrenadeLauncherAttached())
+	if (IsGrenadeLauncherAttached() && (m_bGrenadeMode || gs_gl_rifle_anims()))
 	{
 		if (!m_bGrenadeMode)
 		{
@@ -734,7 +734,7 @@ float CWeaponMagazinedWGrenade::CurrentZoomFactor()
 void CWeaponMagazinedWGrenade::PlayAnimShow()
 {
 	VERIFY(GetState() == eShowing);
-	if (IsGrenadeLauncherAttached())
+	if (IsGrenadeLauncherAttached() && (m_bGrenadeMode || gs_gl_rifle_anims()))
 	{
 		if (!m_bGrenadeMode)
 			HUD_VisualBulletUpdate();
@@ -756,7 +756,7 @@ void CWeaponMagazinedWGrenade::PlayAnimHide()
 {
 	VERIFY(GetState() == eHiding);
 
-	if (IsGrenadeLauncherAttached())
+	if (IsGrenadeLauncherAttached() && (m_bGrenadeMode || gs_gl_rifle_anims()))
 		if (!m_bGrenadeMode)
 			iAmmoElapsed == 0 && HudAnimationExist("anm_hide_empty_w_gl")
 			? PlayHUDMotion("anm_hide_empty_w_gl", TRUE, this, GetState())
@@ -775,7 +775,7 @@ void CWeaponMagazinedWGrenade::PlayAnimReload()
 	VERIFY(GetState() == eReload);
 
 #ifdef NEW_ANIMS //AVO: use new animations
-	if (IsGrenadeLauncherAttached())
+	if (gs_gl_rifle_anims())
 	{
 		if (bMisfire)
 		{
@@ -818,7 +818,7 @@ void CWeaponMagazinedWGrenade::PlayAnimIdle()
 	if (GetState() == eSwitch)
 		return;
 
-	if (IsGrenadeLauncherAttached())
+	if (IsGrenadeLauncherAttached() && (m_bGrenadeMode || gs_gl_rifle_anims()))
 	{
 		if (IsZoomed())
 		{
@@ -933,7 +933,7 @@ void CWeaponMagazinedWGrenade::PlayAnimShoot()
 	else
 	{
 		VERIFY(GetState() == eFire);
-		if (IsGrenadeLauncherAttached())
+		if (gs_gl_rifle_anims())
 			if (iAmmoElapsed > 1 || !HudAnimationExist("anm_shot_w_gl_l"))
 			{
 				if (!IsZoomed() || !HudAnimationExist("anm_shots_w_gl_aim"))
@@ -967,7 +967,7 @@ void CWeaponMagazinedWGrenade::PlayAnimModeSwitch()
 
 bool CWeaponMagazinedWGrenade::TryPlayAnimBore()
 {
-	if (IsGrenadeLauncherAttached())
+	if (IsGrenadeLauncherAttached() && (m_bGrenadeMode || gs_gl_rifle_anims()))
 	{
 		if (m_bGrenadeMode)
 		{

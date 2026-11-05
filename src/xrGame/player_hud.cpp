@@ -393,6 +393,9 @@ void attachable_hud_item::setup_firedeps(firedeps& fd)
 		fd.vLastFP = gs_fp;
 		fd.vLastFPSilencer = gs_fp;
 	}
+	// and its second (a weapon: its underbarrel launcher part's)
+	if (m_parent_hud_item && m_parent_hud_item->hud_fire_point2(m_model, m_item_transform, gs_fp))
+		fd.vLastFP2 = gs_fp;
 }
 
 bool attachable_hud_item::need_renderable()

@@ -121,6 +121,14 @@ public:
 	int iMagazineSize2;
 	// Gunsmith magazine parts size the rifle magazine, also while the launcher is selected.
 	virtual void gs_apply_mag_size(int size, bool live);
+	// Gunsmith launcher parts (grenade_launcher = true) attach the launcher while fitted; in its mode the
+	// animation holds the left hand (no grip IK).
+	virtual void gs_set_launcher(const shared_str& part, bool live);
+	virtual bool gs_grip_ik_allowed() const;
+	// The rifle mode's motions with the launcher fitted (anm_*_w_gl): a gun whose launcher is a part plays its own
+	// motions where its HUD section has none (the left hand goes onto the launcher by the grip IK).
+	bool gs_gl_rifle_anims();
+	virtual const xr_vector<CCartridge>& gs_round_magazine(shared_str& loaded_type) const;
 	xr_vector<CCartridge> m_magazine2;
 
 	bool m_bGrenadeMode;

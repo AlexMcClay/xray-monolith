@@ -69,6 +69,10 @@ namespace gunsmith
 				out.suppressor_part = true;
 			if (p.ammo_mag_size >= 0)
 				out.mag_size = p.ammo_mag_size;
+			if (p.tri_state_reload >= 0)
+				out.tri_state_reload = p.tri_state_reload;
+			if (p.grenade_launcher)
+				out.launcher = section;
 		}
 	}
 
@@ -85,6 +89,8 @@ namespace gunsmith
 		can_fire = true;
 		suppressor_part = false;
 		mag_size = -1;
+		tri_state_reload = -1;
+		launcher = nullptr;
 	}
 
 	namespace
