@@ -52,6 +52,7 @@ CHudItem::CHudItem()
 	script_ui_matrix.identity();
 
 	m_hud_offsets = nullptr;
+	m_hud_recoil = nullptr;
 }
 
 DLL_Pure* CHudItem::_construct()
@@ -69,6 +70,7 @@ CHudItem::~CHudItem()
 {
 	DeleteHudItemData();
 	xr_delete(m_hud_offsets);
+	xr_delete(m_hud_recoil);
 }
 
 void CHudItem::SetHudOffset(u8 slot, const Fvector& pos, const Fvector& rot)
@@ -100,6 +102,20 @@ void CHudItem::ResetHudOffset(u8 slot)
 void CHudItem::ResetHudOffsets()
 {
 	xr_delete(m_hud_offsets);
+}
+
+void CHudItem::SetHudRecoil(const Fvector& pos, const Fvector& rot, const Fvector& pivot)
+{
+	if (!m_hud_recoil)
+		m_hud_recoil = xr_new<hud_recoil>();
+	m_hud_recoil->pos.set(pos);
+	m_hud_recoil->rot.set(rot);
+	m_hud_recoil->pivot.set(pivot);
+}
+
+void CHudItem::ResetHudRecoil()
+{
+	xr_delete(m_hud_recoil);
 }
 
 Fvector* CHudItem::HudOffset(u8 part, u8 slot) const

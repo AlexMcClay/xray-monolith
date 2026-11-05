@@ -569,6 +569,8 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		.def("set_hud_offset", SAFE_WRAP(&CScriptGameObject::set_hud_offset))
 		.def("reset_hud_offset", SAFE_WRAP(&CScriptGameObject::reset_hud_offset))
 		.def("reset_hud_offset", SAFE_WRAP(&CScriptGameObject::reset_hud_offsets))
+		.def("set_hud_recoil", SAFE_WRAP(&CScriptGameObject::set_hud_recoil))
+		.def("reset_hud_recoil", SAFE_WRAP(&CScriptGameObject::reset_hud_recoil))
 		.def("has_hud_offset", SAFE_WRAP(&CScriptGameObject::has_hud_offset))
 		.def("hud_offset_pos", SAFE_WRAP(&CScriptGameObject::hud_offset_pos))
 		.def("hud_offset_rot", SAFE_WRAP(&CScriptGameObject::hud_offset_rot))

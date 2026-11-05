@@ -451,6 +451,19 @@ void CScriptGameObject::reset_hud_offsets()
 		item->ResetHudOffsets();
 }
 
+// A HUD item's script recoil transform, set each frame (CHudItem::SetHudRecoil; Gunsmith Docs research/38)
+void CScriptGameObject::set_hud_recoil(Fvector pos, Fvector rot, Fvector pivot)
+{
+	if (CHudItem* item = get_script_hud_offset_item(this, "set_hud_recoil", 0))
+		item->SetHudRecoil(pos, rot, pivot);
+}
+
+void CScriptGameObject::reset_hud_recoil()
+{
+	if (CHudItem* item = get_script_hud_offset_item(this, "reset_hud_recoil", 0))
+		item->ResetHudRecoil();
+}
+
 bool CScriptGameObject::has_hud_offset(int index)
 {
 	CHudItem* item = get_script_hud_offset_item(this, "has_hud_offset", index);

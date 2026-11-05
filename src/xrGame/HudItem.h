@@ -164,6 +164,20 @@ private:
 	};
 	hud_offsets* m_hud_offsets; // created by the first SetHudOffset
 public:
+	// A transform a script sets each frame, such as a procedural recoil (Gunsmith Docs research/38): the hands, with the
+	// item on them, turned by rot (degrees: x pitch, muzzle up; y yaw, muzzle right; z roll, top to the right) about
+	// pivot (a point in the item's model space) and moved by pos (metres along the item's axes), after every offset
+	// and HUD layer. The barrel, and with g_firepos/g_aimpos the shot, follow; the sight alignment doesn't see it.
+	struct hud_recoil
+	{
+		Fvector pos, rot, pivot;
+	};
+	void SetHudRecoil(const Fvector& pos, const Fvector& rot, const Fvector& pivot);
+	void ResetHudRecoil();
+	const hud_recoil* HudRecoil() const { return m_hud_recoil; } // null when not set
+private:
+	hud_recoil* m_hud_recoil;
+public:
 
 	BOOL GetHUDmode();
 	void PlayBlendAnm(LPCSTR name, float speed = 1.f, float power = 1.f, bool stop_old = true);

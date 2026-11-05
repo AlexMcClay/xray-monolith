@@ -14,6 +14,15 @@ private:
 
 	SCamEffectorInfo m_cam_info_hud;
 
+	// A script's camera offset (level.set_cam_offset; Gunsmith Docs research/38), applied after every effector:
+	// the view turned (degrees, as hud_recoil_rotation) and moved (metres, camera axes) without changing where the
+	// actor looks. The HUD camera takes hud_factor of it: 0, the HUD stays put in the world (it moves on screen);
+	// 1, it stays put on screen.
+	bool m_script_offset_on = false;
+	Fvector m_script_offset_pos = {0.f, 0.f, 0.f};
+	Fvector m_script_offset_rot = {0.f, 0.f, 0.f};
+	float m_script_offset_hud = 0.f;
+
 protected:
 	virtual void UpdateCamEffectors();
 	virtual bool ProcessCameraEffector(CEffectorCam* eff);
@@ -26,6 +35,16 @@ public:
 	virtual ~CActorCameraManager()
 	{
 	}
+
+	void SetScriptOffset(const Fvector& pos, const Fvector& rot, float hud_factor)
+	{
+		m_script_offset_on = true;
+		m_script_offset_pos.set(pos);
+		m_script_offset_rot.set(rot);
+		m_script_offset_hud = hud_factor;
+	}
+
+	void ResetScriptOffset() { m_script_offset_on = false; }
 
 	IC void hud_camera_Matrix(Fmatrix& M)
 	{
