@@ -361,6 +361,20 @@ void CMemoryManager::make_object_visible_somewhen(const CEntityAlive* enemy)
 	obj1->visible(mask, prev);
 }
 
+// The squad shares its enemies (the agent manager every second, and a member seen passing its enemy on). Vanilla
+// makes each one "visible somewhen" for every member; when nobody in the squad has a sighting of it (it was only
+// heard or felt) that creates one at its true current position, so a squad that heard a shot knows exactly where
+// the shooter stands. With ai_squad_share_unseen 0 such an enemy is left to what was heard or felt (the squad's
+// shared sound and hit memories); sightings are still shared as before (the lists are the squad's).
+extern BOOL g_ai_squad_share_unseen;
+
+void CMemoryManager::share_enemy(const CEntityAlive* enemy)
+{
+	if (!g_ai_squad_share_unseen && !visual().visible_object(enemy))
+		return;
+	make_object_visible_somewhen(enemy);
+}
+
 void CMemoryManager::save(NET_Packet& packet) const
 {
 	visual().save(packet);

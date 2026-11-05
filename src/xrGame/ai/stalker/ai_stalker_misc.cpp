@@ -219,7 +219,7 @@ void CAI_Stalker::process_enemies()
 			continue;
 		//Alundaio: END
 
-		memory().make_object_visible_somewhen(member->memory().enemy().selected());
+		memory().share_enemy(member->memory().enemy().selected());
 		break;
 	}
 }

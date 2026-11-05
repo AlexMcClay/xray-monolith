@@ -225,6 +225,7 @@ extern u32 g_ai_aim_inertia_time;
 extern u32 g_ai_aim_queue_inertia_time;
 extern float g_ai_danger_ricochet_mult;
 BOOL g_ai_move_to_cover_run = FALSE;
+BOOL g_ai_squad_share_unseen = TRUE;   // CMemoryManager::share_enemy
 
 extern CrosshairSettings g_crosshair_camera_near;
 extern CrosshairSettings g_crosshair_camera_far;
@@ -2807,6 +2808,8 @@ void CCC_RegisterCommands()
 	
 	extern BOOL g_ai_move_to_cover_run;
 	CMD4(CCC_Integer, "ai_move_to_cover_run", &g_ai_move_to_cover_run, 0, 1);
+	extern BOOL g_ai_squad_share_unseen;
+	CMD4(CCC_Integer, "ai_squad_share_unseen", &g_ai_squad_share_unseen, 0, 1);
 
     CMD4(CCC_Float, "ai_vision_speed_boost", &g_ai_vision_speed_boost, 0.1f, 10.0f);
     CMD4(CCC_Float, "ai_reload_threshold", &g_ai_reload_threshold, 0.01f, 1.0f);

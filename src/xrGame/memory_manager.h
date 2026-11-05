@@ -64,6 +64,9 @@ public:
 	u32 memory_time(const CObject* object) const;
 	Fvector memory_position(const CObject* object) const;
 	void make_object_visible_somewhen(const CEntityAlive* enemy);
+	// Squad sharing of an enemy: make_object_visible_somewhen, unless the console's ai_squad_share_unseen is 0 and
+	// nobody in the squad has a sighting of it (then it would be made up at its true position)
+	void share_enemy(const CEntityAlive* enemy);
 
 public:
 	template <typename T, typename _predicate>
