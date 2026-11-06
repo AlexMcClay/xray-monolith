@@ -218,8 +218,8 @@ bool CPHActorCharacter::CanJump()
 			m_elevator_state.ClimbingState());
 }
 
-static const float ladder_jump_off_speed = 3.5f; // m/s
-static const float ladder_jump_off_lift = 2.f; // m/s up
+static const float ladder_jump_off_speed = 2.f; // m/s
+static const float ladder_jump_off_lift = 1.5f; // m/s up
 
 void CPHActorCharacter::Jump(const Fvector& accel)
 {
@@ -232,8 +232,8 @@ void CPHActorCharacter::Jump(const Fvector& accel)
 		if (amag < 1.f)amag = 1.f;
 		if (m_elevator_state.ClimbingState())
 		{
-			// Off the ladder (research/37): away from it (and aside with a strafe) as vanilla, a little faster, with a
-			// lift unless you look down (vanilla: 3 m/s, no lift)
+			// Off the ladder (research/37): away from it (and aside with a strafe) as vanilla but gentler, with a lift
+			// unless you look down (vanilla: 3 m/s, no lift)
 			m_elevator_state.GetJumpDir(m_acceleration, m_jump_accel);
 			m_jump_accel.mul(ladder_jump_off_speed);
 			if (CamDir().y > -0.4f) m_jump_accel.y += ladder_jump_off_lift;

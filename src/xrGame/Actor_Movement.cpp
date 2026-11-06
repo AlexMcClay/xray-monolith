@@ -16,6 +16,7 @@
 #include "actoreffector.h"
 #include "static_cast_checked.hpp"
 #include "player_hud.h"
+#include "../xrphysics/ielevatorstate.h"
 
 #ifdef DEBUG
 #include "phdebug.h"
@@ -39,7 +40,7 @@ IC static void generate_orthonormal_basis1(const Fvector& dir, Fvector& updir, F
 
 
 static const u32 ladder_hold_ms = 500; // Gunsmith Docs research/37
-static const float ladder_slide_speed = 3.f; // m/s down a ladder with crouch held
+static const float ladder_slide_speed = 5.f; // m/s down a ladder with crouch held
 
 void CActor::g_cl_ValidateMState(float dt, u32 mstate_wf)
 {
@@ -122,6 +123,10 @@ void CActor::g_cl_ValidateMState(float dt, u32 mstate_wf)
 	// The weapons and the ladder camera stay as they are through a short drop off the
 	// ladder state (its ends flip between climbing and near), instead of a holster and draw at every flip
 	const bool ladder_hold = Device.dwTimeGlobal - m_ladder_left_time < ladder_hold_ms;
+	// The camera's hold is only for those flips (the ladder's end, near it); off the ladder for good (the top exit, a
+	// jump, a step aside) the camera is free at once
+	IElevatorState* ladder_state = character_physics_support()->movement()->ElevatorState();
+	const bool ladder_near = ladder_state && (ladder_state->State() == clbNearUp || ladder_state->State() == clbNearDown);
 	if (character_physics_support()->movement()->Environment() == CPHMovementControl::peAtWall)
 	{
 		if (!(mstate_real & mcClimb))
@@ -136,7 +141,7 @@ void CActor::g_cl_ValidateMState(float dt, u32 mstate_wf)
 	else
 	{
 		mstate_real &= ~mcClimb;
-		if (m_ladder_cam && !ladder_hold)
+		if (m_ladder_cam && !(ladder_hold && ladder_near))
 			cam_UnsetLadder();
 	};
 

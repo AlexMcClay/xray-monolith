@@ -45,6 +45,12 @@ static const float exit_lift = 0.06f; // the feet this far above the landing flo
 static const float exit_stand = 1.8f; // the standing body's height
 static const float exit_floor_cos = 0.7f; // the landing floor's slope at most about 45 degrees
 static const float exit_speed = 2.4f; // metres per second along the way
+static const float exit_overshoot = 0.12f; // the rise goes this much higher than the landing ...
+static const float exit_corner = 0.1f; // ... and turns across this far before its top, a rounded corner
+static const float exit_turn_rate = 20.f; // per second: how fast the velocity turns to the way's next direction
+static const float exit_slow_dist = 0.35f; // slowing down over the last part of the way across ...
+static const float exit_handoff_speed = 1.2f; // ... to walking pace, kept when control comes back
+static const float exit_handoff_dist = 0.06f; // control comes back this close to the landing
 static const float exit_time_max = 2.f; // seconds before an exit gives up in any case
 static const float exit_stall_max = 0.25f; // seconds of hardly moving (a prop, a door in the way) before it gives up
 
@@ -159,7 +165,7 @@ bool CElevatorState::FindExit()
 		if (!fits) continue;
 		// the way: up beside the ladder, then across over the lip
 		const float land_y = floor + exit_lift + r; // the foot centre on the landing
-		const float rise = land_y - foot.y;
+		const float rise = land_y + exit_overshoot - foot.y;
 		if (rise > 0.f && exit_ray(Fvector().set(foot.x, foot.y + exit_stand - 2.f * r, foot.z), up, rise, dist))
 			continue;
 		Fvector across = {col.x - foot.x, 0.f, col.z - foot.z};
@@ -178,7 +184,7 @@ bool CElevatorState::FindExit()
 			}
 		}
 		if (!clear) continue;
-		m_exit_rise.set(foot.x, land_y, foot.z);
+		m_exit_rise.set(foot.x, land_y + exit_overshoot, foot.z);
 		m_exit_land.set(col.x, land_y, col.z);
 		return true;
 	}
@@ -195,17 +201,20 @@ void CElevatorState::UpdateExit()
 	else
 		m_exit_stall = 0.f;
 	m_exit_last.set(foot);
-	const Fvector& goal = m_exit_leg == 0 ? m_exit_rise : m_exit_land;
-	Fvector d = Fvector().sub(goal, foot);
-	const float dist = d.magnitude();
-	if (dist < 0.02f)
+	Fvector d = Fvector().sub(m_exit_leg == 0 ? m_exit_rise : m_exit_land, foot);
+	float dist = d.magnitude();
+	if (m_exit_leg == 0 && dist < exit_corner)
 	{
-		if (m_exit_leg == 0)
-		{
-			m_exit_leg = 1;
-			return;
-		}
-		dBodySetLinearVel(m_character->get_body(), 0.f, 0.f, 0.f);
+		m_exit_leg = 1;
+		d.sub(m_exit_land, foot);
+		dist = d.magnitude();
+	}
+	if (m_exit_leg == 1 && dist < exit_handoff_dist)
+	{
+		// control comes back at walking pace along the way across, not from a dead stop
+		Fvector v = {m_exit_land.x - m_exit_rise.x, 0.f, m_exit_land.z - m_exit_rise.z};
+		v.normalize_safe().mul(exit_handoff_speed);
+		dBodySetLinearVel(m_character->get_body(), v.x, 0.f, v.z);
 		m_exit = false;
 		SwitchState(clbNoLadder);
 		return;
@@ -218,11 +227,17 @@ void CElevatorState::UpdateExit()
 		SwitchState(clbNearUp);
 		return;
 	}
-	// ease in over the first 0.15 s
+	// ease in over the first 0.15 s; across, slow down to walking pace near the landing
 	float speed = exit_speed * _min(1.f, 0.3f + m_exit_time / 0.15f);
+	if (m_exit_leg == 1)
+		speed = _min(speed, exit_handoff_speed + (exit_speed - exit_handoff_speed) * _min(1.f, dist / exit_slow_dist));
 	if (m_step > EPS_S) speed = _min(speed, dist / m_step);
 	d.mul(speed / dist);
-	dBodySetLinearVel(m_character->get_body(), d.x, d.y, d.z);
+	// turn toward it smoothly, no sharp corner between the rise and the way across
+	Fvector v;
+	v.set(cast_fv(dBodyGetLinearVel(m_character->get_body())));
+	v.lerp(v, d, _min(1.f, m_step * exit_turn_rate));
+	dBodySetLinearVel(m_character->get_body(), v.x, v.y, v.z);
 }
 
 float CElevatorState::ClimbDirection()
