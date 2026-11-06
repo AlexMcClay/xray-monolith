@@ -223,6 +223,9 @@ void CShootingObject::Light_Render(const Fvector& P)
 	R_ASSERT(light_render);
 
 	light_render->set_hud_mode(m_light_hud);
+	// no shadow in first person: the light sits by the camera, so the HUD gun threw a big hard shadow over the
+	// world (user, 7 Nov 2026); Tarkov's muzzle light has none either. Others' shots keep the renderer's default.
+	light_render->set_shadow(!m_light_hud && ::Render->get_generation() == IRender_interface::GENERATION_R2);
 
 	light_render->set_position(P);
 	light_render->set_color(light_build_color.r * light_scale, light_build_color.g * light_scale,
