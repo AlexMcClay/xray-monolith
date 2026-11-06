@@ -1317,17 +1317,21 @@ void CBulletManager::CommitEvents() // @ the start of frame
 					table["start_speed"] = bullet->max_speed;
 					table["handled"] = false;
 					table["skip_particles"] = false;
+					table["skip_sound"] = false;
 					funct(table);
 					::luabind::object h = table["handled"];
 					m_skip_impact_fx = h.is_valid() && h.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(h);
 					::luabind::object sp = table["skip_particles"];
 					m_skip_impact_particles = sp.is_valid() && sp.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(sp);
+					::luabind::object ss = table["skip_sound"];
+					m_skip_impact_sound = ss.is_valid() && ss.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(ss);
 				}
 
 				if (E.dynamic) DynamicObjectHit(E);
 				else StaticObjectHit(E);
 				m_skip_impact_fx = false;
 				m_skip_impact_particles = false;
+				m_skip_impact_sound = false;
 			}
 
 			break;

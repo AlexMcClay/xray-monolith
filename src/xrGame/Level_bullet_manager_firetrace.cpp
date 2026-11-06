@@ -217,7 +217,7 @@ void CBulletManager::FireShotmark(SBullet* bullet, const Fvector& vDir, const Fv
 		                    : &mtl_pair->CollideSounds[::Random.randI(0, mtl_pair->CollideSounds.size())];
 
 	//проиграть звук
-	if (pSound && ShowMark)
+	if (pSound && ShowMark && !m_skip_impact_sound)
 	{
 		CObject* O = Level().Objects.net_Find(bullet->parent_id);
 		bullet->m_mtl_snd = *pSound;

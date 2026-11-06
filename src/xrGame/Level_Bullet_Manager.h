@@ -193,6 +193,9 @@ protected:
 	bool m_skip_impact_fx = false;
 	// bullet_on_impact skip_particles = true: a script plays this hit's particles itself (decal and sound stay)
 	bool m_skip_impact_particles = false;
+	// bullet_on_impact skip_sound = true: a script plays this hit's sound itself (particles and decal stay;
+	// Tarkov SFX plays Tarkov's close or distant clip by distance, Gunsmith Docs sfx.md)
+	bool m_skip_impact_sound = false;
 
 	//параметры отрисовки трассеров
 	float m_fTracerWidth;
