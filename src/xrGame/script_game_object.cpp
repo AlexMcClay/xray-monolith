@@ -495,6 +495,13 @@ Fvector CScriptGameObject::weapon_fire_point()
 	return w ? w->get_CurrentFirePoint() : Fvector().set(0.f, 0.f, 0.f);
 }
 
+// The weapon's shell ejection point (same space as weapon_fire_point), e.g. for smoke out of the ejection port
+Fvector CScriptGameObject::weapon_shell_point()
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return w ? w->get_LastSP() : Fvector().set(0.f, 0.f, 0.f);
+}
+
 bool CScriptGameObject::weapon_hud_mode()
 {
 	CWeapon* w = smart_cast<CWeapon*>(&object());

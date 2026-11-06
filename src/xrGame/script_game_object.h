@@ -1133,6 +1133,7 @@ public:
 	LPCSTR weapon_particles(LPCSTR kind);
 	void set_weapon_light(float r, float g, float b, float range, float time);
 	Fvector weapon_fire_point();
+	Fvector weapon_shell_point();
 	bool weapon_hud_mode();
 	void set_owner_spread(bool on);
 	void set_spread_k(float k);
