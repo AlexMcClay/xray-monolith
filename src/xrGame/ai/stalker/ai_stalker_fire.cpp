@@ -1359,11 +1359,9 @@ bool CAI_Stalker::can_cry_enemy_is_wounded() const
 	case StalkerDecisionSpace::eWorldOperatorKillWoundedEnemy:
 	case StalkerDecisionSpace::eWorldOperatorCriticallyWounded:
 		return (false);
-	default: NODEFAULT;
+	default:
+		return (true);
 	}
-#ifdef DEBUG
-	return							(false);
-#endif // DEBUG
 }
 
 void CAI_Stalker::on_critical_wound_initiator(const CAI_Stalker* critically_wounded)
