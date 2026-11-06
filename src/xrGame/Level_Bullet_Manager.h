@@ -191,6 +191,8 @@ protected:
 	// the bullet_on_impact script set handled = true: this event's particles, decal and sound are skipped
 	// (FireShotmark), the hit itself is not (Gunsmith Docs vfx.md, E7)
 	bool m_skip_impact_fx = false;
+	// bullet_on_impact skip_particles = true: a script plays this hit's particles itself (decal and sound stay)
+	bool m_skip_impact_particles = false;
 
 	//параметры отрисовки трассеров
 	float m_fTracerWidth;

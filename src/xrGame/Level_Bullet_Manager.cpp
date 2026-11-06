@@ -1289,14 +1289,18 @@ void CBulletManager::CommitEvents() // @ the start of frame
 					table["impact"] = impacts[E.hit_result.impact < 3 ? E.hit_result.impact : 2];
 					table["start_speed"] = bullet->max_speed;
 					table["handled"] = false;
+					table["skip_particles"] = false;
 					funct(table);
 					::luabind::object h = table["handled"];
 					m_skip_impact_fx = h.is_valid() && h.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(h);
+					::luabind::object sp = table["skip_particles"];
+					m_skip_impact_particles = sp.is_valid() && sp.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(sp);
 				}
 
 				if (E.dynamic) DynamicObjectHit(E);
 				else StaticObjectHit(E);
 				m_skip_impact_fx = false;
+				m_skip_impact_particles = false;
 			}
 
 			break;
