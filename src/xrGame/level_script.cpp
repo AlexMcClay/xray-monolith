@@ -1034,6 +1034,77 @@ void reset_cam_offset()
 		A->Cameras().ResetScriptOffset();
 }
 
+// a particle effect or group of this name exists (creating one that doesn't is fatal; Gunsmith Docs vfx.md, E5)
+bool particles_exist(LPCSTR name) { return ::Render->particles_Exists(name); }
+
+// One-shot lights (Gunsmith Docs vfx.md, E8): level.flash_light(pos, r, g, b, range, seconds[, shadow]) lights a
+// point light that fades out (brightness (1 - t)^2) and frees itself. At most 32 at once (the oldest goes first).
+// Updated by CLevel::OnFrame, cleared with the level.
+namespace
+{
+	struct SFlashLight
+	{
+		ref_light light;
+		Fcolor color;
+		u32 start;
+		u32 duration;
+	};
+	xr_vector<SFlashLight> g_flash_lights;
+	const u32 g_flash_lights_max = 32;
+}
+
+void flash_light(const Fvector& pos, float r, float g, float b, float range, float seconds, bool shadow)
+{
+	if (seconds <= 0.f || range <= 0.f)
+		return;
+	if (g_flash_lights.size() >= g_flash_lights_max)
+		g_flash_lights.erase(g_flash_lights.begin());
+	SFlashLight f;
+	f.light = ::Render->light_create();
+	f.light->set_type(IRender_Light::POINT);
+	f.light->set_shadow(shadow);
+	f.light->set_position(pos);
+	f.light->set_range(range);
+	f.color.set(r, g, b, 1.f);
+	f.light->set_color(r, g, b);
+	f.light->set_active(true);
+	f.start = Device.dwTimeGlobal;
+	f.duration = _max(u32(seconds * 1000.f), u32(1));
+	g_flash_lights.push_back(f);
+}
+
+void flash_light(const Fvector& pos, float r, float g, float b, float range, float seconds)
+{
+	flash_light(pos, r, g, b, range, seconds, false);
+}
+
+void flash_lights_update()
+{
+	for (u32 i = 0; i < g_flash_lights.size();)
+	{
+		SFlashLight& f = g_flash_lights[i];
+		const u32 age = Device.dwTimeGlobal - f.start;
+		if (age >= f.duration)
+		{
+			f.light->set_active(false);
+			g_flash_lights.erase(g_flash_lights.begin() + i);
+			continue;
+		}
+		float k = 1.f - float(age) / float(f.duration);
+		k *= k;
+		f.light->set_color(f.color.r * k, f.color.g * k, f.color.b * k);
+		++i;
+	}
+}
+
+void flash_lights_clear()
+{
+	for (SFlashLight& f : g_flash_lights)
+		if (f.light)
+			f.light->set_active(false);
+	g_flash_lights.clear();
+}
+
 // tan(HUD FOV / 2) / tan(world FOV / 2), last frame's: a small angle in the HUD's projection shows on screen as
 // angle / ratio would in the world's, and a barrel turned by it fires that far off (Device.hud_to_world)
 #include "../xrEngine/IInputReceiver.h"
@@ -2837,6 +2908,9 @@ void CLevel::script_register(lua_State* L)
 			def("remove_cam_effector", &remove_cam_effector),
 			def("set_cam_offset", &set_cam_offset),
 			def("reset_cam_offset", &reset_cam_offset),
+			def("flash_light", ((void (*)(const Fvector&, float, float, float, float, float))&flash_light)),
+			def("flash_light", ((void (*)(const Fvector&, float, float, float, float, float, bool))&flash_light)),
+			def("particles_exist", &particles_exist),
 			def("hud_fov_ratio", &hud_fov_ratio),
 			def("set_mouse_sens_scale", &set_mouse_sens_scale),
 			def("get_mouse_sens_scale", &get_mouse_sens_scale),

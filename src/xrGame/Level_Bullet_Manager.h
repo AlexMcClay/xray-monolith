@@ -13,6 +13,7 @@ struct SBullet_Hit
 {
 	float power; // power          * cartridge
 	float impulse; // impulse        * cartridge
+	u8 impact = 2; // what the bullet did (ObjectHit): 0 ricochet, 1 stopped in it, 2 went through
 };
 
 //структура, описывающая пулю и ее свойства в полете
@@ -187,6 +188,9 @@ protected:
 	float m_fCollisionEnergyMin;
 	//сколькол процентов энергии устанется у пули при любом столкновении
 	float m_fCollisionEnergyMax;
+	// the bullet_on_impact script set handled = true: this event's particles, decal and sound are skipped
+	// (FireShotmark), the hit itself is not (Gunsmith Docs vfx.md, E7)
+	bool m_skip_impact_fx = false;
 
 	//параметры отрисовки трассеров
 	float m_fTracerWidth;

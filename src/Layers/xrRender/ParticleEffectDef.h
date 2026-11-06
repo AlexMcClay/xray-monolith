@@ -74,6 +74,12 @@ namespace PS
 			dfFaceAlign = (1 << 21),
 			dfCulling = (1 << 22),
 			dfCullCCW = (1 << 23),
+			// draw an animated flipbook's next frame over the current one, cross-faded by the frame's fraction
+			// (alpha split between the two; Gunsmith Docs vfx.md, E3)
+			dfFrameBlend = (1 << 24),
+			// the effect wants the object lighting probe (ROS: sky and sun visibility, hemi cube) for its shader
+			// (CParticlesObject turns it on; E1)
+			dfLit = (1 << 25),
 		};
 
 		shared_str m_Name;

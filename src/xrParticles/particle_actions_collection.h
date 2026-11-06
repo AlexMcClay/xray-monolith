@@ -235,6 +235,7 @@ namespace PAPI
 		pDomain color; // Choose a color in this domain.
 		float alpha; // Alpha of all generated particles
 		float particle_rate; // Particles to generate per unit time
+		float rate_scale = 1.0f; // this instance's emission rate multiplier (script: particles_object:set_rate_scale)
 		float age; // Initial age of the particles
 		float age_sigma; // St. dev. of initial age of the particles
 		pVector parent_vel;

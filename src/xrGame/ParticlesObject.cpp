@@ -35,6 +35,8 @@ void CParticlesObject::Init(LPCSTR p_name, IRender_Sector* S, BOOL bAutoRemove)
 		IParticleCustom* V = smart_cast<IParticleCustom*>(renderable.visual);
 		VERIFY(V);
 		time_limit = V->GetTimeLimit();
+		// effects with a lit shader get the object lighting probe: sky and sun visibility at the effect (E1)
+		renderable.pROS_Allowed = V->IsLit();
 	}
 	else
 	{

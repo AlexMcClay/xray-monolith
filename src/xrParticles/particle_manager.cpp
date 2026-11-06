@@ -33,6 +33,18 @@ ParticleActions* CParticleManager::GetActionListPtr(int a_list_num)
 	return m_alist_vec[a_list_num];
 }
 
+void CParticleManager::SetSourceRateScale(int alist_id, float k)
+{
+	ParticleActions* pa = GetActionListPtr(alist_id);
+	if (!pa)
+		return;
+	pa->lock();
+	for (PAVecIt it = pa->begin(); it != pa->end(); ++it)
+		if (*it && (*it)->type == PASourceID)
+			static_cast<PASource*>(*it)->rate_scale = k;
+	pa->unlock();
+}
+
 // create
 int CParticleManager::CreateEffect(u32 max_particles)
 {

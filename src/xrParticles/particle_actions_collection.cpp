@@ -1398,10 +1398,11 @@ void PASource::Execute(ParticleEffect* effect, const float dt, float& tm_max)
 {
 	if (m_Flags.is(flSilent)) return;
 
-	int rate = int(floor(particle_rate * dt));
+	const float scaled_rate = particle_rate * rate_scale;
+	int rate = int(floor(scaled_rate * dt));
 
 	// Dither the fraction particle in time.
-	if (drand48() < particle_rate * dt - float(rate))
+	if (drand48() < scaled_rate * dt - float(rate))
 		rate++;
 
 	// Don't emit more than it can hold.

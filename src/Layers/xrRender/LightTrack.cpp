@@ -364,6 +364,11 @@ void CROS_impl::update_smooth(IRenderable* O)
 
 	float l_f = Device.fTimeDelta * ps_r2_lt_smooth;
 	clamp(l_f, 0.f, 1.f);
+	if (!smooth_snapped)
+	{
+		smooth_snapped = true;
+		l_f = 1.f;
+	}
 	float l_i = 1.f - l_f;
 	hemi_smooth = hemi_value * l_f + hemi_smooth * l_i;
 	sun_smooth = sun_value * l_f + sun_smooth * l_i;

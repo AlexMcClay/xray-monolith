@@ -284,9 +284,12 @@ CLevel::CLevel() :
 }
 
 extern CAI_Space* g_ai_space;
+extern void flash_lights_update(); // level_script.cpp (E8)
+extern void flash_lights_clear();
 
 CLevel::~CLevel()
 {
+	flash_lights_clear(); // the one-shot lights belong to this level's renderer (E8)
 	//crash_saving::save_impl = nullptr; // CLevel not available, disable crash save
 	xr_delete(g_player_hud);
 	gunsmith::CPreview::destroy();
@@ -975,9 +978,11 @@ void CLevel::MakeReconnect()
 	}
 }
 
+
 void CLevel::OnFrame()
 {
 	PROF_EVENT("CLevel::OnFrame()");
+	flash_lights_update();
 
 #ifdef DEBUG_MEMORY_MANAGER
     debug_memory_guard __guard__;

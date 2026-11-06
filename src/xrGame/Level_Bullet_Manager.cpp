@@ -1282,11 +1282,21 @@ void CBulletManager::CommitEvents() // @ the start of frame
 						bullet->life_time,
 						E.R.element
 					);
+					// Gunsmith Docs vfx.md, E7: the surface normal, what the bullet did there (ricochet, stop,
+					// pierce), its launch speed; a handler sets handled = true to draw the impact itself
+					table["normal"] = E.normal;
+					static const char* impacts[] = {"ricochet", "stop", "pierce"};
+					table["impact"] = impacts[E.hit_result.impact < 3 ? E.hit_result.impact : 2];
+					table["start_speed"] = bullet->max_speed;
+					table["handled"] = false;
 					funct(table);
+					::luabind::object h = table["handled"];
+					m_skip_impact_fx = h.is_valid() && h.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(h);
 				}
 
 				if (E.dynamic) DynamicObjectHit(E);
 				else StaticObjectHit(E);
+				m_skip_impact_fx = false;
 			}
 
 			break;

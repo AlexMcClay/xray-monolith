@@ -41,7 +41,8 @@ CPS_Instance::~CPS_Instance()
 //----------------------------------------------------
 void CPS_Instance::shedule_Update(u32 dt)
 {
-	if (renderable.pROS) ::Render->ros_destroy(renderable.pROS); //. particles doesn't need ROS
+	// particles don't need ROS, except lit ones (CParticlesObject turns pROS_Allowed on for them; E1)
+	if (renderable.pROS && !renderable.pROS_Allowed) ::Render->ros_destroy(renderable.pROS);
 
 	ISheduled::shedule_Update(dt);
 	m_iLifeTime -= dt;

@@ -1290,7 +1290,12 @@ void CActor::UpdateCL()
 	Cameras().hud_camera_Matrix(trans);
 
 	if (IsFocused())
+	{
 		g_player_hud->update(trans);
+		// the muzzle flame, shot light and fire point at this frame's HUD pose (Gunsmith Docs vfx.md)
+		if (CWeapon* wpn = smart_cast<CWeapon*>(inventory().ActiveItem()))
+			wpn->RefreshHudFireEffects();
+	}
 
 	if (psActorFlags.test(AF_MULTI_ITEM_PICKUP))
 		m_bPickupMode = false;

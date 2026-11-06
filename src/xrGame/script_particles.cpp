@@ -9,6 +9,8 @@
 #include "stdafx.h"
 #include "script_particles.h"
 #include "../xrEngine/objectanimator.h"
+#include "../Include/xrRender/RenderVisual.h"
+#include "../Include/xrRender/ParticleCustom.h"
 
 CScriptParticlesCustom::CScriptParticlesCustom(CScriptParticles* owner, LPCSTR caParticlesName): CParticlesObject(
 	caParticlesName,FALSE, true)
@@ -161,6 +163,41 @@ void CScriptParticles::SetOrientation(float yaw, float pitch, float roll)
 	matrix.translate_over(m_transform.c);
 	m_transform.set(matrix);
 	m_particles->SetXFORM(m_transform);
+}
+
+static IParticleCustom* script_particles_visual(CScriptParticlesCustom* p)
+{
+	return p ? smart_cast<IParticleCustom*>(p->renderable.visual) : nullptr;
+}
+
+void CScriptParticles::SetColor(float r, float g, float b, float a)
+{
+	if (IParticleCustom* V = script_particles_visual(m_particles))
+		V->SetColorScale(r, g, b, a);
+}
+
+void CScriptParticles::SetSizeScale(float k)
+{
+	if (IParticleCustom* V = script_particles_visual(m_particles))
+		V->SetSizeScale(k);
+}
+
+void CScriptParticles::SetTimeScale(float k)
+{
+	if (IParticleCustom* V = script_particles_visual(m_particles))
+		V->SetTimeScale(k);
+}
+
+void CScriptParticles::SetRateScale(float k)
+{
+	if (IParticleCustom* V = script_particles_visual(m_particles))
+		V->SetRateScale(k);
+}
+
+u32 CScriptParticles::ParticlesCount() const
+{
+	IParticleCustom* V = script_particles_visual(m_particles);
+	return V ? V->ParticlesCount() : 0;
 }
 
 void CScriptParticles::SetHudMode(bool bHudMode)

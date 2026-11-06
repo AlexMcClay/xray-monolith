@@ -340,6 +340,8 @@ public:
 	virtual void models_PrefetchOne(LPCSTR name, bool assert = true) = 0;
 	virtual void models_Clear(BOOL b_complete) = 0; 
 	virtual bool models_Exists(LPCSTR name) = 0;
+	// a particle effect or group of this name is loaded (particles.xr or loose .pe/.pg)
+	virtual bool particles_Exists(LPCSTR name) = 0;
 	
 	//  antglobes: Sun Values
 	virtual Fvector GetSunPosition() { static Fvector default_pos; return default_pos; };

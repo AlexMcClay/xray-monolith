@@ -166,6 +166,12 @@ namespace PS
 		}
 
 		virtual u32 ParticlesCount();
+
+		virtual BOOL IsLit();
+		virtual void SetColorScale(float r, float g, float b, float a);
+		virtual void SetSizeScale(float k);
+		virtual void SetTimeScale(float k);
+		virtual void SetRateScale(float k);
 	};
 }
 
