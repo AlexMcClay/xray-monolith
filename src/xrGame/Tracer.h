@@ -21,5 +21,6 @@ public:
 	            float width,
 	            u8 colorID,
 	            float speed,
-	            bool bActor);
+	            bool bActor,
+	            float alpha_k = 1.f);
 };

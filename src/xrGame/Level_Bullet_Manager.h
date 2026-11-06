@@ -198,6 +198,13 @@ protected:
 	float m_fTracerWidth;
 	float m_fTracerLengthMax;
 	float m_fTracerLengthMin;
+	// optional [bullet_manager] keys (0 = off, vanilla): the width grows over the bullet's first
+	// tracer_width_grow_time seconds (1 - (1 - t)^2); the length is at most speed x tracer_length_speed_k
+	// (seconds of flight); the tracer fades out from tracer_fade_start and is gone at tracer_life seconds
+	float m_fTracerWidthGrow = 0.f;
+	float m_fTracerLengthSpeedK = 0.f;
+	float m_fTracerLife = 0.f;
+	float m_fTracerFadeStart = 0.f;
 protected:
 	void PlayWhineSound(SBullet* bullet, CObject* object, const Fvector& pos);
 	void PlayExplodePS(const Fmatrix& xf);
