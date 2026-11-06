@@ -113,6 +113,10 @@ void CWeapon::FireTrace(const Fvector& P, const Fvector& D)
 		{
 			fire_disp = tmp_actor->GetFireDispertion();
 		}
+		else if (!m_owner_spread && H_Parent() && smart_cast<CActor*>(H_Parent()))
+		{
+			fire_disp = GetBaseDispersion(l_cartridge.param_s.kDisp); // the gun's own (set_owner_spread(false))
+		}
 		else
 		{
 			fire_disp = GetFireDispersion(true);
@@ -122,6 +126,20 @@ void CWeapon::FireTrace(const Fvector& P, const Fvector& D)
 
 	bool SendHit = SendHitAllowed(H_Parent());
 	//выстерлить пулю (с учетом возможной стрельбы дробью)
+	if (l_cartridge.param_s.buckShot > 1 && m_pellet_spread >= 0.f)
+	{
+		// one draw for the charge, each pellet around it (set_pellet_spread; Tarkov's CreateMultiProjectileShot)
+		Fvector shot;
+		random_dir(shot, D, fire_disp);
+		for (int i = 0; i < l_cartridge.param_s.buckShot; ++i)
+		{
+			Fvector u, pellet;
+			u.random_dir();
+			pellet.mul(shot, 100.f).mad(u, m_pellet_spread).normalize();
+			FireBullet(P, pellet, 0.f, l_cartridge, H_Parent()->ID(), ID(), SendHit, iAmmoElapsed);
+		}
+	}
+	else
 	for (int i = 0; i < l_cartridge.param_s.buckShot; ++i)
 	{
 		FireBullet(P, D, fire_disp, l_cartridge, H_Parent()->ID(), ID(), SendHit, iAmmoElapsed);

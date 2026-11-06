@@ -1036,6 +1036,20 @@ void reset_cam_offset()
 
 // tan(HUD FOV / 2) / tan(world FOV / 2), last frame's: a small angle in the HUD's projection shows on screen as
 // angle / ratio would in the world's, and a barrel turned by it fires that far off (Device.hud_to_world)
+#include "../xrEngine/IInputReceiver.h"
+
+// The actor's mouse look speed x this (psMouseSensScale, 1 by default), for a script's per-sight sensitivity
+// (Gunsmith Docs research/38); not saved
+void set_mouse_sens_scale(float k)
+{
+	psMouseSensScale = _max(0.01f, k);
+}
+
+float get_mouse_sens_scale()
+{
+	return psMouseSensScale;
+}
+
 float hud_fov_ratio()
 {
 	const float hud = Device.mProjectHud._22;
@@ -2824,6 +2838,8 @@ void CLevel::script_register(lua_State* L)
 			def("set_cam_offset", &set_cam_offset),
 			def("reset_cam_offset", &reset_cam_offset),
 			def("hud_fov_ratio", &hud_fov_ratio),
+			def("set_mouse_sens_scale", &set_mouse_sens_scale),
+			def("get_mouse_sens_scale", &get_mouse_sens_scale),
 			def("set_cam_effector_factor", &set_cam_effector_factor),
 			def("get_cam_effector_factor", &get_cam_effector_factor),
 			def("get_cam_effector_length", &get_cam_effector_length),

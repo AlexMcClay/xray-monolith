@@ -30,7 +30,7 @@ float CWeapon::GetFireDispersion(bool with_cartridge, bool for_crosshair)
 float CWeapon::GetBaseDispersion(float cartridge_k)
 {
 	return m_gs_stats.apply(gunsmith::eStatFireDispersion, fireDispersionBase) * cur_silencer_koef.fire_dispersion *
-		cartridge_k * GetConditionDispersionFactor();
+		cartridge_k * GetConditionDispersionFactor() * m_script_spread_k;
 }
 
 //текущая дисперсия (в радианах) оружия с учетом используемого патрона
