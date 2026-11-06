@@ -90,6 +90,8 @@ private:
 	void static_wm_destroy(static_wallmark* W);
 
 	void skeleton_wm_render(intrusive_ptr<CSkeletonWallmark>, FVF::LIT* & V);
+
+	void render_slot(wm_slot* slot, float ssaCLIP, BOOL bAllPasses);
 public:
 	CWallmarksEngine();
 	~CWallmarksEngine();

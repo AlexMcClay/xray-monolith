@@ -868,6 +868,20 @@ void CRenderTarget::phase_wallmarks()
 	RCache.set_ColorWriteEnable(D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE);
 }
 
+// Decals with a G-buffer shader (Lua blender :wmark_gbuffer(true)): target 0 = rt_Color (albedo RGB, gloss A),
+// target 1 = rt_Position (packed normal XY, depth Z, hemi/material W). The shader's own per-target write masks
+// (dx10color_write_enable_rt) decide what it touches; it must leave depth and hemi/material alone.
+void CRenderTarget::phase_wallmarks_gbuffer()
+{
+	if (!RImplementation.o.dx10_msaa)
+		u_setrt(rt_Color, rt_Position, NULL, HW.pBaseZB);
+	else
+		u_setrt(rt_Color, rt_Position, NULL, rt_MSAADepth->pZRT);
+	// Stencil	- draw only where stencil >= 0x1 (as phase_wallmarks)
+	RCache.set_Stencil(TRUE, D3DCMP_LESSEQUAL, 0x01, 0xff, 0x00);
+	RCache.set_CullMode(CULL_CCW);
+}
+
 void CRenderTarget::phase_combine_volumetric()
 {
 	PIX_EVENT(phase_combine_volumetric);

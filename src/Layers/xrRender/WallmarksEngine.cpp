@@ -489,20 +489,37 @@ ICF void BeginStream(ref_geom hGeom, u32& w_offset, FVF::LIT*& w_verts, FVF::LIT
 	w_start = w_verts;
 }
 
+// bAllPasses: draw the batch once per pass of the shader (G-buffer decals: e.g. albedo + normal, then gloss);
+// vanilla decal shaders are drawn with their first pass only, as before
 ICF void FlushStream(ref_geom hGeom, ref_shader shader, u32& w_offset, FVF::LIT*& w_verts, FVF::LIT*& w_start,
-                     BOOL bSuppressCull)
+                     BOOL bSuppressCull, BOOL bAllPasses = FALSE)
 {
 	u32 w_count = u32(w_verts - w_start);
 	RCache.Vertex.Unlock(w_count, hGeom->vb_stride);
 	if (w_count)
 	{
-		RCache.set_Shader(shader);
-		RCache.set_Geometry(hGeom);
-		if (bSuppressCull) RCache.set_CullMode(CULL_NONE);
-		RCache.Render(D3DPT_TRIANGLELIST, w_offset, w_count / 3);
-		if (bSuppressCull) RCache.set_CullMode(CULL_CCW);
+		u32 passes = bAllPasses ? shader->E[0]->passes.size() : 1;
+		for (u32 pass = 0; pass < passes; pass++)
+		{
+			RCache.set_Shader(shader, pass);
+			RCache.set_Geometry(hGeom);
+			if (bSuppressCull) RCache.set_CullMode(CULL_NONE);
+			RCache.Render(D3DPT_TRIANGLELIST, w_offset, w_count / 3);
+			if (bSuppressCull) RCache.set_CullMode(CULL_CCW);
+		}
 		Device.Statistic->RenderDUMP_WMT_Count += w_count / 3;
 	}
+}
+
+// Does this slot's shader write the G-buffer (Lua blender :wmark_gbuffer(true))? Only R3/R4 bind the G-buffer
+// for decals; elsewhere such a shader is drawn like any other decal.
+static bool slot_gbuffer(CWallmarksEngine::wm_slot* slot)
+{
+#if defined(USE_DX10) || defined(USE_DX11)
+	return slot->shader->E[0]->flags.bWmarkGBuffer ? true : false;
+#else
+	return false;
+#endif
 }
 
 void CWallmarksEngine::Render()
@@ -529,12 +546,49 @@ void CWallmarksEngine::Render()
 
 	lock.Enter(); // Physics may add wallmarks in parallel with rendering
 
+	// albedo-only decals first (vanilla), then the G-buffer ones with rt_Position bound as a second target
+	bool has_gbuffer = false;
 	for (WMSlotVecIt slot_it = marks.begin(); slot_it != marks.end(); slot_it++)
+	{
+		if (slot_gbuffer(*slot_it))
+		{
+			has_gbuffer = true;
+			continue;
+		}
+		render_slot(*slot_it, ssaCLIP, FALSE);
+	}
+#if defined(USE_DX10) || defined(USE_DX11)
+	if (has_gbuffer)
+	{
+		RImplementation.Target->phase_wallmarks_gbuffer();
+		for (WMSlotVecIt slot_it = marks.begin(); slot_it != marks.end(); slot_it++)
+			if (slot_gbuffer(*slot_it))
+				render_slot(*slot_it, ssaCLIP, TRUE);
+		RImplementation.Target->phase_wallmarks(); // back to rt_Color only for the level's own wallmarks
+	}
+#endif
+
+	lock.Leave(); // Physics may add wallmarks in parallel with rendering
+
+	// Level-wmarks
+	RImplementation.r_dsgraph_render_wmarks();
+	Device.Statistic->RenderDUMP_WM.End();
+
+	// Projection
+	Device.mView = mSavedView;
+	Device.mProject._43 = _43;
+	RCache.set_xform_view(Device.mView);
+	RCache.set_xform_project(Device.mProject);
+}
+
+// Draw one slot (all marks with one shader): its static marks, then the skeleton marks queued this frame.
+// Also frees static marks that faded out. bAllPasses: draw every pass of the shader (G-buffer decals).
+void CWallmarksEngine::render_slot(wm_slot* slot, float ssaCLIP, BOOL bAllPasses)
+{
 	{
 		u32 w_offset;
 		FVF::LIT *w_verts, *w_start;
 		BeginStream(hGeom, w_offset, w_verts, w_start);
-		wm_slot* slot = *slot_it;
 		// static wallmarks
 		for (StaticWMVecIt w_it = slot->static_items.begin(); w_it != slot->static_items.end();)
 		{
@@ -549,7 +603,7 @@ void CWallmarksEngine::Render()
 					u32 w_count = u32(w_verts - w_start);
 					if ((w_count + W->verts.size()) >= (MAX_TRIS * 3))
 					{
-						FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,FALSE);
+						FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,FALSE, bAllPasses);
 						BeginStream(hGeom, w_offset, w_verts, w_start);
 					}
 					static_wm_render(W, w_verts);
@@ -576,7 +630,7 @@ void CWallmarksEngine::Render()
 			}
 		}
 		// Flush stream
-		FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,FALSE); //. remove line if !(suppress cull needed)
+		FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,FALSE, bAllPasses); //. remove line if !(suppress cull needed)
 		BeginStream(hGeom, w_offset, w_verts, w_start);
 
 		// dynamic wallmarks
@@ -605,7 +659,7 @@ void CWallmarksEngine::Render()
 			u32 w_count = u32(w_verts - w_start);
 			if ((w_count + W->VCount()) >= (MAX_TRIS * 3))
 			{
-				FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start, TRUE);
+				FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start, TRUE, bAllPasses);
 				BeginStream(hGeom, w_offset, w_verts, w_start);
 			}
 
@@ -626,18 +680,6 @@ void CWallmarksEngine::Render()
 		}
 		slot->skeleton_items.clear();
 		// Flush stream
-		FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,TRUE);
+		FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,TRUE, bAllPasses);
 	}
-
-	lock.Leave(); // Physics may add wallmarks in parallel with rendering
-
-	// Level-wmarks
-	RImplementation.r_dsgraph_render_wmarks();
-	Device.Statistic->RenderDUMP_WM.End();
-
-	// Projection
-	Device.mView = mSavedView;
-	Device.mProject._43 = _43;
-	RCache.set_xform_view(Device.mView);
-	RCache.set_xform_project(Device.mProject);
 }
