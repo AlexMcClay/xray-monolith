@@ -16,6 +16,9 @@ struct SEnumVerticesCallback;
 
 class IRenderable;
 
+// most triangles one skeleton wallmark may have: it must fit the wallmark engine's stream (MAX_TRIS, 16384) whole
+const u32 SKELETON_WALLMARK_MAX_FACES = 8192;
+
 #pragma warning(push)
 #pragma warning(disable:4275)
 class CSkeletonWallmark : public intrusive_base // 4+4+4+12+4+16+16 = 60 + 4 = 64 + 4 = 68

@@ -598,7 +598,8 @@ void CWallmarksEngine::render_slot(wm_slot* slot, float ssaCLIP, BOOL bAllPasses
 				Device.Statistic->RenderDUMP_WMS_Count++;
 				float dst = Device.vCameraPosition.distance_to_sqr(W->bounds.P);
 				float ssa = W->bounds.R * W->bounds.R / dst;
-				if (ssa >= ssaCLIP)
+				// (a mark bigger than the whole stream can't be drawn: it would write past its end)
+				if (ssa >= ssaCLIP && W->verts.size() < u32(MAX_TRIS * 3))
 				{
 					u32 w_count = u32(w_verts - w_start);
 					if ((w_count + W->verts.size()) >= (MAX_TRIS * 3))
@@ -654,6 +655,10 @@ void CWallmarksEngine::render_slot(wm_slot* slot, float ssaCLIP, BOOL bAllPasses
 				VERIFY(W->used_in_render == Device.dwFrame);
 			}
 #endif
+
+			// a mark bigger than the whole stream can't be drawn (it would write past its end)
+			if (W->VCount() >= u32(MAX_TRIS * 3))
+				continue;
 
 			Device.Statistic->RenderDUMP_WMD_Count++;
 			u32 w_count = u32(w_verts - w_start);

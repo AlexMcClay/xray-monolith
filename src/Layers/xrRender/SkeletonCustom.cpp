@@ -832,6 +832,12 @@ intrusive_ptr<CSkeletonWallmark> CKinematics::AddWallmark(const Fmatrix* parent_
 			S->FillVertices(mView, *wm, normal, size, *b_it);
 	}
 
+	// A mark is drawn in one go into the wallmark engine's stream (16384 triangles): a big mark (an explosion's on a
+	// dense model, [wallmarks] dynamic_objects) could hold more and was written past the end of it, corrupting
+	// memory (crash, 7 Nov 2026). Such a mark, or one with no faces, isn't made.
+	if (wm->m_Faces.empty() || wm->m_Faces.size() > SKELETON_WALLMARK_MAX_FACES)
+		return intrusive_ptr<CSkeletonWallmark>();
+
 	wallmarks.push_back(wm);
 	return wm;
 }
