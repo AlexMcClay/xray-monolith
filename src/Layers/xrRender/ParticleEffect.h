@@ -50,6 +50,7 @@ namespace PS
 		float m_SizeK;
 		float m_TimeK;
 		float m_RateK;
+	float m_RateRandom = 1.f; // this play's random rate factor (dfRandomRate)
 		float m_TimeCarry;
 	protected:
 		BOOL SaveActionList(IWriter& F);

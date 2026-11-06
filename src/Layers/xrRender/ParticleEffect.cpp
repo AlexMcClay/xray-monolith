@@ -98,6 +98,12 @@ void CParticleEffect::Play()
 {
 	m_RT_Flags.set(flRT_DefferedStop,FALSE);
 	m_RT_Flags.set(flRT_Playing,TRUE);
+	// a random emission amount per play (dfRandomRate): the burst's count between its min and max
+	if (m_Def && m_Def->m_Flags.is(CPEDef::dfRandomRate))
+	{
+		m_RateRandom = ::Random.randF(m_Def->m_RateRandom.x, m_Def->m_RateRandom.y);
+		ParticleManager()->SetSourceRateScale(m_HandleActionList, m_RateK * m_RateRandom);
+	}
 	ParticleManager()->PlayEffect(m_HandleEffect, m_HandleActionList);
 }
 
@@ -154,7 +160,7 @@ void CParticleEffect::SetTimeScale(float k)
 void CParticleEffect::SetRateScale(float k)
 {
 	m_RateK = _max(k, 0.f);
-	ParticleManager()->SetSourceRateScale(m_HandleActionList, m_RateK);
+	ParticleManager()->SetSourceRateScale(m_HandleActionList, m_RateK * m_RateRandom);
 }
 
 void CParticleEffect::CopyScales(const CParticleEffect* from)

@@ -346,6 +346,11 @@ BOOL CPEDef::Load2(CInifile& ini)
 	{
 		m_fSizeGrowth = ini.r_float("size_growth", "value");
 	}
+
+	if (m_Flags.is(dfRandomRate) && ini.section_exist("rate_random"))
+	{
+		m_RateRandom = ini.r_fvector2("rate_random", "value");
+	}
 	//#ifdef _EDITOR
 	if (pCreateEAction)
 	{
