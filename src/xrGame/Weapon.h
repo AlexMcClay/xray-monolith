@@ -607,6 +607,12 @@ public:
 		return m_current_firedeps.vLastFPSilencer;
 	}
 
+	virtual bool get_LightDir(Fvector& d)
+	{
+		d = get_LastFD();
+		return true;
+	}
+
 	IC const Fvector& get_LastFD()
 	{
 		UpdateFireDependencies();

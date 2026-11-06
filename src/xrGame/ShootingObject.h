@@ -212,6 +212,10 @@ protected:
 	// the shot light is a HUD-mode light (lights the first-person hands and gun, like a hud_mode torch); a weapon
 	// sets it from GetHUDmode() before rendering the light
 	bool m_light_hud = false;
+	// shot light moved this far (m) along the fire direction from the fire point, in the world / in first person
+	// (game_object:set_weapon_light_offset); 0 = at the fire point, as vanilla. Not saved.
+	float m_light_forward = 0.f;
+	float m_light_forward_hud = 0.f;
 	//включение подсветки во время выстрела
 	bool m_bLightShotEnabled;
 protected:
@@ -232,6 +236,8 @@ protected:
 protected:
 	//функции родительского объекта
 	virtual const Fvector& get_CurrentFirePoint() = 0;
+	// the fire direction in the same space as get_CurrentFirePoint, for the shot light's offset; false: none
+	virtual bool get_LightDir(Fvector& d) { return false; }
 	virtual const Fmatrix& get_ParticlesXFORM() = 0;
 
 	virtual void ForceUpdateFireParticles()
@@ -304,6 +310,11 @@ public:
 	LPCSTR GetParticlesName(LPCSTR kind) const;
 	// shot light colour, range (m), time (s); range <= 0 or time <= 0 clears the override
 	void SetLightOverride(float r, float g, float b, float range, float time);
+	void SetLightOffset(float forward, float forward_hud)
+	{
+		m_light_forward = forward;
+		m_light_forward_hud = forward_hud;
+	}
 	bool ShotLightEnabled() const { return m_bLightShotEnabled || m_light_override; }
 	virtual void DumpActiveParams(shared_str const& section_name, CInifile& dst_ini) const;
 };

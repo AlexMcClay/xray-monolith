@@ -496,7 +496,12 @@ void CShootingObject::RenderLight()
 {
 	if (light_render && light_time > 0)
 	{
-		Light_Render(get_CurrentFirePoint());
+		Fvector P = get_CurrentFirePoint();
+		const float forward = m_light_hud ? m_light_forward_hud : m_light_forward;
+		Fvector d;
+		if (forward != 0.f && get_LightDir(d))
+			P.mad(d, forward);
+		Light_Render(P);
 	}
 }
 

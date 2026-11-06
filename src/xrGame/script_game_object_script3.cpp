@@ -578,6 +578,7 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		.def("weapon_fire_point", SAFE_WRAP(&CScriptGameObject::weapon_fire_point))
 		.def("weapon_shell_point", SAFE_WRAP(&CScriptGameObject::weapon_shell_point))
 		.def("weapon_fire_dir", SAFE_WRAP(&CScriptGameObject::weapon_fire_dir))
+		.def("set_weapon_light_offset", SAFE_WRAP(&CScriptGameObject::set_weapon_light_offset))
 		.def("weapon_hud_mode", SAFE_WRAP(&CScriptGameObject::weapon_hud_mode))
 		.def("cam_recoil", SAFE_WRAP(&CScriptGameObject::cam_recoil))
 		.def("set_owner_spread", SAFE_WRAP(&CScriptGameObject::set_owner_spread))

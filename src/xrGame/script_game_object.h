@@ -1135,6 +1135,7 @@ public:
 	Fvector weapon_fire_point();
 	Fvector weapon_shell_point();
 	Fvector weapon_fire_dir();
+	void set_weapon_light_offset(float forward, float forward_hud);
 	bool weapon_hud_mode();
 	void set_owner_spread(bool on);
 	void set_spread_k(float k);

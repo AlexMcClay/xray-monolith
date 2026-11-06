@@ -509,6 +509,14 @@ Fvector CScriptGameObject::weapon_fire_dir()
 	return w ? w->get_LastFD() : Fvector().set(0.f, 0.f, 1.f);
 }
 
+// Move a weapon's shot light along the fire direction: forward (m) for the world, forward_hud in first person,
+// e.g. off the hands; 0 = at the fire point (vanilla)
+void CScriptGameObject::set_weapon_light_offset(float forward, float forward_hud)
+{
+	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
+		w->SetLightOffset(forward, forward_hud);
+}
+
 bool CScriptGameObject::weapon_hud_mode()
 {
 	CWeapon* w = smart_cast<CWeapon*>(&object());

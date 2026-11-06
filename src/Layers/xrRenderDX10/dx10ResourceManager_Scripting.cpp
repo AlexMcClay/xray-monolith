@@ -146,6 +146,13 @@ public:
 		return *this;
 	}
 
+	// particle bloom: this element (l_special) is drawn into SSS's bloom emissive buffer after the forward pass
+	adopt_compiler& _o_bloom(bool E)
+	{
+		C->SH->flags.bBloom = E;
+		return *this;
+	}
+
 	adopt_compiler& _pass(LPCSTR vs, LPCSTR ps)
 	{
 		TryEndPass();
@@ -446,6 +453,7 @@ void CResourceManager::LS_Load()
 		.def("distort", &adopt_compiler::_o_distort, return_reference_to<1>())
 		.def("wmark", &adopt_compiler::_o_wmark, return_reference_to<1>())
 		.def("wmark_gbuffer", &adopt_compiler::_o_wmark_gbuffer, return_reference_to<1>())
+		.def("bloom", &adopt_compiler::_o_bloom, return_reference_to<1>())
 		.def("blend_alpha", &adopt_compiler::_blend_alpha, return_reference_to<1>())
 		.def("blend_op", &adopt_compiler::_blend_op, return_reference_to<1>())
 		.def("fog", &adopt_compiler::_fog, return_reference_to<1>())
