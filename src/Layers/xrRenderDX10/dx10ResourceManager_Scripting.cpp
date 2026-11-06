@@ -138,6 +138,14 @@ public:
 		return *this;
 	}
 
+	// decal (wallmark) shader that writes the G-buffer: drawn with rt_Color as target 0 and rt_Position
+	// (packed normal, depth, hemi/material) as target 1, every pass of it (WallmarksEngine::Render)
+	adopt_compiler& _o_wmark_gbuffer(bool E)
+	{
+		C->SH->flags.bWmarkGBuffer = E;
+		return *this;
+	}
+
 	adopt_compiler& _pass(LPCSTR vs, LPCSTR ps)
 	{
 		TryEndPass();
@@ -195,6 +203,37 @@ public:
 		return *this;
 	}
 
+	// write mask of one render target (0..3) of this pass; the others keep theirs. Different masks per target
+	// turn on independent blending (tss_def.cpp), so e.g. a decal can write albedo RGB to target 0 and only the
+	// packed normal (RG) to target 1
+	adopt_compiler& _dx10color_write_enable_rt(u32 rt, bool cR, bool cG, bool cB, bool cA)
+	{
+		static const u32 rs[4] = {D3DRS_COLORWRITEENABLE, D3DRS_COLORWRITEENABLE1, D3DRS_COLORWRITEENABLE2,
+			D3DRS_COLORWRITEENABLE3};
+		if (rt > 3) return *this;
+		u32 Mask = (cR ? D3DCOLORWRITEENABLE_RED : 0) | (cG ? D3DCOLORWRITEENABLE_GREEN : 0) |
+			(cB ? D3DCOLORWRITEENABLE_BLUE : 0) | (cA ? D3DCOLORWRITEENABLE_ALPHA : 0);
+		C->RS.SetRS(rs[rt], Mask);
+		return *this;
+	}
+
+	// alpha channel blend factors on their own (blend() sets both colour and alpha to the same factors);
+	// call after blend()
+	adopt_compiler& _blend_alpha(u32 abSRC, u32 abDST)
+	{
+		C->RS.SetRS(D3DRS_SRCBLENDALPHA, abSRC);
+		C->RS.SetRS(D3DRS_DESTBLENDALPHA, abDST);
+		return *this;
+	}
+
+	// blend operations for colour and alpha (blend_op.add / subtract / revsubtract / min / max); default add
+	adopt_compiler& _blend_op(u32 opColor, u32 opAlpha)
+	{
+		C->RS.SetRS(D3DRS_BLENDOP, opColor);
+		C->RS.SetRS(D3DRS_BLENDOPALPHA, opAlpha);
+		return *this;
+	}
+
 	adopt_compiler& _dx10Stencil(bool Enable, u32 Func, u32 Mask, u32 WriteMask, u32 Fail, u32 Pass, u32 ZFail)
 	{
 		C->r_Stencil(Enable, Func, Mask, WriteMask, Fail, Pass, ZFail);
@@ -232,6 +271,11 @@ public:
 #pragma warning( pop )
 
 class adopt_blend
+{
+public:
+};
+
+class adopt_blend_op
 {
 public:
 };
@@ -401,6 +445,9 @@ void CResourceManager::LS_Load()
 		.def("emissive", &adopt_compiler::_o_emissive, return_reference_to<1>())
 		.def("distort", &adopt_compiler::_o_distort, return_reference_to<1>())
 		.def("wmark", &adopt_compiler::_o_wmark, return_reference_to<1>())
+		.def("wmark_gbuffer", &adopt_compiler::_o_wmark_gbuffer, return_reference_to<1>())
+		.def("blend_alpha", &adopt_compiler::_blend_alpha, return_reference_to<1>())
+		.def("blend_op", &adopt_compiler::_blend_op, return_reference_to<1>())
 		.def("fog", &adopt_compiler::_fog, return_reference_to<1>())
 		.def("zb", &adopt_compiler::_ZB, return_reference_to<1>())
 		.def("blend", &adopt_compiler::_blend, return_reference_to<1>())
@@ -411,6 +458,7 @@ void CResourceManager::LS_Load()
 		//	For compatibility only
 		.def("dx10color_write_enable", &adopt_compiler::_dx10color_write_enable, return_reference_to<1>())
 		.def("color_write_enable", &adopt_compiler::_dx10color_write_enable, return_reference_to<1>())
+		.def("dx10color_write_enable_rt", &adopt_compiler::_dx10color_write_enable_rt, return_reference_to<1>())
 		.def("dx10texture", &adopt_compiler::_dx10texture, return_reference_to<1>())
 		.def("dx10stencil", &adopt_compiler::_dx10Stencil, return_reference_to<1>())
 		.def("dx10stencil_ref", &adopt_compiler::_dx10StencilRef, return_reference_to<1>())
@@ -436,6 +484,16 @@ void CResourceManager::LS_Load()
 			value("destcolor", int(D3DBLEND_DESTCOLOR)),
 			value("invdestcolor", int(D3DBLEND_INVDESTCOLOR)),
 			value("srcalphasat", int(D3DBLEND_SRCALPHASAT))
+		],
+
+		class_<adopt_blend_op>("blend_op")
+		.enum_("blend_op")
+		[
+			value("add", int(D3DBLENDOP_ADD)),
+			value("subtract", int(D3DBLENDOP_SUBTRACT)),
+			value("revsubtract", int(D3DBLENDOP_REVSUBTRACT)),
+			value("min", int(D3DBLENDOP_MIN)),
+			value("max", int(D3DBLENDOP_MAX))
 		],
 
 		class_<adopt_cmp_func>("cmp_func")

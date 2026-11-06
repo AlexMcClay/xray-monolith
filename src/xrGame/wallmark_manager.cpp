@@ -4,12 +4,66 @@
 #include "../xrEngine/gamemtllib.h"
 #include "../xrphysics/CalculateTriangle.h"
 #include "profiler.h"
+#include "entity_alive.h"
+#include "../Include/xrRender/Kinematics.h"
+#include "../xrEngine/xr_collide_form.h"
 #ifdef DEBUG
 #include "phdebug.h"
 #endif
 
 CWalmarkManager::CWalmarkManager()
 {
+}
+
+const SWallmarkGameSettings& wallmark_game_settings()
+{
+	static SWallmarkGameSettings s;
+	static bool loaded = false;
+	if (!loaded)
+	{
+		loaded = true;
+		s.dynamic_objects = !!READ_IF_EXISTS(pSettings, r_bool, "wallmarks", "dynamic_objects", false);
+		s.object_ttl = READ_IF_EXISTS(pSettings, r_float, "wallmarks", "object_ttl", 0.f);
+	}
+	return s;
+}
+
+float object_wallmark_ttl(CObject* O)
+{
+	float t = wallmark_game_settings().object_ttl;
+	if (t <= 0.f || !O || smart_cast<CEntityAlive*>(O))
+		return 0.f;
+	return t;
+}
+
+bool place_object_wallmark(CObject* O, IWallMarkArray* marks, const Fvector& start, const Fvector& dir, float range,
+                           float size, float ttl, bool ignore_opt, bool blood, u16 element)
+{
+	if (!O || !marks || marks->empty() || g_dedicated_server)
+		return false;
+	// no marks on the body we look through (as FireShotmark)
+	if (Level().CurrentEntity() && Level().CurrentEntity()->ID() == O->ID())
+		return false;
+	IKinematics* K = PKinematics(O->Visual());
+	if (!K)
+		return false;
+
+	// the hit bone's material, when the ray hit a bone (skeleton collision form)
+	if (element != u16(-1) && element < K->LL_BoneCount() && smart_cast<CCF_Skeleton*>(O->CFORM()))
+	{
+		SGameMtl* mtl = GMLib.GetMaterialByIdx(K->LL_GetData(element).game_mtl_idx);
+		if (mtl && mtl->Flags.is(SGameMtl::flSuppressWallmarks))
+			return false;
+		if (mtl && blood && !mtl->Flags.is(SGameMtl::flBloodmark))
+			return false;
+	}
+
+	Fvector p;
+	p.mad(start, dir, _max(range - 0.01f, 0.f));
+	if (!ttl)
+		ttl = object_wallmark_ttl(O);
+	::Render->add_SkeletonWallmark(&O->renderable.xform, K, marks, p, dir, size, ttl, ignore_opt);
+	return true;
 }
 
 CWalmarkManager::~CWalmarkManager()
@@ -185,6 +239,33 @@ void CWalmarkManager::StartWorkflow()
 		}
 		else
 			++_not_dist;
+	}
+
+	// [wallmarks] dynamic_objects: the blast also marks moving objects in reach that it can see
+	if (wallmark_game_settings().dynamic_objects)
+	{
+		xr_vector<CObject*> nearest;
+		Level().ObjectSpace.GetNearest(nearest, m_pos, m_trace_dist, m_owner);
+		u32 obj_count = 0;
+		for (u32 i = 0; i < nearest.size() && obj_count < max_wallmarks_count; i++)
+		{
+			CObject* O = nearest[i];
+			if (!PKinematics(O->Visual()))
+				continue;
+			Fvector center, dir;
+			O->Center(center);
+			dir.sub(center, m_pos);
+			float d = dir.magnitude();
+			if (d < EPS_L)
+				continue;
+			dir.div(d);
+			// a wall between the blast and the object
+			if (Level().ObjectSpace.RayTest(m_pos, dir, d, collide::rqtStatic, NULL, m_owner))
+				continue;
+			// start at the blast: the mark lands on the first bone the ray meets
+			if (place_object_wallmark(O, &*m_wallmarks, m_pos, dir, 0.f, m_wallmark_size))
+				++obj_count;
+		}
 	}
 	/*
 		Msg("----------------------------------");

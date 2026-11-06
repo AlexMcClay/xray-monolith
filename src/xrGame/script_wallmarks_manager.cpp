@@ -3,6 +3,7 @@
 #include "script_wallmarks_manager.h"
 #include "Level.h"
 #include "material_manager.h"
+#include "wallmark_manager.h"
 #include "../Include/xrRender/RenderVisual.h"
 
 ScriptWallmarksArray::ScriptWallmarksArray(LPCSTR section)
@@ -65,7 +66,7 @@ void ScriptWallmarksManager::PlaceWallmark(Fvector dir, Fvector start_pos,
 	CScriptGameObject* ignore_obj, float ttl, float rotation)
 {
 	collide::rq_result result;
-	BOOL reach_wall =
+	BOOL hit =
 		Level().ObjectSpace.RayPick(
 			start_pos,
 			dir,
@@ -73,9 +74,17 @@ void ScriptWallmarksManager::PlaceWallmark(Fvector dir, Fvector start_pos,
 			collide::rqtBoth,
 			result,
 			ignore_obj ? &ignore_obj->object() : nullptr
-		)
-		&&
-		!result.O;
+		);
+	BOOL reach_wall = hit && !result.O;
+
+	// [wallmarks] dynamic_objects: a ray that meets a moving object marks it (skeleton wallmark). The rotation
+	// argument doesn't apply there (skeleton marks get a random one)
+	if (hit && result.O && wallmark_game_settings().dynamic_objects)
+	{
+		place_object_wallmark(result.O, FindSection(section), start_pos, dir, result.range, wallmark_size, ttl, true,
+		                      false, u16(result.element));
+		return;
+	}
 
 	if (reach_wall)
 	{

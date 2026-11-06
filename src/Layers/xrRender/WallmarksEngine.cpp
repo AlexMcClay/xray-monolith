@@ -13,6 +13,61 @@
 float wallmark_range_static = 100.f;
 float wallmark_range_skeleton = 50.f;
 
+// Decal budget and lifetime ([wallmarks] in system.ltx; see WallmarksEngine.h). Defaults = vanilla.
+SWallmarkSettings g_wallmark_settings = {0, 0, 0, 1.f, 1.f, 0.f, 0.f};
+
+void SWallmarkSettings::load()
+{
+	static_max = 0;
+	skeleton_max = 0;
+	skeleton_max_per_object = 0;
+	fade_time = 1.f;
+	fade_fraction = 1.f;
+	static_ttl = 0.f;
+	skeleton_ttl = 0.f;
+
+	LPCSTR S = "wallmarks";
+	if (!pSettings->section_exist(S))
+		return;
+	if (pSettings->line_exist(S, "static_max")) static_max = pSettings->r_u32(S, "static_max");
+	if (pSettings->line_exist(S, "skeleton_max")) skeleton_max = pSettings->r_u32(S, "skeleton_max");
+	if (pSettings->line_exist(S, "skeleton_max_per_object")) skeleton_max_per_object = pSettings->r_u32(S, "skeleton_max_per_object");
+	if (pSettings->line_exist(S, "fade_time")) fade_time = pSettings->r_float(S, "fade_time");
+	if (pSettings->line_exist(S, "fade_fraction")) fade_fraction = pSettings->r_float(S, "fade_fraction");
+	if (pSettings->line_exist(S, "static_ttl")) static_ttl = pSettings->r_float(S, "static_ttl");
+	if (pSettings->line_exist(S, "skeleton_ttl")) skeleton_ttl = pSettings->r_float(S, "skeleton_ttl");
+	clamp(fade_time, 0.f, 3600.f);
+	clamp(fade_fraction, 0.f, 1.f);
+	Msg("* [wallmarks] static_max %u, skeleton_max %u (per object %u), fade_time %.2f, fade_fraction %.2f, static_ttl %.1f, skeleton_ttl %.1f",
+		static_max, skeleton_max, skeleton_max_per_object, fade_time, fade_fraction, static_ttl, skeleton_ttl);
+}
+
+float wallmark_fade(float time_start, float ttl, float evict_start)
+{
+	float now = RDEVICE.fTimeGlobal;
+	float f = 0.f;
+	if (ttl != -1.f)
+	{
+		// life fade: none until the last fade_fraction of the life, then linear to 1
+		// (fade_fraction 1 gives age / ttl, the vanilla value)
+		float frac = g_wallmark_settings.fade_fraction;
+		float age = now - time_start;
+		if (frac > 0.f)
+			f = (age - ttl * (1.f - frac)) / (ttl * frac);
+		else
+			f = age >= ttl ? 1.f : 0.f;
+	}
+	if (evict_start >= 0.f)
+	{
+		// pushed out by a cap: fade over fade_time from then on
+		float t = g_wallmark_settings.fade_time;
+		float e = t > 0.f ? (now - evict_start) / t : 1.f;
+		f = _max(f, e);
+	}
+	clamp(f, 0.f, 1.f);
+	return f;
+}
+
 namespace WallmarksEngine
 {
 	struct wm_slot
@@ -64,6 +119,7 @@ CWallmarksEngine::CWallmarksEngine()
 	static_pool.reserve(256);
 	marks.reserve(256);
 	hGeom.create(FVF::F_LIT, RCache.Vertex.Buffer(), NULL);
+	g_wallmark_settings.load();
 }
 
 CWallmarksEngine::~CWallmarksEngine()
@@ -88,6 +144,7 @@ void CWallmarksEngine::clear()
 			xr_delete(static_pool[it]);
 		static_pool.clear();
 	}
+	skeleton_budget.clear();
 }
 
 // allocate
@@ -102,7 +159,8 @@ CWallmarksEngine::static_wallmark* CWallmarksEngine::static_wm_allocate()
 	}
 
 	W->m_fTimeStart = RDEVICE.fTimeGlobal;
-	W->m_fTimeEnd = ps_r__WallmarkTTL * 15.f;
+	W->m_fTimeEnd = g_wallmark_settings.static_ttl > 0.f ? g_wallmark_settings.static_ttl : ps_r__WallmarkTTL * 15.f;
+	W->m_fEvictStart = -1.f;
 	W->verts.clear();
 	return W;
 }
@@ -116,7 +174,7 @@ void CWallmarksEngine::static_wm_destroy(CWallmarksEngine::static_wallmark* W)
 // render
 void CWallmarksEngine::static_wm_render(CWallmarksEngine::static_wallmark* W, FVF::LIT* & V)
 {
-	float a = W->TimeEnd() == -1.f ? 0.f : (RDEVICE.fTimeGlobal - W->TimeStart()) / W->TimeEnd();
+	float a = W->Fade();
 	int aC = iFloor(a * 255.f);
 	clamp(aC, 0, 255);
 	u32 C = color_rgba(128, 128, 128, aC);
@@ -296,6 +354,8 @@ void CWallmarksEngine::AddWallmark_internal(CDB::TRI* pTri, const Fvector* pVert
 
 		// no similar - register _new_
 		slot->static_items.push_back(W);
+		if (g_wallmark_settings.static_max)
+			static_budget();
 	}
 	//else
 	//{
@@ -336,9 +396,70 @@ void CWallmarksEngine::AddSkeletonWallmark(const Fmatrix* xf, CKinematics* obj, 
 	if (!ignore_opt && xf->c.distance_to_sqr(Device.vCameraPosition) > _sqr(wallmark_range_skeleton)) return;
 
 	VERIFY(obj&&xf&&(size>EPS_L));
+	// a visual that isn't kinematic (no bones) can't take a skeleton mark: skip it instead of crashing
+	if (!obj || !xf) return;
 	lock.Enter();
-	obj->AddWallmark(xf, start, dir, sh, size, ttl);
+	intrusive_ptr<CSkeletonWallmark> wm = obj->AddWallmark(xf, start, dir, sh, size, ttl);
+	if (wm && g_wallmark_settings.skeleton_max)
+		skeleton_budget_add(wm);
 	lock.Leave();
+}
+
+// Static cap: while more than static_max finite marks are not yet fading, the oldest starts to fade out
+// (it dies after fade_time). One pass over all marks per new mark; cheap next to rendering them.
+void CWallmarksEngine::static_budget()
+{
+	float now = RDEVICE.fTimeGlobal;
+	for (;;)
+	{
+		u32 live = 0;
+		static_wallmark* oldest = NULL;
+		for (WMSlotVecIt slot_it = marks.begin(); slot_it != marks.end(); slot_it++)
+		{
+			StaticWMVec& items = (*slot_it)->static_items;
+			for (StaticWMVecIt it = items.begin(); it != items.end(); it++)
+			{
+				static_wallmark* W = *it;
+				if (W->m_fEvictStart >= 0.f || W->TimeEnd() == -1.f) continue;
+				live++;
+				if (!oldest || W->TimeStart() < oldest->TimeStart()) oldest = W;
+			}
+		}
+		if (live <= g_wallmark_settings.static_max || !oldest)
+			return;
+		oldest->m_fEvictStart = now;
+	}
+}
+
+// Skeleton cap over all objects: marks are listed in the order they were made; dead ones (their object dropped
+// them, or they faded out) leave the list; while more than skeleton_max are not yet fading, the oldest fades.
+void CWallmarksEngine::skeleton_budget_add(intrusive_ptr<CSkeletonWallmark> wm)
+{
+	// prune: only this list still holds it (object gone or mark removed), or fully faded
+	u32 n = 0;
+	for (u32 i = 0; i < skeleton_budget.size(); i++)
+	{
+		CSkeletonWallmark* W = &*skeleton_budget[i];
+		if (W->intrusive_ref_count() <= 1) continue;
+		if (wallmark_fade(W->TimeStart(), W->TimeEnd(), W->EvictStart()) >= 1.f) continue;
+		if (n != i) skeleton_budget[n] = skeleton_budget[i];
+		n++;
+	}
+	skeleton_budget.resize(n);
+	skeleton_budget.push_back(wm);
+
+	u32 live = 0;
+	for (u32 i = 0; i < skeleton_budget.size(); i++)
+		if (!skeleton_budget[i]->Evicted() && skeleton_budget[i]->TimeEnd() != -1.f)
+			live++;
+	float now = RDEVICE.fTimeGlobal;
+	for (u32 i = 0; i < skeleton_budget.size() && live > g_wallmark_settings.skeleton_max; i++)
+	{
+		CSkeletonWallmark* W = &*skeleton_budget[i];
+		if (W->Evicted() || W->TimeEnd() == -1.f) continue;
+		W->Evict(now);
+		live--;
+	}
 }
 
 void CWallmarksEngine::AddSkeletonWallmark(intrusive_ptr<CSkeletonWallmark> wm)
@@ -368,20 +489,37 @@ ICF void BeginStream(ref_geom hGeom, u32& w_offset, FVF::LIT*& w_verts, FVF::LIT
 	w_start = w_verts;
 }
 
+// bAllPasses: draw the batch once per pass of the shader (G-buffer decals: e.g. albedo + normal, then gloss);
+// vanilla decal shaders are drawn with their first pass only, as before
 ICF void FlushStream(ref_geom hGeom, ref_shader shader, u32& w_offset, FVF::LIT*& w_verts, FVF::LIT*& w_start,
-                     BOOL bSuppressCull)
+                     BOOL bSuppressCull, BOOL bAllPasses = FALSE)
 {
 	u32 w_count = u32(w_verts - w_start);
 	RCache.Vertex.Unlock(w_count, hGeom->vb_stride);
 	if (w_count)
 	{
-		RCache.set_Shader(shader);
-		RCache.set_Geometry(hGeom);
-		if (bSuppressCull) RCache.set_CullMode(CULL_NONE);
-		RCache.Render(D3DPT_TRIANGLELIST, w_offset, w_count / 3);
-		if (bSuppressCull) RCache.set_CullMode(CULL_CCW);
+		u32 passes = bAllPasses ? shader->E[0]->passes.size() : 1;
+		for (u32 pass = 0; pass < passes; pass++)
+		{
+			RCache.set_Shader(shader, pass);
+			RCache.set_Geometry(hGeom);
+			if (bSuppressCull) RCache.set_CullMode(CULL_NONE);
+			RCache.Render(D3DPT_TRIANGLELIST, w_offset, w_count / 3);
+			if (bSuppressCull) RCache.set_CullMode(CULL_CCW);
+		}
 		Device.Statistic->RenderDUMP_WMT_Count += w_count / 3;
 	}
+}
+
+// Does this slot's shader write the G-buffer (Lua blender :wmark_gbuffer(true))? Only R3/R4 bind the G-buffer
+// for decals; elsewhere such a shader is drawn like any other decal.
+static bool slot_gbuffer(CWallmarksEngine::wm_slot* slot)
+{
+#if defined(USE_DX10) || defined(USE_DX11)
+	return slot->shader->E[0]->flags.bWmarkGBuffer ? true : false;
+#else
+	return false;
+#endif
 }
 
 void CWallmarksEngine::Render()
@@ -408,12 +546,49 @@ void CWallmarksEngine::Render()
 
 	lock.Enter(); // Physics may add wallmarks in parallel with rendering
 
+	// albedo-only decals first (vanilla), then the G-buffer ones with rt_Position bound as a second target
+	bool has_gbuffer = false;
 	for (WMSlotVecIt slot_it = marks.begin(); slot_it != marks.end(); slot_it++)
+	{
+		if (slot_gbuffer(*slot_it))
+		{
+			has_gbuffer = true;
+			continue;
+		}
+		render_slot(*slot_it, ssaCLIP, FALSE);
+	}
+#if defined(USE_DX10) || defined(USE_DX11)
+	if (has_gbuffer)
+	{
+		RImplementation.Target->phase_wallmarks_gbuffer();
+		for (WMSlotVecIt slot_it = marks.begin(); slot_it != marks.end(); slot_it++)
+			if (slot_gbuffer(*slot_it))
+				render_slot(*slot_it, ssaCLIP, TRUE);
+		RImplementation.Target->phase_wallmarks(); // back to rt_Color only for the level's own wallmarks
+	}
+#endif
+
+	lock.Leave(); // Physics may add wallmarks in parallel with rendering
+
+	// Level-wmarks
+	RImplementation.r_dsgraph_render_wmarks();
+	Device.Statistic->RenderDUMP_WM.End();
+
+	// Projection
+	Device.mView = mSavedView;
+	Device.mProject._43 = _43;
+	RCache.set_xform_view(Device.mView);
+	RCache.set_xform_project(Device.mProject);
+}
+
+// Draw one slot (all marks with one shader): its static marks, then the skeleton marks queued this frame.
+// Also frees static marks that faded out. bAllPasses: draw every pass of the shader (G-buffer decals).
+void CWallmarksEngine::render_slot(wm_slot* slot, float ssaCLIP, BOOL bAllPasses)
+{
 	{
 		u32 w_offset;
 		FVF::LIT *w_verts, *w_start;
 		BeginStream(hGeom, w_offset, w_verts, w_start);
-		wm_slot* slot = *slot_it;
 		// static wallmarks
 		for (StaticWMVecIt w_it = slot->static_items.begin(); w_it != slot->static_items.end();)
 		{
@@ -428,21 +603,21 @@ void CWallmarksEngine::Render()
 					u32 w_count = u32(w_verts - w_start);
 					if ((w_count + W->verts.size()) >= (MAX_TRIS * 3))
 					{
-						FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,FALSE);
+						FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,FALSE, bAllPasses);
 						BeginStream(hGeom, w_offset, w_verts, w_start);
 					}
 					static_wm_render(W, w_verts);
 				}
 			}
 
-			// don't need to check wallmarks with infinite lifetime
-			if (W->TimeEnd() == -1.f)
+			// don't need to check wallmarks with infinite lifetime (unless a cap pushed them out)
+			if (W->TimeEnd() == -1.f && W->m_fEvictStart < 0.f)
 			{
 				w_it++;
 				continue;
 			}
 
-			float w = W->TimeEnd() == -1.f ? 0.f : (RDEVICE.fTimeGlobal - W->TimeStart()) / W->TimeEnd();
+			float w = W->Fade();
 			if (w < 1.f)
 			{
 				w_it++;
@@ -455,7 +630,7 @@ void CWallmarksEngine::Render()
 			}
 		}
 		// Flush stream
-		FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,FALSE); //. remove line if !(suppress cull needed)
+		FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,FALSE, bAllPasses); //. remove line if !(suppress cull needed)
 		BeginStream(hGeom, w_offset, w_verts, w_start);
 
 		// dynamic wallmarks
@@ -484,7 +659,7 @@ void CWallmarksEngine::Render()
 			u32 w_count = u32(w_verts - w_start);
 			if ((w_count + W->VCount()) >= (MAX_TRIS * 3))
 			{
-				FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start, TRUE);
+				FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start, TRUE, bAllPasses);
 				BeginStream(hGeom, w_offset, w_verts, w_start);
 			}
 
@@ -505,18 +680,6 @@ void CWallmarksEngine::Render()
 		}
 		slot->skeleton_items.clear();
 		// Flush stream
-		FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,TRUE);
+		FlushStream(hGeom, slot->shader, w_offset, w_verts, w_start,TRUE, bAllPasses);
 	}
-
-	lock.Leave(); // Physics may add wallmarks in parallel with rendering
-
-	// Level-wmarks
-	RImplementation.r_dsgraph_render_wmarks();
-	Device.Statistic->RenderDUMP_WM.End();
-
-	// Projection
-	Device.mView = mSavedView;
-	Device.mProject._43 = _43;
-	RCache.set_xform_view(Device.mView);
-	RCache.set_xform_project(Device.mProject);
 }

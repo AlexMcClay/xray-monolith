@@ -343,6 +343,14 @@ void SimulatorStates::UpdateDesc(D3D_BLEND_DESC& desc) const
 			}
 		}
 	}
+
+	// D3D11 uses only RenderTarget[0] (its write mask too) for every target unless IndependentBlendEnable is set.
+	// Turn it on only when a pass gave its targets different write masks (dx10color_write_enable_rt); the blend
+	// factors above are the same for every target, so nothing else changes. Passes with equal masks (all the
+	// existing ones) keep IndependentBlendEnable off, as before.
+	for (int i = 1; i < 4; ++i)
+		if (desc.RenderTarget[i].RenderTargetWriteMask != desc.RenderTarget[0].RenderTargetWriteMask)
+			desc.IndependentBlendEnable = TRUE;
 }
 #else
 void SimulatorStates::UpdateDesc(D3D_BLEND_DESC& desc) const

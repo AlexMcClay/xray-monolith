@@ -119,6 +119,8 @@ ShaderElement::ShaderElement()
 	flags.isLandscape = FALSE;
 	flags.isWater = FALSE;
 
+	flags.bWmarkGBuffer = FALSE;
+
 	flags.iScopeLense = 0; 	//  Redotix99: for 3D Shader Based Scopes
 	//	0 = eNoLense, 
 	//  1 = eBackLense, 
@@ -136,6 +138,7 @@ BOOL ShaderElement::equal(ShaderElement& S)
 
 	if (flags.bLandscape != S.flags.bLandscape) return FALSE;
 	if (flags.bWmark != S.flags.bWmark) return FALSE;
+	if (flags.bWmarkGBuffer != S.flags.bWmarkGBuffer) return FALSE;
 	if (flags.bDistort != S.flags.bDistort) return FALSE;
 	if (passes.size() != S.passes.size()) return FALSE;
 	for (u32 p = 0; p < passes.size(); p++)

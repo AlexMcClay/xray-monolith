@@ -27,6 +27,7 @@ class CSkeletonWallmark : public intrusive_base // 4+4+4+12+4+16+16 = 60 + 4 = 6
 	Fvector3 m_ContactPoint; // 12		model space
 	float m_fTimeStart; // 4
 	float m_fTimeEnd; // 4
+	float m_fEvictStart; // 4	time a decal cap pushed this mark out (it then fades), -1 = not pushed out
 public:
 #ifdef DEBUG
 	u32					used_in_render;	
@@ -46,7 +47,7 @@ public:
 	Fsphere m_Bounds; // 16		world space
 public:
 	CSkeletonWallmark(CKinematics* p, const Fmatrix* m, ref_shader s, const Fvector& cp, float ts, float te):
-		m_Parent(p), m_XForm(m), m_Shader(s), m_fTimeStart(ts), m_ContactPoint(cp), m_fTimeEnd(te)
+		m_Parent(p), m_XForm(m), m_Shader(s), m_fTimeStart(ts), m_ContactPoint(cp), m_fTimeEnd(te), m_fEvictStart(-1.f)
 	{
 #ifdef DEBUG
 						used_in_render = u32(-1);
@@ -70,6 +71,10 @@ public:
 
 	IC float TimeStart() { return m_fTimeStart; }
 	IC float TimeEnd() { return m_fTimeEnd; }
+	// decal budget: start fading this mark out now (a cap pushed it out); see wallmark_fade
+	IC void Evict(float now) { if (m_fEvictStart < 0.f) m_fEvictStart = now; }
+	IC bool Evicted() { return m_fEvictStart >= 0.f; }
+	IC float EvictStart() { return m_fEvictStart; }
 	IC const Fmatrix* XFORM() { return m_XForm; }
 	IC const Fvector3& ContactPoint() { return m_ContactPoint; }
 	IC ref_shader Shader() { return m_Shader; }
@@ -170,7 +175,8 @@ public:
 	void* Update_Callback_Param;
 public:
 	// wallmarks
-	void AddWallmark(const Fmatrix* parent, const Fvector3& start, const Fvector3& dir, ref_shader shader, float size, float ttl = 0.f);
+	// returns the new mark (null if the ray missed every bone), for the decal budget
+	intrusive_ptr<CSkeletonWallmark> AddWallmark(const Fmatrix* parent, const Fvector3& start, const Fvector3& dir, ref_shader shader, float size, float ttl = 0.f);
 	void CalculateWallmarks();
 	void RenderWallmark(intrusive_ptr<CSkeletonWallmark> wm, FVF::LIT* & verts);
 	void ClearWallmarks();

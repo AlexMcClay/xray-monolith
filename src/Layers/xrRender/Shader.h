@@ -131,6 +131,10 @@ public:
 		u32 isWater : 1;
 
 		u32 iScopeLense : 2; //  Redotix99: for 3D Shader Based Scopes 		
+
+		// decal shader (Lua blender :wmark_gbuffer(true)): the wallmark engine draws it with the albedo AND the
+		// G-buffer position/normal target bound (R3/R4), and draws every pass of it
+		u32 bWmarkGBuffer : 1;
 	};
 
 public:
