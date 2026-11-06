@@ -502,6 +502,13 @@ Fvector CScriptGameObject::weapon_shell_point()
 	return w ? w->get_LastSP() : Fvector().set(0.f, 0.f, 0.f);
 }
 
+// The weapon's fire direction (same space as weapon_fire_point), e.g. to aim a script muzzle effect along the bore
+Fvector CScriptGameObject::weapon_fire_dir()
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return w ? w->get_LastFD() : Fvector().set(0.f, 0.f, 1.f);
+}
+
 bool CScriptGameObject::weapon_hud_mode()
 {
 	CWeapon* w = smart_cast<CWeapon*>(&object());
