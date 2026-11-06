@@ -1129,6 +1129,8 @@ public:
 	void set_hud_recoil(Fvector pos, Fvector rot, Fvector pivot);
 	void reset_hud_recoil();
 	void set_cam_recoil(bool on);
+	void set_weapon_particles(LPCSTR kind, LPCSTR name);
+	LPCSTR weapon_particles(LPCSTR kind);
 	void set_owner_spread(bool on);
 	void set_spread_k(float k);
 	void set_pellet_spread(float metres_at_100);

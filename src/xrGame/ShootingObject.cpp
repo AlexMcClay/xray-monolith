@@ -358,13 +358,42 @@ void CShootingObject::StartSmokeParticles(const Fvector& play_pos,
                                           const Fvector& parent_vel)
 {
 	CParticlesObject* pSmokeParticles = NULL;
-	StartParticles(pSmokeParticles, *m_sSmokeParticlesCurrent, play_pos, parent_vel, true);
+	StartParticles(pSmokeParticles, SmokeParticlesName().size() ? *SmokeParticlesName() : NULL, play_pos, parent_vel, true);
 }
 
 
+bool CShootingObject::SetParticlesOverride(LPCSTR kind, LPCSTR name)
+{
+	shared_str value = (name && name[0]) ? name : "";
+	if (!xr_strcmp(kind, "flame"))
+	{
+		if (m_sFlameParticlesOverride != value)
+		{
+			StopFlameParticles();
+			m_sFlameParticlesOverride = value;
+		}
+		return true;
+	}
+	if (!xr_strcmp(kind, "smoke"))
+	{
+		m_sSmokeParticlesOverride = value;
+		return true;
+	}
+	return false;
+}
+
+LPCSTR CShootingObject::GetParticlesName(LPCSTR kind) const
+{
+	if (!xr_strcmp(kind, "flame"))
+		return FlameParticlesName().size() ? FlameParticlesName().c_str() : "";
+	if (!xr_strcmp(kind, "smoke"))
+		return SmokeParticlesName().size() ? SmokeParticlesName().c_str() : "";
+	return "";
+}
+
 void CShootingObject::StartFlameParticles()
 {
-	if (0 == m_sFlameParticlesCurrent.size()) return;
+	if (0 == FlameParticlesName().size()) return;
 
 	//если партиклы циклические
 	if (m_pFlameParticles && m_pFlameParticles->IsLooped() &&
@@ -375,7 +404,7 @@ void CShootingObject::StartFlameParticles()
 	}
 
 	StopFlameParticles();
-	m_pFlameParticles = CParticlesObject::Create(*m_sFlameParticlesCurrent,FALSE);
+	m_pFlameParticles = CParticlesObject::Create(*FlameParticlesName(),FALSE);
 	UpdateFlameParticles();
 
 
@@ -391,7 +420,7 @@ void CShootingObject::StartFlameParticles()
 
 void CShootingObject::StopFlameParticles()
 {
-	if (0 == m_sFlameParticlesCurrent.size()) return;
+	if (0 == FlameParticlesName().size()) return;
 	if (m_pFlameParticles == NULL) return;
 
 	m_pFlameParticles->SetAutoRemove(true);
@@ -401,7 +430,7 @@ void CShootingObject::StopFlameParticles()
 
 void CShootingObject::UpdateFlameParticles()
 {
-	if (0 == m_sFlameParticlesCurrent.size()) return;
+	if (0 == FlameParticlesName().size()) return;
 	if (!m_pFlameParticles) return;
 
 	Fmatrix pos;
