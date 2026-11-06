@@ -487,6 +487,20 @@ void CScriptGameObject::set_weapon_light(float r, float g, float b, float range,
 		                                "CGameObject : set_weapon_light needs a weapon!");
 }
 
+// The weapon's current fire point (the silencer's when fitted): in the first-person HUD's space while
+// weapon_hud_mode() (level.ribbon_add's hud flag moves it to the world's), else in the world
+Fvector CScriptGameObject::weapon_fire_point()
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return w ? w->get_CurrentFirePoint() : Fvector().set(0.f, 0.f, 0.f);
+}
+
+bool CScriptGameObject::weapon_hud_mode()
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return w && w->GetHUDmode();
+}
+
 LPCSTR CScriptGameObject::weapon_particles(LPCSTR kind)
 {
 	CWeapon* w = smart_cast<CWeapon*>(&object());
