@@ -341,6 +341,11 @@ BOOL CPEDef::Load2(CInifile& ini)
 	{
 		m_APDefaultRotation = ini.r_fvector3("align_to_path", "default_rotation");
 	}
+
+	if (m_Flags.is(dfSizeGrowth) && ini.section_exist("size_growth"))
+	{
+		m_fSizeGrowth = ini.r_float("size_growth", "value");
+	}
 	//#ifdef _EDITOR
 	if (pCreateEAction)
 	{

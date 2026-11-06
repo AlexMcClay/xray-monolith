@@ -80,6 +80,12 @@ namespace PS
 			// the effect wants the object lighting probe (ROS: sky and sun visibility, hemi cube) for its shader
 			// (CParticlesObject turns it on; E1)
 			dfLit = (1 << 25),
+			// draw the effect's particles back to front from the camera (big alpha-blended smoke: no sorting pops
+			// between overlapping puffs); costs a sort per frame, so only flagged effects
+			dfSortParticles = (1 << 26),
+			// every particle's size grows by its own factor, exp(m_fSizeGrowth x seconds), keeping each puff's
+			// start size (TargetSize drives them all to one size); [size_growth] value in a loose .pe
+			dfSizeGrowth = (1 << 27),
 		};
 
 		shared_str m_Name;
@@ -98,6 +104,7 @@ namespace PS
 		int m_MaxParticles; // max particle count
 		Fvector m_VelocityScale; // velocity scale
 		Fvector m_APDefaultRotation; // align to path
+		float m_fSizeGrowth = 0.f; // dfSizeGrowth: ln of the size factor per second
 		// collision
 		float m_fCollideOneMinusFriction;
 		float m_fCollideResilience;

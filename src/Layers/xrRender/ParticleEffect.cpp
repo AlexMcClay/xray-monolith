@@ -2,6 +2,7 @@
 #pragma hdrstop
 
 #include "ParticleEffect.h"
+#include "light.h"
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 
@@ -214,6 +215,14 @@ void CParticleEffect::OnFrame(u32 frame_dt)
 			PAPI::Particle* particles;
 			u32 p_cnt;
 			ParticleManager()->GetParticles(m_HandleEffect, particles, p_cnt);
+
+			// each particle grows by the same factor from its own size (dfSizeGrowth)
+			if (m_Def->m_Flags.is(CPEDef::dfSizeGrowth) && m_Def->m_fSizeGrowth != 0.f)
+			{
+				const float k = expf(m_Def->m_fSizeGrowth * fDT_STEP);
+				for (u32 i = 0; i < p_cnt; ++i)
+					particles[i].size.mul(k);
+			}
 
 			// our actions
 			if (m_Def->m_Flags.is(CPEDef::dfFramed | CPEDef::dfAnimated))
@@ -653,6 +662,72 @@ u32 ParticleRenderStream(FVF::LIT* pv, u32 count, PAPI::Particle * particles, CP
 	return u32(pv - pv_begin);
 }
 
+
+// Lit effects (dfLit): the light of active lamps, torches and flashes near the effect, for the particle shader's
+// L_particle_lights (Tarkov lights every smoke puff with up to 8 nearby lights). Static and dynamic point and spot
+// lights whose range reaches the effect; falloff (1 - d / range)^2, spot cones; the 8 strongest; no occlusion.
+// First-person HUD lights are skipped (their position is in the HUD's space). Gunsmith Docs vfx.md "Engine".
+static Fvector particle_lights_at(const Fvector& P, float radius)
+{
+	static xr_vector<ISpatial*> found;
+	Fvector sum = {0.f, 0.f, 0.f};
+	if (!g_SpatialSpace)
+		return sum;
+	found.clear();
+	const Fvector box = {radius, radius, radius};
+	g_SpatialSpace->q_box(found, 0, STYPE_LIGHTSOURCE, P, box);
+	float best[8];
+	Fvector best_c[8];
+	u32 n = 0;
+	for (ISpatial* sp : found)
+	{
+		light* L = (light*)(sp->dcast_Light());
+		if (!L || !L->flags.bActive || L->flags.bHudMode || L->range <= 0.f)
+			continue;
+		Fvector d;
+		d.sub(P, L->position);
+		const float dist = d.magnitude();
+		if (dist >= L->range + radius)
+			continue;
+		float a = 1.f - _max(dist - radius * 0.5f, 0.f) / L->range;
+		clamp(a, 0.f, 1.f);
+		a *= a;
+		if (L->flags.type == IRender_Light::SPOT && dist > EPS_L)
+		{
+			d.div(dist);
+			const float edge = _cos(L->cone * 0.5f);
+			const float c = d.dotproduct(L->direction);
+			float k = (c - edge) / _max(1.f - edge, 0.001f) * 3.f;
+			clamp(k, 0.f, 1.f);
+			a *= k;
+		}
+		if (a <= 0.f)
+			continue;
+		Fvector c = {L->color.r * a, L->color.g * a, L->color.b * a};
+		const float w = c.x + c.y + c.z;
+		if (n < 8)
+		{
+			best[n] = w;
+			best_c[n++] = c;
+		}
+		else
+		{
+			u32 lo = 0;
+			for (u32 i = 1; i < 8; ++i)
+				if (best[i] < best[lo])
+					lo = i;
+			if (w > best[lo])
+			{
+				best[lo] = w;
+				best_c[lo] = c;
+			}
+		}
+	}
+	for (u32 i = 0; i < n; ++i)
+		sum.add(best_c[i]);
+	return sum;
+}
+
 void CParticleEffect::Render(float)
 {
 #ifdef _GPA_ENABLED
@@ -669,6 +744,18 @@ void CParticleEffect::Render(float)
 	{
 		if (m_Def && m_Def->m_Flags.is(CPEDef::dfSprite))
 		{
+			// back to front from the camera (dfSortParticles): a sorted copy
+			if (m_Def->m_Flags.is(CPEDef::dfSortParticles) && p_cnt > 1)
+			{
+				static xr_vector<PAPI::Particle> sorted;
+				sorted.assign(particles, particles + p_cnt);
+				const Fvector& cam = Device.vCameraPosition;
+				std::sort(sorted.begin(), sorted.end(), [&cam](const PAPI::Particle& a, const PAPI::Particle& b)
+				{
+					return a.pos.distance_to_sqr(cam) > b.pos.distance_to_sqr(cam);
+				});
+				particles = sorted.data();
+			}
 			FVF::LIT* pv_start = (FVF::LIT*)RCache.Vertex.Lock(p_cnt * 4 * 4, geom->vb_stride, dwOffset);
 			dwCount = ParticleRenderStream(pv_start, p_cnt, particles, this);
 
@@ -688,6 +775,12 @@ void CParticleEffect::Render(float)
 
 				RCache.set_xform_world(Fidentity);
 				RCache.set_Geometry(geom);
+				// nearby lights for a lit effect's shader (L_particle_lights; 0 when none)
+				if (m_Def->m_Flags.is(CPEDef::dfLit) && !GetHudMode())
+				{
+					const Fvector lc = particle_lights_at(vis.sphere.P, _max(vis.sphere.R, 0.5f));
+					RCache.set_c("L_particle_lights", lc.x, lc.y, lc.z, 0.f);
+				}
 
 				RCache.set_CullMode(m_Def->m_Flags.is(CPEDef::dfCulling)
 					                    ? (m_Def->m_Flags.is(CPEDef::dfCullCCW) ? CULL_CCW : CULL_CW)
