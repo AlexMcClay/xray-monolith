@@ -198,19 +198,31 @@ void CShootingObject::Light_Start()
 	if (Device.dwFrame != light_frame)
 	{
 		light_frame = Device.dwFrame;
-		light_time = light_lifetime;
-
-		light_build_color.set(Random.randFs(light_var_color, light_base_color.r),
-		                      Random.randFs(light_var_color, light_base_color.g),
-		                      Random.randFs(light_var_color, light_base_color.b), 1);
-		light_build_range = Random.randFs(light_var_range, light_base_range);
+		if (m_light_override)
+		{
+			light_play_lifetime = m_light_ov_time;
+			light_build_color.set(Random.randFs(0.05f, m_light_ov_color.x), Random.randFs(0.05f, m_light_ov_color.y),
+			                      Random.randFs(0.05f, m_light_ov_color.z), 1);
+			light_build_range = Random.randFs(m_light_ov_range * 0.25f, m_light_ov_range);
+		}
+		else
+		{
+			light_play_lifetime = light_lifetime;
+			light_build_color.set(Random.randFs(light_var_color, light_base_color.r),
+			                      Random.randFs(light_var_color, light_base_color.g),
+			                      Random.randFs(light_var_color, light_base_color.b), 1);
+			light_build_range = Random.randFs(light_var_range, light_base_range);
+		}
+		light_time = light_play_lifetime;
 	}
 }
 
 void CShootingObject::Light_Render(const Fvector& P)
 {
-	float light_scale = light_time / light_lifetime;
+	float light_scale = light_play_lifetime > 0.f ? light_time / light_play_lifetime : 0.f;
 	R_ASSERT(light_render);
+
+	light_render->set_hud_mode(m_light_hud);
 
 	light_render->set_position(P);
 	light_render->set_color(light_build_color.r * light_scale, light_build_color.g * light_scale,
@@ -458,6 +470,15 @@ void CShootingObject::UpdateLight()
 		light_time -= Device.fTimeDelta;
 		if (light_time <= 0) StopLight();
 	}
+}
+
+// Script override of the shot light (game_object:set_weapon_light)
+void CShootingObject::SetLightOverride(float r, float g, float b, float range, float time)
+{
+	m_light_override = range > 0.f && time > 0.f;
+	m_light_ov_color.set(r, g, b);
+	m_light_ov_range = range;
+	m_light_ov_time = time;
 }
 
 void CShootingObject::StopLight()

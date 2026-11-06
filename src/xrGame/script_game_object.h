@@ -1131,6 +1131,7 @@ public:
 	void set_cam_recoil(bool on);
 	void set_weapon_particles(LPCSTR kind, LPCSTR name);
 	LPCSTR weapon_particles(LPCSTR kind);
+	void set_weapon_light(float r, float g, float b, float range, float time);
 	void set_owner_spread(bool on);
 	void set_spread_k(float k);
 	void set_pellet_spread(float metres_at_100);

@@ -201,6 +201,17 @@ protected:
 	float light_lifetime;
 	u32 light_frame;
 	float light_time;
+	// this shot's light time (the config's, or the script override's)
+	float light_play_lifetime = 1.f;
+	// Script override of the shot light (game_object:set_weapon_light): used instead of the config's, also when the
+	// config disables the light. Not saved: a script sets it again.
+	bool m_light_override = false;
+	Fvector m_light_ov_color = {0.f, 0.f, 0.f};
+	float m_light_ov_range = 0.f;
+	float m_light_ov_time = 0.f;
+	// the shot light is a HUD-mode light (lights the first-person hands and gun, like a hud_mode torch); a weapon
+	// sets it from GetHUDmode() before rendering the light
+	bool m_light_hud = false;
 	//включение подсветки во время выстрела
 	bool m_bLightShotEnabled;
 protected:
@@ -291,5 +302,8 @@ public:
 	// kind "flame" or "smoke"; name "" (or nil) clears the override. Returns false for another kind.
 	bool SetParticlesOverride(LPCSTR kind, LPCSTR name);
 	LPCSTR GetParticlesName(LPCSTR kind) const;
+	// shot light colour, range (m), time (s); range <= 0 or time <= 0 clears the override
+	void SetLightOverride(float r, float g, float b, float range, float time);
+	bool ShotLightEnabled() const { return m_bLightShotEnabled || m_light_override; }
 	virtual void DumpActiveParams(shared_str const& section_name, CInifile& dst_ini) const;
 };

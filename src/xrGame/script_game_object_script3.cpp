@@ -574,6 +574,7 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		.def("set_cam_recoil", SAFE_WRAP(&CScriptGameObject::set_cam_recoil))
 		.def("set_weapon_particles", SAFE_WRAP(&CScriptGameObject::set_weapon_particles))
 		.def("weapon_particles", SAFE_WRAP(&CScriptGameObject::weapon_particles))
+		.def("set_weapon_light", SAFE_WRAP(&CScriptGameObject::set_weapon_light))
 		.def("cam_recoil", SAFE_WRAP(&CScriptGameObject::cam_recoil))
 		.def("set_owner_spread", SAFE_WRAP(&CScriptGameObject::set_owner_spread))
 		.def("set_spread_k", SAFE_WRAP(&CScriptGameObject::set_spread_k))

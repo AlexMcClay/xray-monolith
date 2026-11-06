@@ -476,6 +476,17 @@ void CScriptGameObject::set_weapon_particles(LPCSTR kind, LPCSTR name)
 		                                "CGameObject : set_weapon_particles needs a weapon and \"flame\" or \"smoke\"!");
 }
 
+// A weapon's shot light from a script: colour, range (m), time (s); range or time <= 0 back to the config's
+// (CShootingObject::SetLightOverride; Gunsmith Docs vfx.md)
+void CScriptGameObject::set_weapon_light(float r, float g, float b, float range, float time)
+{
+	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
+		w->SetLightOverride(r, g, b, range, time);
+	else
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError,
+		                                "CGameObject : set_weapon_light needs a weapon!");
+}
+
 LPCSTR CScriptGameObject::weapon_particles(LPCSTR kind)
 {
 	CWeapon* w = smart_cast<CWeapon*>(&object());

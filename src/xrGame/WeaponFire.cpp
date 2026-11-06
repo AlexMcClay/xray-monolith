@@ -147,7 +147,7 @@ void CWeapon::FireTrace(const Fvector& P, const Fvector& D)
 
 	StartShotParticles();
 
-	if (m_bLightShotEnabled)
+	if (ShotLightEnabled())
 		Light_Start();
 
 	// Interactive Grass FX
