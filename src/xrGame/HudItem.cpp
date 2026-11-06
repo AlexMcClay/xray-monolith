@@ -1232,6 +1232,8 @@ void CHudItem::Ray(SPickParam& pp)
 	// Trace from the resulting transform
 	pp.defs.start = matrix.c;
 	pp.defs.dir = matrix.k;
+	if (m_shot_pitch != 0.f)   // a script's zero: up toward the barrel's own up
+		pp.defs.dir.mul(_cos(m_shot_pitch)).mad(matrix.j, _sin(m_shot_pitch)).normalize();
 }
 
 void CHudItem::UpdatePick()

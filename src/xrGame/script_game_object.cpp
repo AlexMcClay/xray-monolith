@@ -466,6 +466,38 @@ void CScriptGameObject::set_cam_recoil(bool on)
 		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError, "CGameObject : cannot access class member set_cam_recoil!");
 }
 
+void CScriptGameObject::set_owner_spread(bool on)
+{
+	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
+		w->m_owner_spread = on;
+	else
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError, "CGameObject : cannot access class member set_owner_spread!");
+}
+
+void CScriptGameObject::set_spread_k(float k)
+{
+	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
+		w->m_script_spread_k = _max(0.f, k);
+	else
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError, "CGameObject : cannot access class member set_spread_k!");
+}
+
+void CScriptGameObject::set_pellet_spread(float metres_at_100)
+{
+	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
+		w->m_pellet_spread = metres_at_100;
+	else
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError, "CGameObject : cannot access class member set_pellet_spread!");
+}
+
+void CScriptGameObject::set_shot_pitch(float radians)
+{
+	if (CHudItem* item = smart_cast<CHudItem*>(&object()))
+		item->m_shot_pitch = radians;
+	else
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError, "CGameObject : cannot access class member set_shot_pitch!");
+}
+
 bool CScriptGameObject::cam_recoil()
 {
 	CWeapon* w = smart_cast<CWeapon*>(&object());

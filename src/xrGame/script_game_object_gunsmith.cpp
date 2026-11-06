@@ -7,6 +7,7 @@
 #include "script_game_object.h"
 #include "script_game_object_impl.h"
 #include "Weapon.h"
+#include "player_hud.h"
 #include "inventory_item.h"
 #include "ai_space.h"
 #include "script_engine.h"
@@ -255,6 +256,21 @@ void set_hud_round_slots_script(CScriptGameObject* self, LPCSTR chambers, LPCSTR
 	return ::luabind::object(L, section.c_str());
 }
 
+// The sight aimed through: its aim point on the HUD model, in the model's space (as set_hud_recoil's pivot), or nil
+// without a sight point or a HUD model (Gunsmith Docs research/38: Tarkov's camera following the sight)
+::luabind::object gs_hud_sight_point_script(lua_State* L, CScriptGameObject* self)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_hud_sight_point");
+	attachable_hud_item* hi = weapon ? weapon->HudItemData() : nullptr;
+	if (!hi || !hi->m_model)
+		return ::luabind::object();
+	Fvector p;
+	gunsmith::CVisuals::SSightKey key;
+	if (!weapon->gs_visuals().sight_point(hi->m_model, p, key))
+		return ::luabind::object();
+	return ::luabind::object(L, p);
+}
+
 // Sight modes: the sight aimed through's mode, { mode, count, zoom, sight } (mode from 0; zoom
 // its magnification, 1 = none; sight: which of the part's sights, from 0), or nil without a sight.
 ::luabind::object gs_sight_mode_script(lua_State* L, CScriptGameObject* self)
@@ -472,6 +488,7 @@ void gs_hud_bone_visible_script(CScriptGameObject* self, LPCSTR bone, bool visib
 		.def("gs_preview_attach", &gs_preview_attach_script, raw<1>())
 		.def("gs_sight_section", &gs_sight_section_script, raw<1>())
 		.def("gs_sight_mode", &gs_sight_mode_script, raw<1>())
+		.def("gs_hud_sight_point", &gs_hud_sight_point_script, raw<1>())
 		.def("gs_sights", &gs_sights_script, raw<1>())
 		.def("gs_sight_node", &gs_sight_node_script, raw<1>())
 		.def("gs_sight_set", &gs_sight_set_script, raw<1>())

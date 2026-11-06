@@ -175,6 +175,10 @@ public:
 	void SetHudRecoil(const Fvector& pos, const Fvector& rot, const Fvector& pivot);
 	void ResetHudRecoil();
 	const hud_recoil* HudRecoil() const { return m_hud_recoil; } // null when not set
+	// The actor's shots leave this far above the barrel's line (radians, about the barrel's right axis, in world
+	// space after the HUD-to-world mapping), e.g. a sight's zero (game_object:set_shot_pitch; Gunsmith Docs
+	// research/38)
+	float m_shot_pitch = 0.f;
 private:
 	hud_recoil* m_hud_recoil;
 public:

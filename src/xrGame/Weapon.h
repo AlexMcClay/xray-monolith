@@ -685,6 +685,17 @@ public:
 	// false: the actor's shots with this weapon give no camera kick (game_object:set_cam_recoil), for a script's own
 	// recoil (Gunsmith Docs research/38); the cam_* values and stats stay as they are
 	bool m_cam_recoil = true;
+	// false: the actor's shots with this weapon take only the gun's own spread, not the shooter's (movement, hip
+	// fire: CActor::GetWeaponAccuracy); the crosshair and the aimed sway still use the full spread
+	// (game_object:set_owner_spread; Gunsmith Docs research/38)
+	bool m_owner_spread = true;
+	// x the gun's own spread on every shot, the player's and NPCs' (game_object:set_spread_k), e.g. a script's wear
+	// curve; 1 = none
+	float m_script_spread_k = 1.f;
+	// >= 0: a multi-projectile round's pellets share one spread draw (the whole pattern moves together) and each
+	// lies within this of it, in metres at 100 m, as a direction on the unit sphere (game_object:set_pellet_spread);
+	// < 0: vanilla's, each pellet its own draw from the gun's spread
+	float m_pellet_spread = -1.f;
 
 	// Getters
 	float GetCamRelaxSpeed() { return cam_recoil.RelaxSpeed; };

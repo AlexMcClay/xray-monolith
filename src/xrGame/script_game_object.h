@@ -1129,6 +1129,10 @@ public:
 	void set_hud_recoil(Fvector pos, Fvector rot, Fvector pivot);
 	void reset_hud_recoil();
 	void set_cam_recoil(bool on);
+	void set_owner_spread(bool on);
+	void set_spread_k(float k);
+	void set_pellet_spread(float metres_at_100);
+	void set_shot_pitch(float radians);
 	bool cam_recoil();
 	bool has_hud_offset(int index);
 	Fvector hud_offset_pos(int index);
