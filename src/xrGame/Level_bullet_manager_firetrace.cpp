@@ -23,6 +23,7 @@
 #include "actor.h"
 #include "ai/monsters/basemonster/base_monster.h"
 #include "script_game_object.h"
+#include "wallmark_manager.h"
 
 //константы ShootFactor, определяющие 
 //поведение пули при столкновении с объектом
@@ -196,7 +197,8 @@ void CBulletManager::FireShotmark(SBullet* bullet, const Fvector& vDir, const Fv
 				                               &*mtl_pair->m_pCollideMarks,
 				                               p,
 				                               bullet->dir,
-				                               bullet->wallmark_size);
+				                               bullet->wallmark_size,
+				                               object_wallmark_ttl(R.O)); // [wallmarks] object_ttl, 0 = default
 		}
 	}
 	else
