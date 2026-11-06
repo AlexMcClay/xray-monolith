@@ -1112,7 +1112,7 @@ void flash_lights_clear()
 //     life s; widths m (over a point's life); rise m/s^2 (up); drag: the share of speed kept per second; sway m/s^2
 //   level.ribbon_color(id, r, g, b)            tint (0-1), white by default
 //   level.ribbon_add(id, pos, alpha[, hud])    a new point at pos (hud: pos is in the first-person HUD's space,
-//                                              moved to the world's like a hud_mode light); alpha 0-1
+//                                              moved to where it shows on screen at the same distance); alpha 0-1
 //   level.ribbon_release(id)                   no more points: removed when the last one is gone
 //   level.ribbon_points(id)                    points alive
 // A point fades in over its first 10 % of life and out over the last 50 %. At most 64 ribbons and 256 points each.
@@ -1185,7 +1185,19 @@ void ribbon_add(int id, const Fvector& pos, float alpha, bool hud)
 	SRibbonPoint p;
 	p.pos = pos;
 	if (hud)
-		Device.hud_to_world(p.pos);
+	{
+		// the HUD point where it shows on screen, at the same distance from the camera: in view space scale x and y
+		// by the HUD's projection over the world's (Device.hud_to_world keeps the screen spot but not the depth,
+		// which put the point far off: each turn of the view then drew a long horizontal streak; user, 7 Nov 2026)
+		Fvector v;
+		Device.mView.transform_tiny(v, p.pos);
+		if (Device.mProject._11 != 0.f && Device.mProject._22 != 0.f)
+		{
+			v.x *= Device.mProjectHud._11 / Device.mProject._11;
+			v.y *= Device.mProjectHud._22 / Device.mProject._22;
+		}
+		Device.mInvView.transform_tiny(p.pos, v);
+	}
 	p.vel.set(0.f, 0.f, 0.f);
 	p.age = 0.f;
 	p.alpha = alpha;
