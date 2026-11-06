@@ -711,8 +711,8 @@ bool CKinematics::PickBone(const Fmatrix& parent_xform, IKinematics::pick_result
 	return false;
 }
 
-void CKinematics::AddWallmark(const Fmatrix* parent_xform, const Fvector3& start, const Fvector3& dir,
-                              ref_shader shader, float size, float ttl)
+intrusive_ptr<CSkeletonWallmark> CKinematics::AddWallmark(const Fmatrix* parent_xform, const Fvector3& start,
+                                                          const Fvector3& dir, ref_shader shader, float size, float ttl)
 {
 	Fvector S, D, normal = {0, 0, 0};
 	// transform ray from world to model
@@ -750,7 +750,7 @@ void CKinematics::AddWallmark(const Fmatrix* parent_xform, const Fvector3& start
 				}
 		}
 	}
-	if (!picked) return;
+	if (!picked) return intrusive_ptr<CSkeletonWallmark>();
 
 	// calculate contact point
 	Fvector cp;
@@ -785,8 +785,31 @@ void CKinematics::AddWallmark(const Fmatrix* parent_xform, const Fvector3& start
 		}
 	}
 
+	// decal budget: over [wallmarks] skeleton_max_per_object, the oldest marks on this object start to fade out
+	if (g_wallmark_settings.skeleton_max_per_object)
+	{
+		u32 live = 0;
+		for (u32 wm_idx = 0; wm_idx < wallmarks.size(); wm_idx++)
+			if (!wallmarks[wm_idx]->Evicted() && wallmarks[wm_idx]->TimeEnd() != -1.f)
+				live++;
+		while (live >= g_wallmark_settings.skeleton_max_per_object)
+		{
+			CSkeletonWallmark* oldest = NULL;
+			for (u32 wm_idx = 0; wm_idx < wallmarks.size(); wm_idx++)
+			{
+				CSkeletonWallmark* it = &*wallmarks[wm_idx];
+				if (it->Evicted() || it->TimeEnd() == -1.f) continue;
+				if (!oldest || it->TimeStart() < oldest->TimeStart()) oldest = it;
+			}
+			if (!oldest) break;
+			oldest->Evict(RDEVICE.fTimeGlobal);
+			live--;
+		}
+	}
+
 	// ok. allocate wallmark
-	intrusive_ptr<CSkeletonWallmark> wm = xr_new<CSkeletonWallmark>(this, parent_xform, shader, cp, RDEVICE.fTimeGlobal, ttl ? ttl : ps_r__WallmarkTTL);
+	float def_ttl = g_wallmark_settings.skeleton_ttl > 0.f ? g_wallmark_settings.skeleton_ttl : ps_r__WallmarkTTL;
+	intrusive_ptr<CSkeletonWallmark> wm = xr_new<CSkeletonWallmark>(this, parent_xform, shader, cp, RDEVICE.fTimeGlobal, ttl ? ttl : def_ttl);
 	wm->m_LocalBounds.set(cp, size * 2.f);
 	wm->XFORM()->transform_tiny(wm->m_Bounds.P, cp);
 	wm->m_Bounds.R = wm->m_LocalBounds.R;
@@ -810,6 +833,7 @@ void CKinematics::AddWallmark(const Fmatrix* parent_xform, const Fvector3& start
 	}
 
 	wallmarks.push_back(wm);
+	return wm;
 }
 
 struct zero_wm_pred
@@ -826,7 +850,7 @@ void CKinematics::CalculateWallmarks()
 		for (SkeletonWMVecIt it = wallmarks.begin(); it != wallmarks.end(); it++)
 		{
 			intrusive_ptr<CSkeletonWallmark>& wm = *it;
-			float w = wm->TimeEnd() == -1.f ? 0.f : (RDEVICE.fTimeGlobal - wm->TimeStart()) / wm->TimeEnd();
+			float w = wallmark_fade(wm->TimeStart(), wm->TimeEnd(), wm->EvictStart());
 			if (w < 1.f)
 			{
 				// append wm to WallmarkEngine
@@ -836,7 +860,9 @@ void CKinematics::CalculateWallmarks()
 			}
 			else
 			{
-				// remove wallmark				
+				// remove wallmark: null it so zero_wm_pred below really erases it (it used to stay in the
+				// list forever, so expired marks piled up on long-lived objects)
+				wm = 0;
 				need_remove = true;
 			}
 		}
@@ -861,7 +887,7 @@ void CKinematics::RenderWallmark(intrusive_ptr<CSkeletonWallmark> wm, FVF::LIT* 
 	for (u32 f_idx = 0; f_idx < wm->m_Faces.size(); f_idx++)
 	{
 		CSkeletonWallmark::WMFace F = wm->m_Faces[f_idx];
-		float w = wm->TimeEnd() == -1.f ? 0.f : (RDEVICE.fTimeGlobal - wm->TimeStart()) / wm->TimeEnd();
+		float w = wallmark_fade(wm->TimeStart(), wm->TimeEnd(), wm->EvictStart());
 		for (u32 k = 0; k < 3; k++)
 		{
 			Fvector P;

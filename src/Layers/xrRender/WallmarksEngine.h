@@ -11,6 +11,27 @@ namespace WallmarksEngine
 class CSkeletonWallmark;
 class CKinematics;
 
+// Decal budget and lifetime: optional [wallmarks] keys in system.ltx, read when a level loads.
+// Every default keeps vanilla behaviour (no caps, fade over the whole life, vanilla lifetimes).
+struct SWallmarkSettings
+{
+	u32 static_max; // most static (level) marks alive at once; 0 = no cap. Infinite marks (ttl -1) don't count
+	u32 skeleton_max; // most marks on skinned / kinematic objects at once (all objects together); 0 = no cap
+	u32 skeleton_max_per_object; // most marks on one object; 0 = no cap
+	float fade_time; // seconds a mark pushed out by a cap takes to fade away (0 = removed at once)
+	float fade_fraction; // last part of the life over which a mark fades (1 = vanilla: fades over its whole life)
+	float static_ttl; // lifetime of static marks placed without their own ttl (0 = vanilla: r__wallmark_ttl x 15)
+	float skeleton_ttl; // lifetime of skeleton marks placed without their own ttl (0 = vanilla: r__wallmark_ttl)
+
+	void load();
+};
+extern SWallmarkSettings g_wallmark_settings;
+
+// How far a mark has faded, 0 (full) to 1 (gone): the life fade (last fade_fraction of ttl; ttl -1 = never)
+// and, once a cap pushed it out (evict_start >= 0), the eviction fade over fade_time, whichever is further.
+// With the default settings this is age / ttl, exactly the vanilla value shaders get in the vertex alpha.
+float wallmark_fade(float time_start, float ttl, float evict_start);
+
 class CWallmarksEngine
 {
 public:
@@ -24,9 +45,11 @@ public:
 		float m_fTimeStart;
 
 		float m_fTimeEnd;
+		float m_fEvictStart; // time a cap pushed this mark out (it then fades over fade_time), -1 = not pushed out
 
 		IC float TimeStart() { return m_fTimeStart; }
 		IC float TimeEnd() { return m_fTimeEnd; }
+		IC float Fade() { return wallmark_fade(m_fTimeStart, m_fTimeEnd, m_fEvictStart); }
 	};
 
 	DEFINE_VECTOR(static_wallmark*, StaticWMVec, StaticWMVecIt);
@@ -46,9 +69,16 @@ private:
 	xr_vector<u32> sml_adjacency;
 
 	xrCriticalSection lock;
+
+	// every live skeleton mark in the order they were made, kept only while [wallmarks] skeleton_max is set
+	xr_vector<intrusive_ptr<CSkeletonWallmark>> skeleton_budget;
 private:
 	wm_slot* FindSlot(ref_shader shader);
 	wm_slot* AppendSlot(ref_shader shader);
+
+	// budget: push out the oldest marks over the caps (they fade, then die)
+	void static_budget();
+	void skeleton_budget_add(intrusive_ptr<CSkeletonWallmark> wm);
 private:
 	void BuildMatrix(Fmatrix& dest, float invsz, const Fvector& from);
 	void RecurseTri(u32 T, Fmatrix& mView, static_wallmark& W);
