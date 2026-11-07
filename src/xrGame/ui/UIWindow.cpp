@@ -2,6 +2,7 @@
 #include "UIWindow.h"
 #include "../UICursor.h"
 #include "../MainMenu.h"
+#include "../UIDialogHolder.h"
 
 #include "../Include/xrRender/DebugRender.h"
 #include "../Include/xrRender/UIRender.h"
@@ -184,6 +185,8 @@ CUIWindow::CUIWindow()
 CUIWindow::~CUIWindow()
 {
 	VERIFY(!(GetParent()&&IsAutoDelete()));
+
+	CDialogHolder::ForgetWindow(this);   // never left on a HUD list after it is gone
 
 	erase_capture_subtree(this);
 

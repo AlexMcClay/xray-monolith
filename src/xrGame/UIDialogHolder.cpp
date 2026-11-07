@@ -35,13 +35,47 @@ bool operator ==(const recvItem& i1, const recvItem& i2)
 	return i1.m_item == i2.m_item;
 }
 
+// Every live holder (the game's HUD, the main menu), for ForgetWindow
+static xr_vector<CDialogHolder*>& holders()
+{
+	static xr_vector<CDialogHolder*> list;
+	return list;
+}
+
 CDialogHolder::CDialogHolder()
 {
 	m_b_in_update = false;
+	holders().push_back(this);
 }
 
 CDialogHolder::~CDialogHolder()
 {
+	xr_vector<CDialogHolder*>& h = holders();
+	h.erase(std::remove(h.begin(), h.end(), this), h.end());
+}
+
+void CDialogHolder::ForgetWindow(CUIWindow* wnd)
+{
+	if (!wnd)
+		return;
+	for (CDialogHolder* h : holders())
+	{
+		for (dlgItem& it : h->m_dialogsToRender)
+			if (it.wnd == wnd)
+			{
+				it.wnd = nullptr;
+				it.enabled = false;
+			}
+		for (dlgItem& it : h->m_dialogsToRender_new)
+			if (it.wnd == wnd)
+			{
+				it.wnd = nullptr;
+				it.enabled = false;
+			}
+		for (u32 i = h->m_input_receivers.size(); i > 0; --i)
+			if (static_cast<CUIWindow*>(h->m_input_receivers[i - 1].m_item) == wnd)
+				h->m_input_receivers.erase(h->m_input_receivers.begin() + (i - 1));
+	}
 }
 
 #include "player_hud.h"
@@ -168,7 +202,7 @@ void CDialogHolder::DoRenderDialogs()
 	xr_vector<dlgItem>::iterator it = m_dialogsToRender.begin();
 	for (; it != m_dialogsToRender.end(); ++it)
 	{
-		if ((*it).enabled && (*it).wnd->IsShown())
+		if ((*it).enabled && (*it).wnd && (*it).wnd->IsShown())
 			(*it).wnd->Draw();
 	}
 }

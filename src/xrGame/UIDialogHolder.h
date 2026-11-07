@@ -45,6 +45,11 @@ protected:
 public:
 	CDialogHolder();
 	virtual ~CDialogHolder();
+	// A window is being destroyed: every holder lets go of it (its render entries emptied and disabled, popped at the
+	// end of the next OnFrame; its input receiver entry removed). A script window freed while still on the HUD's
+	// list (a mod dropping it without RemoveDialogToRender, or Lua collecting it) used to crash the next frame in
+	// OnFrame / DoRenderDialogs. Called by ~CUIWindow.
+	static void ForgetWindow(CUIWindow* wnd);
 
 	//dialogs
 	void OnExternalHideIndicators();
