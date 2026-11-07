@@ -100,6 +100,8 @@ public:
 		CAI_Stalker const* m_object;
 		CBlend const* const* m_blend;
 		bool m_forward;
+		float const* m_lean_roll{};    // the spine's params only: the lean (set_lean), else null
+		float const* m_lean_shift{};
 
 		callback_params()
 		{
@@ -119,6 +121,19 @@ private:
 	callback_params m_spine_params;
 	callback_params m_shoulder_params;
 	callback_params m_head_params;
+
+	// A lean (scripts: game_object:set_lean): the spine rolls around the torso's facing and the upper body shifts
+	// sideways; > 0 to the right. Eased toward the target each frame.
+	float m_lean_roll_target{};
+	float m_lean_shift_target{};
+	float m_lean_roll{};
+	float m_lean_shift{};
+
+public:
+	void set_lean(float roll, float shift);
+	IC float lean_roll() const { return m_lean_roll; }
+	IC float lean_shift() const { return m_lean_shift; }
+	void update_lean();
 
 private:
 	IC bool strapped() const;

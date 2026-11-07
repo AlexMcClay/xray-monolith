@@ -247,6 +247,7 @@ void CStalkerAnimationManager::update()
 	START_PROFILE("stalker/client_update/animations")
 		try
 		{
+			update_lean();
 			update_impl();
 		}
 		catch (...)
