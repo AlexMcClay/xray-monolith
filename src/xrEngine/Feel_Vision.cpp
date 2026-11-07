@@ -6,6 +6,15 @@
 #include "igame_level.h"
 #include "cl_intersect.h"
 
+// Foliage rules for the sight test (console; 0, 0, 1 = as before). A see-through surface (0 < transparency < 1:
+// bushes, fences) crossed within ai_vision_foliage_eye metres of the eye doesn't count (the looker stands in a bush
+// and sees out of it); one within ai_vision_foliage_target metres of the target counts only ai_vision_foliage_target_k
+// as much (0 not at all, 1 fully: a target inside a bush is seen more easily than one behind it). Solid surfaces
+// always block.
+ENGINE_API float g_ai_vision_foliage_eye = 0.f;
+ENGINE_API float g_ai_vision_foliage_target = 0.f;
+ENGINE_API float g_ai_vision_foliage_target_k = 1.f;
+
 namespace Feel
 {
 	Vision::Vision(CObject const* owner) :
@@ -24,6 +33,7 @@ namespace Feel
 		Vision::feel_visible_Item* item;
 		float vis;
 		float vis_threshold;
+		float length{};   // from the eye to the target point
 
 		SFeelParam(Vision* _parent, Vision::feel_visible_Item* _item, float _vis_threshold) : parent(_parent),
 		                                                                                      item(_item), vis(1.f),
@@ -37,6 +47,13 @@ namespace Feel
 	{
 		SFeelParam* fp = (SFeelParam*)params;
 		float vis = fp->parent->feel_vision_mtl_transp(result.O, result.element);
+		if (vis > 0.f && vis < 1.f)
+		{
+			if (result.range < g_ai_vision_foliage_eye)
+				vis = 1.f;
+			else if (fp->length - result.range < g_ai_vision_foliage_target)
+				vis = 1.f - (1.f - vis) * g_ai_vision_foliage_target_k;
+		}
 		fp->vis *= vis;
 		if (NULL == result.O && fis_zero(vis))
 		{
@@ -218,6 +235,7 @@ namespace Feel
 				                     collide::rq_target(
 					                     collide::rqtStatic | /**/collide::rqtObject | /**/collide::rqtObstacle));
 				SFeelParam feel_params(this, &*I, vis_threshold);
+				feel_params.length = f - .2f;
 				// check cache
 				if (I->Cache.result && I->Cache.similar(P, D, f))
 				{

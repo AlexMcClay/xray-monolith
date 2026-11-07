@@ -2815,6 +2815,12 @@ void CCC_RegisterCommands()
 	CMD4(CCC_Integer, "ai_npc_hit_anims", &g_ai_npc_hit_anims, 0, 1);
 	extern BOOL g_ai_run_sharp_turn_walk;
 	CMD4(CCC_Integer, "ai_run_sharp_turn_walk", &g_ai_run_sharp_turn_walk, 0, 1);
+	extern ENGINE_API float g_ai_vision_foliage_eye;
+	extern ENGINE_API float g_ai_vision_foliage_target;
+	extern ENGINE_API float g_ai_vision_foliage_target_k;
+	CMD4(CCC_Float, "ai_vision_foliage_eye", &g_ai_vision_foliage_eye, 0.f, 5.f);
+	CMD4(CCC_Float, "ai_vision_foliage_target", &g_ai_vision_foliage_target, 0.f, 5.f);
+	CMD4(CCC_Float, "ai_vision_foliage_target_k", &g_ai_vision_foliage_target_k, 0.f, 1.f);
 
     CMD4(CCC_Float, "ai_vision_speed_boost", &g_ai_vision_speed_boost, 0.1f, 10.0f);
     CMD4(CCC_Float, "ai_reload_threshold", &g_ai_reload_threshold, 0.01f, 1.0f);
