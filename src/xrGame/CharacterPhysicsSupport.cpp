@@ -546,7 +546,10 @@ void CCharacterPhysicsSupport::in_Hit(SHit& H, bool is_killing)
 	if (!m_pPhysicsShell && is_killing)
 		KillHit(H);
 
-	if (m_flags.test(fl_use_hit_anims) && Type() != etBitting && !m_flags.test(fl_death_anim_on))
+	// ai_npc_hit_anims 0: stalkers don't play the hit flinch (the actor's body and monsters are unaffected)
+	extern BOOL g_ai_npc_hit_anims;
+	if (m_flags.test(fl_use_hit_anims) && Type() != etBitting && !m_flags.test(fl_death_anim_on) &&
+		(g_ai_npc_hit_anims || Type() != etStalker))
 		//&& Type() == etStalker
 	{
 		m_hit_animations.PlayHitMotion(H.direction(), H.bone_space_position(), H.bone(), m_EntityAlife);
