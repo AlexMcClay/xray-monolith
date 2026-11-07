@@ -83,6 +83,13 @@ public:
 	IC void finalize(const CCoverPoint*) const;
 	Cover const* add_smart_cover(LPCSTR table_name, smart_cover::object const& object, bool const& is_combat_cover,
 	                             bool const& can_fire, ::luabind::object const& loopholes) const;
+	// Takes a smart cover out (its object is being destroyed) and deletes it; false if it isn't registered (the
+	// manager was already cleared). Only script_only covers are safe to remove while the level runs: an engine cover
+	// can still be referenced as an ordinary cover point.
+	bool remove_smart_cover(Cover const* cover) const;
+	// Whether this smart cover is registered (by pointer: safe after a clear)
+	bool has_smart_cover(Cover const* cover) const;
+	// The smart cover with this id, or nullptr if there is none
 	Cover* smart_cover(shared_str const& cover_id) const;
 };
 
