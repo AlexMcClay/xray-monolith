@@ -753,6 +753,9 @@ public:
 	bool inside(const Fvector& position) const;
 
 	Fvector head_orientation() const;
+	// A monster or stalker hears a sound as if it had been played: memory, danger and the hear callback, as the
+	// engine's own sounds (CCustomMonster::feel_sound_new). who may be nil; type is snd_type (bits).
+	void feel_sound(CScriptGameObject* who, int sound_type, const Fvector& position, float power);
 	u32 vertex_in_direction(u32 level_vertex_id, Fvector direction, float max_distance) const;
 
 	void info_add(LPCSTR text);

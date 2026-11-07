@@ -14,6 +14,10 @@
 #include "reward_event_generator.h"
 #include "material_manager.h"
 #include "Weapon.h"
+#include "ai_space.h"
+#include "script_engine.h"
+#include "ai/stalker/ai_stalker.h"
+#include "script_game_object.h"
 
 #include "../Include/xrRender/UIRender.h"
 #include "../Include/xrRender/Kinematics.h"
@@ -1368,6 +1372,26 @@ void CBulletManager::CommitEvents() // @ the start of frame
 		}
 	}
 	m_Events.clear_and_reserve();
+
+	if (!m_NearEvents.empty())
+	{
+		::luabind::functor<void> funct;
+		if (ai().script_engine().functor("_G.CAI_Stalker__OnBulletNear", funct))
+		{
+			xr_vector<u16> told;
+			for (near_event const& ne : m_NearEvents)
+			{
+				if (std::find(told.begin(), told.end(), ne.npc_id) != told.end())
+					continue;
+				told.push_back(ne.npc_id);
+				CAI_Stalker* stalker = smart_cast<CAI_Stalker*>(Level().Objects.net_Find(ne.npc_id));
+				if (!stalker || stalker->getDestroy() || !stalker->g_Alive())
+					continue;
+				funct(stalker->lua_game_object(), ne.shooter_id, ne.point);
+			}
+		}
+		m_NearEvents.clear();
+	}
 }
 
 void CBulletManager::RegisterEvent(EventType Type, BOOL _dynamic, SBullet* bullet, const Fvector& end_point,

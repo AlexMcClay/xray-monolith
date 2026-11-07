@@ -156,6 +156,17 @@ protected:
 	BulletVec m_BulletsRendered; // copy for rendering
 	xr_vector<_event> m_Events;
 
+	// Bullets passing a stalker's bounding sphere without the stalker being the shooter, queued by the trace (it runs
+	// on the parallel thread) and handed to scripts at the next CommitEvents (main thread):
+	// _G.CAI_Stalker__OnBulletNear(npc, shooter_id, point), once per stalker per frame. For near-miss reactions.
+	struct near_event
+	{
+		u16 npc_id;
+		u16 shooter_id;
+		Fvector point;
+	};
+	xr_vector<near_event> m_NearEvents;
+
 #ifdef DEBUG
 	u32						m_thread_id;
 
