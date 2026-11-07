@@ -122,6 +122,7 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		.def("memory_hit_objects", SAFE_WRAP(&CScriptGameObject::memory_hit_objects), return_stl_iterator)
 		.def("not_yet_visible_objects", SAFE_WRAP(&CScriptGameObject::not_yet_visible_objects), return_stl_iterator)
 		.def("visibility_threshold", SAFE_WRAP(&CScriptGameObject::visibility_threshold))
+		.def("feel_sound", SAFE_WRAP(&CScriptGameObject::feel_sound))
 		.def("enable_vision", SAFE_WRAP(&CScriptGameObject::enable_vision))
 		.def("vision_enabled", SAFE_WRAP(&CScriptGameObject::vision_enabled))
 		.def("set_sound_threshold", SAFE_WRAP(&CScriptGameObject::set_sound_threshold))

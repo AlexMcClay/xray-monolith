@@ -67,6 +67,16 @@ BOOL CBulletManager::test_callback(const collide::ray_defs& rd, CObject* object,
 				// проверим попали ли мы в описывающую сферу 
 				if (Fsphere::rpNone != S.intersect_full(bullet->bullet_pos, bullet->dir, dist))
 				{
+					// a bullet through a stalker's bounding sphere: a near miss (or a hit) for scripts (CommitEvents)
+					if (stalker && bullet->parent_id != stalker->ID() &&
+						Level().BulletManager().m_NearEvents.size() < 256)
+					{
+						CBulletManager::near_event ne;
+						ne.npc_id = stalker->ID();
+						ne.shooter_id = bullet->parent_id;
+						ne.point.mad(bullet->bullet_pos, bullet->dir, dist);
+						Level().BulletManager().m_NearEvents.push_back(ne);
+					}
 					// да попали, найдем кто стрелял
 					bool play_whine = true;
 					CObject* initiator = Level().Objects.net_Find(bullet->parent_id);

@@ -1862,6 +1862,18 @@ void CScriptGameObject::patrol_path_make_inactual()
 }
 
 
+void CScriptGameObject::feel_sound(CScriptGameObject* who, int sound_type, const Fvector& position, float power)
+{
+	CCustomMonster* monster = smart_cast<CCustomMonster*>(&object());
+	if (!monster)
+	{
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError,
+		                                "CScriptGameObject : feel_sound is for monsters and stalkers!");
+		return;
+	}
+	monster->feel_sound_new(who ? &who->object() : nullptr, sound_type, CSound_UserDataPtr(), position, power);
+}
+
 Fvector CScriptGameObject::head_orientation() const
 {
 	CAI_Stalker* stalker = smart_cast<CAI_Stalker*>(&object());

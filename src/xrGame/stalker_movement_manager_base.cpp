@@ -38,6 +38,9 @@ extern bool show_restrictions(CRestrictedObject* object);
 const float BAD_PATH_ANGLE = PI_DIV_2 - PI_DIV_8;
 const float BAD_PATH_DISTANCE_CHECK = 2.f;
 
+// ai_run_sharp_turn_walk 0: a run in the danger state stays a run at sharp path turns (check_for_bad_path)
+BOOL g_ai_run_sharp_turn_walk = TRUE;
+
 class sight_manager_enable_guard : private xray::noncopyable
 {
 	CSightManager& m_manager;
@@ -795,6 +798,9 @@ void stalker_movement_manager_base::force_update(const bool& force_update)
 
 void stalker_movement_manager_base::check_for_bad_path(stalker_movement_params& movement_params)
 {
+	if (!g_ai_run_sharp_turn_walk)
+		return;
+
 	if (movement_params.m_movement_type != eMovementTypeRun)
 		return;
 
