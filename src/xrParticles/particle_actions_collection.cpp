@@ -1798,11 +1798,9 @@ void PATurbulence::Execute(ParticleEffect* effect, const float dt, float& tm_max
 		TAL_SCOPED_TASK_NAMED( "PATurbulence::Execute()" );
 #endif // _GPA_ENABLED
 
-	if (noise_start)
-	{
-		noise_start = 0;
-		noise3Init();
-	};
+	// set up once (thread-safe static init: effects may update in parallel, CParticlesObject::UpdateAllMT)
+	static const bool noise_ready = (noise3Init(), noise_start = 0, true);
+	(void)noise_ready;
 
 	age += dt;
 

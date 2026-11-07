@@ -20,6 +20,11 @@ protected:
 protected:
 	u32 mt_dt;
 
+	// parallel particle update (r__mt_particles): the scheduler only asks for an update (m_mt_want), and an effect
+	// drawn last frame (m_mt_render_frame) is due every frame; UpdateAllMT runs them all at once on worker threads
+	bool m_mt_want;
+	u32 m_mt_render_frame;
+
 protected:
 	virtual ~CParticlesObject();
 
@@ -31,6 +36,8 @@ public:
 	virtual void shedule_Update(u32 dt);
 	virtual void renderable_Render();
 	void PerformAllTheWork(u32 dt);
+	// once a frame before the world is drawn (CLevel::OnRender): update every due effect in parallel
+	static void UpdateAllMT();
 	void __stdcall PerformAllTheWork_mt();
 
 	Fvector& Position();
