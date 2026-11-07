@@ -54,6 +54,9 @@ void PS::OnEffectParticleBirth(void* owner, u32, PAPI::Particle& m, u32)
 			m.frame = (u16)iFloor(Random.randI(PED->m_Frame.m_iFrameCount) * 255.f);
 		if (PED->m_Flags.is(CPEDef::dfAnimated) && PED->m_Flags.is(CPEDef::dfRandomPlayback) && Random.randI(2))
 			m.flags.set(Particle::ANIMATE_CCW,TRUE);
+		// per-particle growth factor (dfSizeGrowth + [size_growth] random): a seed 0-255 in the flags' high byte
+		if (PED->m_Flags.is(CPEDef::dfSizeGrowth) && PED->m_SizeGrowthRandom.x != PED->m_SizeGrowthRandom.y)
+			m.flags.flags = u16((m.flags.flags & 0x00ff) | (u16(Random.randI(256)) << 8));
 	}
 }
 
@@ -225,9 +228,23 @@ void CParticleEffect::OnFrame(u32 frame_dt)
 			// each particle grows by the same factor from its own size (dfSizeGrowth)
 			if (m_Def->m_Flags.is(CPEDef::dfSizeGrowth) && m_Def->m_fSizeGrowth != 0.f)
 			{
-				const float k = expf(m_Def->m_fSizeGrowth * fDT_STEP);
-				for (u32 i = 0; i < p_cnt; ++i)
-					particles[i].size.mul(k);
+				const Fvector2& rnd = m_Def->m_SizeGrowthRandom;
+				if (rnd.x == rnd.y)
+				{
+					const float k = expf(m_Def->m_fSizeGrowth * rnd.x * fDT_STEP);
+					for (u32 i = 0; i < p_cnt; ++i)
+						particles[i].size.mul(k);
+				}
+				else
+				{
+					// each particle's own rate: min..max by the seed set at its birth
+					const float g = m_Def->m_fSizeGrowth * fDT_STEP;
+					for (u32 i = 0; i < p_cnt; ++i)
+					{
+						const float t = float(particles[i].flags.flags >> 8) / 255.f;
+						particles[i].size.mul(expf(g * (rnd.x + (rnd.y - rnd.x) * t)));
+					}
+				}
 			}
 
 			// our actions
