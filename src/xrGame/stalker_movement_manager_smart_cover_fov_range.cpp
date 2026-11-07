@@ -60,7 +60,10 @@ bool stalker_movement_manager_smart_cover::in_fov(
 	Fvector const& object_position
 ) const
 {
-	cover_type const& cover = *(ai().cover_manager().smart_cover(cover_id));
+	cover_type const* found = ai().cover_manager().smart_cover(cover_id);
+	if (!found)
+		return (false);   // no such cover (released, or a script's typo)
+	cover_type const& cover = *found;
 	loophole_type const& loophole = this->loophole(cover, loophole_id);
 	return (cover.is_position_in_fov(loophole, object_position));
 }
@@ -73,7 +76,8 @@ bool stalker_movement_manager_smart_cover::in_current_loophole_fov(Fvector const
 		return (m_current.cover()->is_position_in_fov(*m_current.cover_loophole(), position));
 
 	smart_cover::cover const* cover = ai().cover_manager().smart_cover(m_enter_cover_id);
-	VERIFY(cover);
+	if (!cover)
+		return (false);   // released while the stalker was entering it
 
 	smart_cover::loophole const* loophole = cover->description()->loophole(m_enter_loophole_id);
 	return (cover->is_position_in_fov(*loophole, position));
@@ -87,7 +91,8 @@ bool stalker_movement_manager_smart_cover::in_current_loophole_range(Fvector con
 		return (m_current.cover()->is_position_in_range(*m_current.cover_loophole(), position));
 
 	smart_cover::cover const* cover = ai().cover_manager().smart_cover(m_enter_cover_id);
-	VERIFY(cover);
+	if (!cover)
+		return (false);   // released while the stalker was entering it
 
 	smart_cover::loophole const* loophole = cover->description()->loophole(m_enter_loophole_id);
 	return (cover->is_position_in_range(*loophole, position));
@@ -96,7 +101,10 @@ bool stalker_movement_manager_smart_cover::in_current_loophole_range(Fvector con
 bool stalker_movement_manager_smart_cover::in_range(shared_str const& cover_id, shared_str const& loophole_id,
                                                     Fvector const& object_position) const
 {
-	cover_type const& cover = *(ai().cover_manager().smart_cover(cover_id));
+	cover_type const* found = ai().cover_manager().smart_cover(cover_id);
+	if (!found)
+		return (false);   // no such cover (released, or a script's typo)
+	cover_type const& cover = *found;
 	loophole_type const& loophole = this->loophole(cover, loophole_id);
 	return (cover.is_position_in_range(loophole, object_position));
 }
@@ -106,7 +114,10 @@ bool stalker_movement_manager_smart_cover::in_min_acceptable_range(shared_str co
                                                                    Fvector const& position,
                                                                    float const& min_range) const
 {
-	cover_type const& cover = *(ai().cover_manager().smart_cover(cover_id));
+	cover_type const* found = ai().cover_manager().smart_cover(cover_id);
+	if (!found)
+		return (false);   // no such cover (released, or a script's typo)
+	cover_type const& cover = *found;
 	loophole_type const& loophole = this->loophole(cover, loophole_id);
 	return (cover.in_min_acceptable_range(loophole, position, min_range));
 }

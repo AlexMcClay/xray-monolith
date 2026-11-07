@@ -142,6 +142,8 @@ void stalker_movement_params::cover_id(shared_str const& cover_id)
 	}
 
 	m_cover = ai().cover_manager().smart_cover(cover_id);
+	if (!m_cover)
+		m_cover_id = "";   // no such cover (logged by the cover manager): no target, as if none was given
 }
 
 void stalker_movement_params::actualize_loophole() const

@@ -16,6 +16,7 @@
 #include "smart_cover_loophole.h"
 #include "smart_cover_storage.h"
 #include "smart_cover_object.h"
+#include "smart_cover_description.h"
 
 #define MIN_COVER_VALUE 16
 
@@ -141,6 +142,14 @@ void CCoverManager::clear()
 	if (!get_covers())
 		return;
 
+	// script_only smart covers aren't in the tree: delete them here, before the tree's covers are deleted (which
+	// leaves the other entries of m_smart_covers dangling)
+	for (Cover*& c : m_smart_covers)
+	{
+		if (c && c->description()->script_only())
+			xr_delete(c);
+	}
+
 	covers().all(m_nearest);
 	clear_covers(m_nearest);
 	m_covers->clear();
@@ -212,13 +221,35 @@ CCoverManager::Cover const* CCoverManager::add_smart_cover(LPCSTR table_name, sm
 			loopholes
 		);
 
-	remove_nearby_covers(*smart_cover, object);
-	m_covers->insert(smart_cover);
+	if (!smart_cover->description()->script_only())
+	{
+		remove_nearby_covers(*smart_cover, object);
+		m_covers->insert(smart_cover);
+	}
 
 	m_smart_covers.push_back(smart_cover);
 	m_smart_covers_actual = false;
 
 	return (smart_cover);
+}
+
+bool CCoverManager::has_smart_cover(Cover const* cover) const
+{
+	return (cover && std::find(m_smart_covers.begin(), m_smart_covers.end(), cover) != m_smart_covers.end());
+}
+
+bool CCoverManager::remove_smart_cover(Cover const* cover) const
+{
+	SmartCovers::iterator found = std::find(m_smart_covers.begin(), m_smart_covers.end(), cover);
+	if (found == m_smart_covers.end())
+		return (false);
+
+	Cover* smart_cover = *found;
+	m_smart_covers.erase(found);   // the vector stays sorted
+	if (!smart_cover->description()->script_only())
+		m_covers->remove(smart_cover);
+	xr_delete(smart_cover);
+	return (true);
 }
 
 class id_predicate_less
@@ -264,13 +295,12 @@ CCoverManager::Cover* CCoverManager::smart_cover(shared_str const& cover_id) con
 		id_predicate_less()
 	);
 
-	VERIFY2(
-		((found != m_smart_covers.end()) && ((*found)->id()._get() == cover_id._get())),
-		make_string (
-			"smart_cover [%s] not found",
-			cover_id.c_str()
-		)
-	);
+	// a missing id (a script's typo, or a cover released since) used to read past the end or return the wrong cover
+	if ((found == m_smart_covers.end()) || ((*found)->id()._get() != cover_id._get()))
+	{
+		Msg("! smart_cover [%s] not found", cover_id.c_str());
+		return (nullptr);
+	}
 
 	return (*found);
 }

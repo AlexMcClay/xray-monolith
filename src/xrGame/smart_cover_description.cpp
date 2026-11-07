@@ -106,6 +106,13 @@ description::description(shared_str const& table_id)
 	load_loopholes(table_id);
 	load_transitions(table_id);
 	process_loopholes();
+
+	string256 temp;
+	xr_strcpy(temp, "smart_covers.descriptions.");
+	xr_strcat(temp, *table_id);
+	xr_strcat(temp, ".script_only");
+	::luabind::object flag;
+	m_script_only = ai().script_engine().function_object(temp, flag, LUA_TBOOLEAN) && ::luabind::object_cast<bool>(flag);
 }
 
 void description::load_loopholes(shared_str const& table_id)

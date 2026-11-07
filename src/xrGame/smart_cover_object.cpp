@@ -18,7 +18,39 @@
 #include "smart_cover_description.h"
 #include "smart_cover_loophole.h"
 #include "../xrengine/xr_collide_form.h"
+#include "ai/stalker/ai_stalker.h"
+#include "stalker_movement_manager_smart_cover.h"
 using smart_cover::object;
+
+// Released while the level runs (a script's temporary cover): stalkers heading for it are sent nowhere, then the cover
+// leaves the cover manager. A stalker still inside can't be pulled out safely (its animations use the cover): the
+// script must have it leave first; that case is logged. At level unload the manager may already be cleared, and then
+// nothing is touched.
+void object::net_Destroy()
+{
+	if (m_cover && g_pGameLevel && ai().get_alife())
+	{
+		if (ai().cover_manager().has_smart_cover(m_cover))
+		{
+			if (!m_cover->description()->script_only())
+				Msg("! smart cover [%s] released while the level runs, but it isn't script_only: stalkers may still "
+				    "hold it as a cover point", cName().c_str());
+			for (u32 i = 0, n = Level().Objects.o_count(); i < n; ++i)
+			{
+				CAI_Stalker* stalker = smart_cast<CAI_Stalker*>(Level().Objects.o_get_by_iterator(i));
+				if (!stalker || stalker->getDestroy())
+					continue;
+				if (stalker->movement().current_params().cover() == m_cover)
+					Msg("! smart cover [%s] released while [%s] is in it", cName().c_str(), stalker->cName().c_str());
+				if (stalker->movement().target_params().cover() == m_cover)
+					stalker->movement().target_params().cover_id("");
+			}
+			ai().cover_manager().remove_smart_cover(m_cover);
+		}
+	}
+	m_cover = nullptr;
+	inherited::net_Destroy();
+}
 
 BOOL object::net_Spawn(CSE_Abstract* server_entity)
 {

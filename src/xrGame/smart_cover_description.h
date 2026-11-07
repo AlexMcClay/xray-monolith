@@ -42,11 +42,16 @@ namespace smart_cover
 		Loopholes m_loopholes;
 		TransitionGraph m_transitions;
 		shared_str m_table_id;
+		// script_only = true in the description table: covers made from it are for scripts that send a stalker there
+		// by name. They stay out of the cover tree (the engine's own cover search never picks them, nearby ordinary
+		// cover points are kept) and can be released while the level runs (smart_cover::object::net_Destroy).
+		bool m_script_only{};
 
 	public:
 		description(shared_str const& table_id);
 		~description();
 		IC shared_str const& table_id() const;
+		IC bool script_only() const { return m_script_only; }
 		IC Loopholes const& loopholes() const;
 		IC TransitionGraph const& transitions() const;
 		loophole const* loophole(shared_str const& loophole_id) const;

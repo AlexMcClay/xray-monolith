@@ -32,6 +32,7 @@ namespace smart_cover
 		virtual bool feel_touch_on_contact(CObject*) { return FALSE; }
 		virtual bool use(CGameObject* who_use) { return false; }
 		virtual BOOL net_Spawn(CSE_Abstract* DC);
+		virtual void net_Destroy();
 		virtual void UpdateCL();
 		virtual void shedule_Update(u32 dt);
 		virtual bool IsVisibleForZones() { return false; }
