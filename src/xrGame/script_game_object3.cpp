@@ -1874,6 +1874,30 @@ void CScriptGameObject::feel_sound(CScriptGameObject* who, int sound_type, const
 	monster->feel_sound_new(who ? &who->object() : nullptr, sound_type, CSound_UserDataPtr(), position, power);
 }
 
+void CScriptGameObject::set_lean(float roll, float shift)
+{
+	CAI_Stalker* stalker = smart_cast<CAI_Stalker*>(&object());
+	if (!stalker)
+	{
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError,
+		                                "CAI_Stalker : cannot access class member set_lean!");
+		return;
+	}
+	stalker->animation().set_lean(roll, shift);
+}
+
+float CScriptGameObject::lean_roll() const
+{
+	CAI_Stalker* stalker = smart_cast<CAI_Stalker*>(&object());
+	return stalker ? stalker->animation().lean_roll() : 0.f;
+}
+
+float CScriptGameObject::lean_shift() const
+{
+	CAI_Stalker* stalker = smart_cast<CAI_Stalker*>(&object());
+	return stalker ? stalker->animation().lean_shift() : 0.f;
+}
+
 Fvector CScriptGameObject::head_orientation() const
 {
 	CAI_Stalker* stalker = smart_cast<CAI_Stalker*>(&object());
