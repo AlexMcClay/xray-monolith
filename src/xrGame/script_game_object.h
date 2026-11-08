@@ -1135,6 +1135,7 @@ public:
 	void reset_hud_offset(int index);
 	void reset_hud_offsets();
 	void set_hud_recoil(Fvector pos, Fvector rot, Fvector pivot);
+	void set_hud_recoil_screen(Fvector pos, Fvector rot, Fvector pivot);
 	void reset_hud_recoil();
 	void set_cam_recoil(bool on);
 	void set_weapon_particles(LPCSTR kind, LPCSTR name);

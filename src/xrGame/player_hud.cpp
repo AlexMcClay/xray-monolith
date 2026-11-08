@@ -1443,8 +1443,34 @@ void player_hud::update(const Fmatrix& cam_trans)
 			Fmatrix pivot_inv;
 			pivot_inv.invert(pivot);
 
+			// A canted sight rolls the hands before recoil is applied. For screen-relative recoil, apply pitch and
+			// yaw in the camera frame about the weapon pivot in world space, rather than post-multiplying them in
+			// the already-rolled weapon frame. The projectile follows the resulting barrel transform as before.
+			Fvector local_rot = rc->rot;
+			if (rc->screen_rotation && (!fis_zero(rc->rot.x) || !fis_zero(rc->rot.y)))
+			{
+				Fmatrix camera, camera_inv, screen_turn, world_turn;
+				camera.identity();
+				camera.i.set(Device.vCameraRight);
+				camera.j.set(Device.vCameraTop);
+				camera.k.set(Device.vCameraDirection);
+				camera_inv.invert(camera);
+				hud_recoil_rotation(screen_turn, Fvector().set(rc->rot.x, rc->rot.y, 0.f));
+				world_turn.mul_43(camera, screen_turn);
+				world_turn.mulB_43(camera_inv);
+
+				Fvector pivot_world, turned_pivot;
+				m_transform.transform_tiny(pivot_world, at);
+				world_turn.transform_tiny(turned_pivot, pivot_world);
+				world_turn.c.sub(pivot_world, turned_pivot);
+				m_transform.mulA_43(world_turn);
+				if (!m_attached_items[1])
+					m_transform_2.mulA_43(world_turn);
+				local_rot.x = local_rot.y = 0.f;
+			}
+
 			Fmatrix kick;
-			hud_recoil_rotation(kick, rc->rot);
+			hud_recoil_rotation(kick, local_rot);
 			kick.c.set(rc->pos);
 
 			Fmatrix m;

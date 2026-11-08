@@ -458,6 +458,14 @@ void CScriptGameObject::set_hud_recoil(Fvector pos, Fvector rot, Fvector pivot)
 		item->SetHudRecoil(pos, rot, pivot);
 }
 
+// As set_hud_recoil, but pitch and yaw are about the camera's right and up axes. This keeps vertical recoil
+// vertical on screen while aiming through a canted sight; position and roll remain local to the weapon.
+void CScriptGameObject::set_hud_recoil_screen(Fvector pos, Fvector rot, Fvector pivot)
+{
+	if (CHudItem* item = get_script_hud_offset_item(this, "set_hud_recoil_screen", 0))
+		item->SetHudRecoilScreen(pos, rot, pivot);
+}
+
 void CScriptGameObject::set_cam_recoil(bool on)
 {
 	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
