@@ -34,6 +34,8 @@ public:
 	virtual void SetSizeScale(float k) { ; }
 	virtual void SetTimeScale(float k) { ; }
 	virtual void SetRateScale(float k) { ; }
+	// every new particle's velocity x k at birth (a script effect thrown faster or slower)
+	virtual void SetSpeedScale(float k) { ; }
 };
 
 #endif	//	ParticleCustom_included

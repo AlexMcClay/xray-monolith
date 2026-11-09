@@ -22,6 +22,8 @@
 #include "../xrEngine/gamemtllib.h"
 #include "hudsound.h"
 #include "script_game_object.h"
+#include "ai_space.h"
+#include "script_engine.h"
 
 #ifdef DEBUG
 #	include "../xrEngine/StatGraph.h"
@@ -390,11 +392,38 @@ void CExplosive::Explode()
 	Fvector::generate_orthonormal_basis(explode_matrix.j, explode_matrix.i, explode_matrix.k);
 	explode_matrix.c.set(pos);
 
-	CParticlesObject* pStaticPG;
-	pStaticPG = CParticlesObject::Create(*m_sExplodeParticles, !m_bDynamicParticles);
-	if (m_bDynamicParticles) m_pExpParticle = pStaticPG;
-	pStaticPG->UpdateParent(explode_matrix, vel);
-	pStaticPG->Play(false);
+	// _G.CExplosiveOnExplode(table) for scripts (Gunsmith Docs vfx.md "Explosions"): position, direction (the
+	// blast's +Y, as the particles get it), particles (the config's explode_particles), section, id,
+	// initiator, velocity. A handler that sets skip_particles = true draws the blast's particles itself; the
+	// sound, light, wallmarks, fragments and blast wave stay.
+	bool skip_particles = false;
+	{
+		::luabind::functor<void> funct;
+		if (ai().script_engine().functor("_G.CExplosiveOnExplode", funct))
+		{
+			::luabind::object table = ::luabind::newtable(ai().script_engine().lua());
+			table["position"] = pos;
+			table["direction"] = dir;
+			table["velocity"] = vel;
+			table["particles"] = m_sExplodeParticles.size() ? m_sExplodeParticles.c_str() : "";
+			table["section"] = cast_game_object()->cNameSect().c_str();
+			table["id"] = cast_game_object()->ID();
+			table["initiator"] = Initiator();
+			table["skip_particles"] = false;
+			funct(table);
+			::luabind::object sp = table["skip_particles"];
+			skip_particles = sp.is_valid() && sp.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(sp);
+		}
+	}
+
+	if (!skip_particles)
+	{
+		CParticlesObject* pStaticPG;
+		pStaticPG = CParticlesObject::Create(*m_sExplodeParticles, !m_bDynamicParticles);
+		if (m_bDynamicParticles) m_pExpParticle = pStaticPG;
+		pStaticPG->UpdateParent(explode_matrix, vel);
+		pStaticPG->Play(false);
+	}
 
 	//включаем подсветку от взрыва
 	StartLight();

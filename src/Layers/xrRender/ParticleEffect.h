@@ -50,6 +50,7 @@ namespace PS
 		float m_SizeK;
 		float m_TimeK;
 		float m_RateK;
+		float m_SpeedK;
 	float m_RateRandom = 1.f; // this play's random rate factor (dfRandomRate)
 		float m_TimeCarry;
 	protected:
@@ -112,6 +113,7 @@ namespace PS
 		virtual BOOL IsLit();
 		virtual void SetColorScale(float r, float g, float b, float a);
 		virtual void SetSizeScale(float k);
+		virtual void SetSpeedScale(float k);
 		virtual void SetTimeScale(float k);
 		virtual void SetRateScale(float k);
 		void CopyScales(const CParticleEffect* from);

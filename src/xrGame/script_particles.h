@@ -58,6 +58,7 @@ public:
 	// per-instance controls (Gunsmith Docs vfx.md, E5): colour and alpha multipliers, size, time and rate
 	void SetColor(float r, float g, float b, float a);
 	void SetSizeScale(float k);
+	void SetSpeedScale(float k);
 	void SetTimeScale(float k);
 	void SetRateScale(float k);
 	u32 ParticlesCount() const;

@@ -54,6 +54,9 @@ void PS::OnEffectParticleBirth(void* owner, u32, PAPI::Particle& m, u32)
 			m.frame = (u16)iFloor(Random.randI(PED->m_Frame.m_iFrameCount) * 255.f);
 		if (PED->m_Flags.is(CPEDef::dfAnimated) && PED->m_Flags.is(CPEDef::dfRandomPlayback) && Random.randI(2))
 			m.flags.set(Particle::ANIMATE_CCW,TRUE);
+		// the script's speed scale (particles_object:set_speed_scale)
+		if (PE->m_SpeedK != 1.f)
+			m.vel.mul(PE->m_SpeedK);
 		// per-particle growth factor (dfSizeGrowth + [size_growth] random): a seed 0-255 in the flags' high byte
 		if (PED->m_Flags.is(CPEDef::dfSizeGrowth) && PED->m_SizeGrowthRandom.x != PED->m_SizeGrowthRandom.y)
 			m.flags.flags = u16((m.flags.flags & 0x00ff) | (u16(Random.randI(256)) << 8));
@@ -81,6 +84,7 @@ CParticleEffect::CParticleEffect()
 	m_ColorK.set(1.f, 1.f, 1.f, 1.f);
 	m_SizeK = 1.f;
 	m_TimeK = 1.f;
+	m_SpeedK = 1.f;
 	m_RateK = 1.f;
 	m_TimeCarry = 0.f;
 	m_InitialPosition.set(0, 0, 0);
@@ -155,6 +159,11 @@ void CParticleEffect::SetSizeScale(float k)
 	m_SizeK = _max(k, 0.f);
 }
 
+void CParticleEffect::SetSpeedScale(float k)
+{
+	m_SpeedK = _max(k, 0.f);
+}
+
 void CParticleEffect::SetTimeScale(float k)
 {
 	m_TimeK = _max(k, 0.f);
@@ -173,6 +182,7 @@ void CParticleEffect::CopyScales(const CParticleEffect* from)
 	SetColorScale(from->m_ColorK.r, from->m_ColorK.g, from->m_ColorK.b, from->m_ColorK.a);
 	SetSizeScale(from->m_SizeK);
 	SetTimeScale(from->m_TimeK);
+	SetSpeedScale(from->m_SpeedK);
 	if (from->m_RateK != 1.f)
 		SetRateScale(from->m_RateK);
 }

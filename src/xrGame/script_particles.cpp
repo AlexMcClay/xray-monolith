@@ -182,6 +182,12 @@ void CScriptParticles::SetSizeScale(float k)
 		V->SetSizeScale(k);
 }
 
+void CScriptParticles::SetSpeedScale(float k)
+{
+	if (IParticleCustom* V = script_particles_visual(m_particles))
+		V->SetSpeedScale(k);
+}
+
 void CScriptParticles::SetTimeScale(float k)
 {
 	if (IParticleCustom* V = script_particles_visual(m_particles))

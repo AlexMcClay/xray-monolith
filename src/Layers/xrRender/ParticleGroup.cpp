@@ -646,6 +646,11 @@ void CParticleGroup::SetSizeScale(float k)
 	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetSizeScale(k); });
 }
 
+void CParticleGroup::SetSpeedScale(float k)
+{
+	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetSpeedScale(k); });
+}
+
 void CParticleGroup::SetTimeScale(float k)
 {
 	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetTimeScale(k); });
