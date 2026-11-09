@@ -307,9 +307,12 @@ void HUD_SOUND_COLLECTION_LAYERED::SetVolumeMult(LPCSTR alias, float k)
 	{
 		if (!(c.m_alias == alias))
 			continue;
+		// (every variant with a live voice, not m_activeSnd: set_position forgets that for a 2D sound every frame,
+		// so the player's own first-person loops were never reached)
 		for (auto& i : c.m_sound_items)
-			if (i.m_activeSnd && i.m_activeSnd->snd._feedback())
-				i.m_activeSnd->snd.set_volume(i.m_play_volume * k);
+			for (auto& v : i.sounds)
+				if (v.snd._feedback())
+					v.snd.set_volume(i.m_play_volume * k);
 	}
 }
 
