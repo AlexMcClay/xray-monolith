@@ -209,6 +209,12 @@ void CPEDef::ExecuteCollision(PAPI::Particle* particles, u32 p_cnt, float dt, CP
 						CDB::TRI* T = g_pGameLevel->ObjectSpace.GetStaticTris() + RQ.element;
 						Fvector* verts = g_pGameLevel->ObjectSpace.GetStaticVerts();
 						n.mknormal(verts[T->verts[0]], verts[T->verts[1]], verts[T->verts[2]]);
+						// a decal where it landed (particles_object:set_collision_marks)
+						if (owner->m_CollideMarks && pick_cnt == 0 && !m.flags.is(Particle::COLLIDE_MARKED))
+						{
+							m.flags.set(Particle::COLLIDE_MARKED, TRUE);
+							owner->CollisionMark(pt, T, verts);
+						}
 					}
 #endif
 					pick_cnt++;

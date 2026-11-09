@@ -53,6 +53,16 @@ namespace PS
 		float m_SpeedK;
 	float m_RateRandom = 1.f; // this play's random rate factor (dfRandomRate)
 		float m_TimeCarry;
+
+		// decals where colliding particles hit the level (SetCollisionMarks). Touched only by the thread updating
+		// this effect; the wallmark engine locks itself.
+		IWallMarkArray* m_CollideMarks = nullptr;
+		float m_CollideMarkChance = 0.f;
+		float m_CollideMarkSize = 0.f;
+		float m_CollideMarkTTL = 0.f;
+		int m_CollideMarkLeft = 0;
+		u32 m_CollideMarkSeed = 0x9e3779b9u;
+		void CollisionMark(const Fvector& pt, CDB::TRI* T, Fvector* verts);
 	protected:
 		BOOL SaveActionList(IWriter& F);
 		BOOL LoadActionList(IReader& F);
@@ -116,6 +126,7 @@ namespace PS
 		virtual void SetSpeedScale(float k);
 		virtual void SetTimeScale(float k);
 		virtual void SetRateScale(float k);
+		virtual void SetCollisionMarks(IWallMarkArray* marks, float chance, float size, float ttl, int max_marks);
 		void CopyScales(const CParticleEffect* from);
 	};
 

@@ -103,6 +103,36 @@ void ScriptWallmarksManager::PlaceWallmark(Fvector dir, Fvector start_pos,
 	}
 }
 
+// A pool spreading under a body, a stain soaking in: the level mark is built at full size and drawn growing from
+// grow_from x size to full size over grow_time seconds (its shader must leave out what falls outside the texture;
+// Tarkov VFX's G-buffer decal shaders do). A ray that meets a moving object marks it as place does (no growth).
+void ScriptWallmarksManager::PlaceWallmarkGrowing(Fvector dir, Fvector start_pos,
+	float trace_dist, float wallmark_size, LPCSTR section,
+	CScriptGameObject* ignore_obj, float ttl, float rotation, float grow_time, float grow_from)
+{
+	collide::rq_result result;
+	BOOL hit = Level().ObjectSpace.RayPick(start_pos, dir, trace_dist, collide::rqtBoth, result,
+	                                       ignore_obj ? &ignore_obj->object() : nullptr);
+	if (hit && result.O)
+	{
+		if (wallmark_game_settings().dynamic_objects)
+			place_object_wallmark(result.O, FindSection(section), start_pos, dir, result.range, wallmark_size, ttl, true,
+			                      false, u16(result.element));
+		return;
+	}
+	if (!hit)
+		return;
+	CDB::TRI* pTri = Level().ObjectSpace.GetStaticTris() + result.element;
+	SGameMtl* pMaterial = GMLib.GetMaterialByIdx(pTri->material);
+	if (pMaterial->Flags.is(SGameMtl::flSuppressWallmarks))
+		return;
+	Fvector* pVerts = Level().ObjectSpace.GetStaticVerts();
+	Fvector end_point;
+	end_point.mad(start_pos, dir, result.range);
+	::Render->add_StaticWallmarkGrowing(FindSection(section), end_point, wallmark_size, pTri, pVerts, ttl, true, rotation,
+	                                    grow_time, grow_from);
+}
+
 void ScriptWallmarksManager::PlaceSkeletonWallmark(CScriptGameObject* obj, LPCSTR section, 
 	Fvector start, Fvector dir, float size, float ttl)
 {

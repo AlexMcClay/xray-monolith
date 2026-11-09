@@ -8,6 +8,7 @@
 
 #include "pch_script.h"
 #include "script_particles.h"
+#include "script_game_object.h"
 
 using namespace luabind;
 
@@ -37,6 +38,10 @@ void CScriptParticles::script_register(lua_State* L)
 		.def("set_time_scale", &CScriptParticles::SetTimeScale)
 		.def("set_rate_scale", &CScriptParticles::SetRateScale)
 		.def("particles_count", &CScriptParticles::ParticlesCount)
+		.def("attach_to_bone", &CScriptParticles::AttachToBone)
+		.def("detach", &CScriptParticles::Detach)
+		.def("attached", &CScriptParticles::Attached)
+		.def("set_collision_marks", &CScriptParticles::SetCollisionMarks)
 
 		.def("last_position", &CScriptParticles::LastPosition)
 		.def("load_path", &CScriptParticles::LoadPath)

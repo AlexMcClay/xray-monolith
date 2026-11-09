@@ -173,6 +173,7 @@ namespace PS
 		virtual void SetSpeedScale(float k);
 		virtual void SetTimeScale(float k);
 		virtual void SetRateScale(float k);
+		virtual void SetCollisionMarks(IWallMarkArray* marks, float chance, float size, float ttl, int max_marks);
 	};
 }
 

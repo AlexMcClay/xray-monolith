@@ -38,6 +38,9 @@ public:
 	void PerformAllTheWork(u32 dt);
 	// once a frame before the world is drawn (CLevel::OnRender): update every due effect in parallel
 	static void UpdateAllMT();
+	// once a frame on the main thread, before the effects update (UpdateAllMT) and in the scheduler: an effect that
+	// follows something moves its emitter here (script particles attached to a bone)
+	virtual void UpdateFollow() {}
 	void __stdcall PerformAllTheWork_mt();
 
 	Fvector& Position();

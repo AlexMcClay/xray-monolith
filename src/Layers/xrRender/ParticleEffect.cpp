@@ -8,6 +8,8 @@
 
 #ifndef _EDITOR
 #include <xmmintrin.h>
+#include "dxWallMarkArray.h"
+#include "../../xrEngine/gamemtllib.h"
 #endif
 
 using namespace PAPI;
@@ -202,6 +204,49 @@ void CParticleEffect::CopyScales(const CParticleEffect* from)
 	SetSpeedScale(from->m_SpeedK);
 	if (from->m_RateK != 1.f)
 		SetRateScale(from->m_RateK);
+	if (from->m_CollideMarks)
+		SetCollisionMarks(from->m_CollideMarks, from->m_CollideMarkChance, from->m_CollideMarkSize, from->m_CollideMarkTTL,
+		                  from->m_CollideMarkLeft);
+}
+
+void CParticleEffect::SetCollisionMarks(IWallMarkArray* marks, float chance, float size, float ttl, int max_marks)
+{
+	m_CollideMarks = (marks && size > 0.f && chance > 0.f && max_marks > 0) ? marks : nullptr;
+	m_CollideMarkChance = chance;
+	m_CollideMarkSize = size;
+	m_CollideMarkTTL = _max(ttl, 0.f);
+	m_CollideMarkLeft = max_marks;
+	m_CollideMarkSeed = u32(m_HandleEffect) * 2654435761u + ::Random.randI(1 << 30) + 1u;
+}
+
+// A colliding particle hit the level's triangle T at pt (ExecuteCollision, on the thread updating this effect):
+// maybe leave a decal there. Own random numbers (xorshift): ::Random isn't safe from worker threads.
+void CParticleEffect::CollisionMark(const Fvector& pt, CDB::TRI* T, Fvector* verts)
+{
+#ifndef _EDITOR
+	if (!m_CollideMarks || m_CollideMarkLeft <= 0 || !T)
+		return;
+	auto rnd = [this]() -> float
+	{
+		u32 x = m_CollideMarkSeed;
+		x ^= x << 13;
+		x ^= x >> 17;
+		x ^= x << 5;
+		m_CollideMarkSeed = x;
+		return float(x >> 8) / float(1 << 24);
+	};
+	if (rnd() >= m_CollideMarkChance)
+		return;
+	SGameMtl* mtl = GMLib.GetMaterialByIdx(T->material);
+	if (mtl && mtl->Flags.is(SGameMtl::flSuppressWallmarks))
+		return;
+	ref_shader* S = static_cast<dxWallMarkArray*>(m_CollideMarks)->dxGenerateWallmark();
+	if (!S || !*S)
+		return;
+	m_CollideMarkLeft--;
+	const float size = m_CollideMarkSize * (0.75f + 0.5f * rnd());
+	RImplementation.Wallmarks->AddStaticWallmark(T, verts, pt, *S, size, m_CollideMarkTTL, false, rnd() * 360.f);
+#endif
 }
 
 void CParticleEffect::OnFrame(u32 frame_dt)

@@ -21,6 +21,8 @@ void CScriptWallmarksManager::script_register(lua_State *L)
 		// demonized: add user defined rotation to wallmark
 		.def("place", (void (ScriptWallmarksManager::*)(Fvector, Fvector, float, float, LPCSTR, CScriptGameObject*, float, float))(&ScriptWallmarksManager::PlaceWallmark))
 
+		// a level mark that spreads (dir, start, range, size, section, ignore_obj, ttl, rotation, grow_time, grow_from)
+		.def("place_growing", &ScriptWallmarksManager::PlaceWallmarkGrowing)
 		.def("place_skeleton", &ScriptWallmarksManager::PlaceSkeletonWallmark),
 
 		def("wallmarks_manager", &GetManager)

@@ -646,6 +646,15 @@ void CRender::add_StaticWallmark(IWallMarkArray* pArray, const Fvector& P, float
 	if (pShader) add_StaticWallmark(*pShader, P, s, T, V, ttl, ignore_opt, rotation);
 }
 
+void CRender::add_StaticWallmarkGrowing(IWallMarkArray* pArray, const Fvector& P, float s, CDB::TRI* T, Fvector* V, float ttl, bool ignore_opt, float rotation, float grow_time, float grow_from)
+{
+	if (T->suppress_wm) return;
+	VERIFY2(_valid(P) && _valid(s) && T && V && (s > EPS_L), "Invalid static wallmark params");
+	dxWallMarkArray* pWMA = (dxWallMarkArray*)pArray;
+	ref_shader* pShader = pWMA->dxGenerateWallmark();
+	if (pShader) Wallmarks->AddStaticWallmarkGrowing(T, V, P, &**pShader, s, ttl, ignore_opt, rotation, grow_time, grow_from);
+}
+
 void CRender::add_StaticWallmark(const wm_shader& S, const Fvector& P, float s, CDB::TRI* T, Fvector* V)
 {
 	dxUIShader* pShader = (dxUIShader*)&*S;

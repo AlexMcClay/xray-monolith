@@ -161,6 +161,8 @@ CWallmarksEngine::static_wallmark* CWallmarksEngine::static_wm_allocate()
 	W->m_fTimeStart = RDEVICE.fTimeGlobal;
 	W->m_fTimeEnd = g_wallmark_settings.static_ttl > 0.f ? g_wallmark_settings.static_ttl : ps_r__WallmarkTTL * 15.f;
 	W->m_fEvictStart = -1.f;
+	W->m_fGrowTime = 0.f;
+	W->m_fGrowFrom = 1.f;
 	W->verts.clear();
 	return W;
 }
@@ -180,11 +182,35 @@ void CWallmarksEngine::static_wm_render(CWallmarksEngine::static_wallmark* W, FV
 	u32 C = color_rgba(128, 128, 128, aC);
 	FVF::LIT* S = &*W->verts.begin();
 	FVF::LIT* E = &*W->verts.end();
-	for (; S != E; S++, V++)
+	// spreading mark: texture coordinates scaled about the centre (0.5, 0.5) by 1 / current size
+	float inv = 1.f;
+	if (W->m_fGrowTime > 0.f)
 	{
-		V->p.set(S->p);
-		V->color = C;
-		V->t.set(S->t);
+		float t = (RDEVICE.fTimeGlobal - W->m_fTimeStart) / W->m_fGrowTime;
+		if (t < 1.f)
+		{
+			clamp(t, 0.f, 1.f);
+			float e = 1.f - (1.f - t) * (1.f - t);
+			inv = 1.f / _max(W->m_fGrowFrom + (1.f - W->m_fGrowFrom) * e, 0.01f);
+		}
+	}
+	if (inv == 1.f)
+	{
+		for (; S != E; S++, V++)
+		{
+			V->p.set(S->p);
+			V->color = C;
+			V->t.set(S->t);
+		}
+	}
+	else
+	{
+		for (; S != E; S++, V++)
+		{
+			V->p.set(S->p);
+			V->color = C;
+			V->t.set(0.5f + (S->t.x - 0.5f) * inv, 0.5f + (S->t.y - 0.5f) * inv);
+		}
 	}
 }
 
@@ -265,7 +291,8 @@ void CWallmarksEngine::BuildMatrix(Fmatrix& mView, float invsz, const Fvector& f
 
 // demonized: add user defined rotation to wallmark
 void CWallmarksEngine::AddWallmark_internal(CDB::TRI* pTri, const Fvector* pVerts, const Fvector& contact_point,
-                                            ref_shader hShader, float sz, float ttl, float rotation)
+                                            ref_shader hShader, float sz, float ttl, float rotation, float grow_time,
+                                            float grow_from)
 {
 	// query for polygons in bounding box
 	// calculate adjacency
@@ -308,6 +335,11 @@ void CWallmarksEngine::AddWallmark_internal(CDB::TRI* pTri, const Fvector* pVert
 	// create wallmark
 	static_wallmark* W = static_wm_allocate();
 	if (ttl) W->m_fTimeEnd = ttl;
+	if (grow_time > 0.f && grow_from < 1.f)
+	{
+		W->m_fGrowTime = grow_time;
+		W->m_fGrowFrom = _max(grow_from, 0.01f);
+	}
 	RecurseTri(0, mView, *W);
 
 	// calc sphere
@@ -385,6 +417,16 @@ void CWallmarksEngine::AddStaticWallmark(CDB::TRI* pTri, const Fvector* pVerts, 
 	// Physics may add wallmarks in parallel with rendering
 	lock.Enter();
 	AddWallmark_internal(pTri, pVerts, contact_point, hShader, sz, ttl, rotation);
+	lock.Leave();
+}
+
+void CWallmarksEngine::AddStaticWallmarkGrowing(CDB::TRI* pTri, const Fvector* pVerts, const Fvector& contact_point,
+	ref_shader hShader, float sz, float ttl, bool ignore_opt, float rotation, float grow_time, float grow_from)
+{
+	if (!ignore_opt && contact_point.distance_to_sqr(Device.vCameraPosition) > _sqr(wallmark_range_static))
+		return;
+	lock.Enter();
+	AddWallmark_internal(pTri, pVerts, contact_point, hShader, sz, ttl, rotation, grow_time, grow_from);
 	lock.Leave();
 }
 

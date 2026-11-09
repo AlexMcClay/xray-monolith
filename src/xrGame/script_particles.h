@@ -14,15 +14,27 @@
 // refs
 class CObjectAnimator;
 class CScriptParticles;
+class CScriptGameObject;
 
 class CScriptParticlesCustom : public CParticlesObject
 {
 	CObjectAnimator* m_animator;
 	virtual ~CScriptParticlesCustom();
 	CScriptParticles* m_owner;
+
+	// following a bone (attach_to_bone): the object, its bone, the effect's transform in the bone's space
+	u16 m_follow_id;
+	u16 m_follow_bone;
+	Fmatrix m_follow_local;
+	Fvector m_follow_prev;
+	u32 m_follow_frame;
 public:
 	CScriptParticlesCustom(CScriptParticles* owner, LPCSTR caParticlesName);
 	virtual void shedule_Update(u32 dt);
+	virtual void UpdateFollow();
+	bool AttachToBone(CObject* O, u16 bone, const Fmatrix& world);
+	void Detach() { m_follow_id = u16(-1); }
+	bool Attached() const { return m_follow_id != u16(-1); }
 
 	void LoadPath(LPCSTR caPathName);
 	void StartPath(bool looped);
@@ -62,6 +74,15 @@ public:
 	void SetTimeScale(float k);
 	void SetRateScale(float k);
 	u32 ParticlesCount() const;
+	// follow a bone of obj (bone id; an unknown id = the root bone) keeping the effect's current place and
+	// direction relative to it: the emitter moves with the bone every frame (particles already out stay where they
+	// are). Ends by itself when the object goes away. detach() stops following.
+	bool AttachToBone(CScriptGameObject* obj, u16 bone);
+	void Detach();
+	bool Attached() const;
+	// decals where its particles hit the level (effects with collision on): wallmark section (as wallmarks_manager),
+	// chance per particle, size (x 0.75-1.25), ttl (0 = default), most per play. section "" turns it off.
+	void SetCollisionMarks(LPCSTR section, float chance, float size, float ttl, int max_marks);
 	Fvector LastPosition() const { return m_transform.c; }
 	void LoadPath(LPCSTR caPathName);
 	void StartPath(bool looped);

@@ -11,12 +11,22 @@
 #include "../xrEngine/objectanimator.h"
 #include "../Include/xrRender/RenderVisual.h"
 #include "../Include/xrRender/ParticleCustom.h"
+#include "../Include/xrRender/Kinematics.h"
+#include "script_game_object.h"
+#include "script_wallmarks_manager.h"
+#include "GamePersistent.h"
+#include "Level.h"
 
 CScriptParticlesCustom::CScriptParticlesCustom(CScriptParticles* owner, LPCSTR caParticlesName): CParticlesObject(
 	caParticlesName,FALSE, true)
 {
 	m_owner = owner;
 	m_animator = 0;
+	m_follow_id = u16(-1);
+	m_follow_bone = 0;
+	m_follow_local.identity();
+	m_follow_prev.set(0, 0, 0);
+	m_follow_frame = 0;
 }
 
 CScriptParticlesCustom::~CScriptParticlesCustom()
@@ -38,8 +48,57 @@ void CScriptParticlesCustom::PSI_destroy()
 	CParticlesObject::PSI_destroy();
 }
 
+static bool bone_world(CObject* O, u16& bone, Fmatrix& out)
+{
+	IKinematics* K = O && O->Visual() ? O->Visual()->dcast_PKinematics() : nullptr;
+	if (!K)
+		return false;
+	if (bone >= K->LL_BoneCount())
+		bone = K->LL_GetBoneRoot();
+	K->CalculateBones();
+	out.mul_43(O->XFORM(), K->LL_GetTransform(bone));
+	return true;
+}
+
+bool CScriptParticlesCustom::AttachToBone(CObject* O, u16 bone, const Fmatrix& world)
+{
+	Fmatrix bw, inv;
+	if (!bone_world(O, bone, bw))
+		return false;
+	inv.invert(bw);
+	m_follow_local.mul_43(inv, world);
+	m_follow_id = O->ID();
+	m_follow_bone = bone;
+	m_follow_prev.set(world.c);
+	m_follow_frame = 0;
+	return true;
+}
+
+void CScriptParticlesCustom::UpdateFollow()
+{
+	if (m_follow_id == u16(-1) || m_follow_frame == Device.dwFrame || m_bDead)
+		return;
+	m_follow_frame = Device.dwFrame;
+	CObject* O = g_pGameLevel ? Level().Objects.net_Find(m_follow_id) : nullptr;
+	Fmatrix bw;
+	if (!O || O->getDestroy() || !bone_world(O, m_follow_bone, bw))
+	{
+		m_follow_id = u16(-1);
+		return;
+	}
+	Fmatrix m;
+	m.mul_43(bw, m_follow_local);
+	Fvector vel;
+	vel.set(0, 0, 0);
+	if (Device.fTimeDelta > EPS_S)
+		vel.sub(m.c, m_follow_prev).div(Device.fTimeDelta);
+	m_follow_prev.set(m.c);
+	UpdateParent(m, vel);
+}
+
 void CScriptParticlesCustom::shedule_Update(u32 _dt)
 {
+	UpdateFollow();
 	CParticlesObject::shedule_Update(_dt);
 	if (m_animator)
 	{
@@ -198,6 +257,42 @@ void CScriptParticles::SetRateScale(float k)
 {
 	if (IParticleCustom* V = script_particles_visual(m_particles))
 		V->SetRateScale(k);
+}
+
+bool CScriptParticles::AttachToBone(CScriptGameObject* obj, u16 bone)
+{
+	if (!m_particles || !obj)
+		return false;
+	return m_particles->AttachToBone(&obj->object(), bone, m_transform);
+}
+
+void CScriptParticles::Detach()
+{
+	if (m_particles)
+		m_particles->Detach();
+}
+
+bool CScriptParticles::Attached() const
+{
+	return m_particles && m_particles->Attached();
+}
+
+void CScriptParticles::SetCollisionMarks(LPCSTR section, float chance, float size, float ttl, int max_marks)
+{
+	IParticleCustom* V = script_particles_visual(m_particles);
+	if (!V)
+		return;
+	IWallMarkArray* marks = nullptr;
+	if (section && section[0] && g_pGamePersistent)
+	{
+		if (!pSettings->section_exist(section) || !pSettings->line_exist(section, "wallmarks"))
+		{
+			Msg("! particles_object:set_collision_marks: no section [%s] with wallmarks", section);
+			return;
+		}
+		marks = GamePersistent().GetWallmarksManager().FindSection(section);
+	}
+	V->SetCollisionMarks(marks, chance, size, ttl, max_marks);
 }
 
 u32 CScriptParticles::ParticlesCount() const

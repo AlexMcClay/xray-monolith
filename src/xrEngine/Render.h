@@ -299,6 +299,8 @@ public:
 
 	// demonized: add user defined rotation to wallmark
 	virtual void add_StaticWallmark(IWallMarkArray* pArray, const Fvector& P, float s, CDB::TRI* T, Fvector* V, float ttl, bool ignore_opt, float rotation) = 0;
+	// a mark that spreads: drawn grow_from x its size at first, full size after grow_time seconds (ease out)
+	virtual void add_StaticWallmarkGrowing(IWallMarkArray* pArray, const Fvector& P, float s, CDB::TRI* T, Fvector* V, float ttl, bool ignore_opt, float rotation, float grow_time, float grow_from) = 0;
 	virtual void clear_static_wallmarks() = 0;
 	//virtual void add_SkeletonWallmark (intrusive_ptr<CSkeletonWallmark> wm) = 0;
 	//virtual void add_SkeletonWallmark (const Fmatrix* xf, CKinematics* obj, ref_shader& sh, const Fvector& start, const Fvector& dir, float size)=0;

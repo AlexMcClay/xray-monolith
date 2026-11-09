@@ -116,6 +116,7 @@ namespace PAPI
 		enum
 		{
 			ANIMATE_CCW = (1 << 0),
+			COLLIDE_MARKED = (1 << 1), // left its decal already (collision marks: one per particle)
 		};
 
 		Rotation rot; // 4

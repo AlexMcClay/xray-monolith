@@ -46,6 +46,12 @@ public:
 
 		float m_fTimeEnd;
 		float m_fEvictStart; // time a cap pushed this mark out (it then fades over fade_time), -1 = not pushed out
+		// spreading mark (AddStaticWallmark with grow_time): drawn grow_from x its size at first, growing to full size
+		// over grow_time seconds (ease out). The geometry is built at full size; only the texture coordinates are
+		// scaled about the centre, so the texture's shader must leave out what falls outside 0..1 (or the texture
+		// must be clear at its edges with clamp addressing).
+		float m_fGrowTime;
+		float m_fGrowFrom;
 
 		IC float TimeStart() { return m_fTimeStart; }
 		IC float TimeEnd() { return m_fTimeEnd; }
@@ -83,7 +89,7 @@ private:
 	void BuildMatrix(Fmatrix& dest, float invsz, const Fvector& from);
 	void RecurseTri(u32 T, Fmatrix& mView, static_wallmark& W);
 	void AddWallmark_internal(CDB::TRI* pTri, const Fvector* pVerts, const Fvector& contact_point, ref_shader hTexture, float sz, float ttl = 0.f, bool random_rotation = true);
-	void AddWallmark_internal(CDB::TRI* pTri, const Fvector* pVerts, const Fvector& contact_point, ref_shader hTexture, float sz, float ttl, float rotation);
+	void AddWallmark_internal(CDB::TRI* pTri, const Fvector* pVerts, const Fvector& contact_point, ref_shader hTexture, float sz, float ttl, float rotation, float grow_time = 0.f, float grow_from = 1.f);
 
 	static_wallmark* static_wm_allocate();
 	void static_wm_render(static_wallmark* W, FVF::LIT* & V);
@@ -100,6 +106,8 @@ public:
 
 	// demonized: add user defined rotation to wallmark
 	void AddStaticWallmark(CDB::TRI* pTri, const Fvector* pVerts, const Fvector& contact_point, ref_shader hTexture, float sz, float ttl, bool ignore_opt, float rotation);
+	// a mark that spreads: grow_from x size at first, full size after grow_time seconds (see static_wallmark)
+	void AddStaticWallmarkGrowing(CDB::TRI* pTri, const Fvector* pVerts, const Fvector& contact_point, ref_shader hTexture, float sz, float ttl, bool ignore_opt, float rotation, float grow_time, float grow_from);
 
 	void AddSkeletonWallmark(intrusive_ptr<CSkeletonWallmark> wm);
 	void AddSkeletonWallmark(const Fmatrix* xf, CKinematics* obj, ref_shader& sh, const Fvector& start,

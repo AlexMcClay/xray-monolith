@@ -2,6 +2,8 @@
 #define	ParticleCustom_included
 #pragma once
 
+class IWallMarkArray;
+
 class IParticleCustom
 {
 public:
@@ -36,6 +38,11 @@ public:
 	virtual void SetRateScale(float k) { ; }
 	// every new particle's velocity x k at birth (a script effect thrown faster or slower)
 	virtual void SetSpeedScale(float k) { ; }
+	// decals where colliding particles (an effect with collision on) hit the level: each hit leaves, with the given
+	// chance, a static wallmark picked from marks (size x 0.75-1.25, random rotation, ttl as wallmarks_manager, 0 =
+	// default), at most max_marks per effect; marks = NULL turns it off. marks must live as long as the effect
+	// (script wallmark sections live for the game).
+	virtual void SetCollisionMarks(IWallMarkArray* marks, float chance, float size, float ttl, int max_marks) { ; }
 };
 
 #endif	//	ParticleCustom_included

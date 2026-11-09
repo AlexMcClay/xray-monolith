@@ -661,6 +661,11 @@ void CParticleGroup::SetRateScale(float k)
 	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetRateScale(k); });
 }
 
+void CParticleGroup::SetCollisionMarks(IWallMarkArray* marks, float chance, float size, float ttl, int max_marks)
+{
+	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetCollisionMarks(marks, chance, size, ttl, max_marks); });
+}
+
 u32 CParticleGroup::ParticlesCount()
 {
 	int p_count = 0;

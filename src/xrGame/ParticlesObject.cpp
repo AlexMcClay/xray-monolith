@@ -246,7 +246,10 @@ void CParticlesObject::UpdateAllMT()
 	{
 		// CParticlesObject is the only CPS_Instance
 		CParticlesObject* P = static_cast<CParticlesObject*>(psi);
-		if (P->m_bDead || !P->renderable.visual || P->dwLastTime == now)
+		if (P->m_bDead || !P->renderable.visual)
+			continue;
+		P->UpdateFollow();
+		if (P->dwLastTime == now)
 			continue;
 		if (P->m_mt_want || P->m_mt_render_frame + 1 >= frame)
 			due.push_back(P);
