@@ -23,6 +23,8 @@
 #include "script_game_object.h"
 #include "player_hud.h"
 #include "HudSound.h"
+#include "ai_space.h"
+#include "script_engine.h"
 
 #include "../build_config_defines.h"
 #include "WeaponRG6.h"
@@ -1041,32 +1043,17 @@ float CWeaponMagazined::ShotPitch() const
 	return m_shot_pitch_random > 0.f ? 1.f + ::Random.randF(-m_shot_pitch_random, m_shot_pitch_random) : 1.f;
 }
 
-// Is the shooter under a roof? Tarkov picks a shot's indoor clips by the shooter's environment (volumes placed by hand
-// in its levels); X-Ray has none, so: five rays from the fire point, straight up and four at 45 degrees, indoors when at
-// least four hit the level's static geometry within 25 m (a doorway or a porch counts as outdoors). Kept for a second
-// while the gun stays within a metre.
+// Is this shot indoors? Tarkov picks a shot's indoor clips by the shooter's environment (volumes placed by hand in its
+// levels). The engine doesn't decide: it asks _G.CWeapon_ShotIndoors(weapon, fire point) (gunsmith_callbacks.script
+// forwards it to the weapon_shot_indoors callback; the Gunsmith Framework's gunsmith_indoor answers it). No script, or
+// no answer: outdoors. (Until 10 Nov 2026 the engine cast five rays itself; moved to Lua, roadmap So6.)
 bool CWeaponMagazined::ShotIndoors()
 {
-	const Fvector p = get_LastFP();
-	if (m_indoor_time >= 0.f && Device.fTimeGlobal - m_indoor_time < 1.f && p.similar(m_indoor_pos, 1.f))
-		return m_indoor_last;
-	Fvector dirs[5];
-	dirs[0].set(0.f, 1.f, 0.f);
-	dirs[1].set(0.7071f, 0.7071f, 0.f);
-	dirs[2].set(-0.7071f, 0.7071f, 0.f);
-	dirs[3].set(0.f, 0.7071f, 0.7071f);
-	dirs[4].set(0.f, 0.7071f, -0.7071f);
-	int hits = 0;
-	for (const Fvector& d : dirs)
-	{
-		collide::rq_result R;
-		if (Level().ObjectSpace.RayPick(p, d, 25.f, collide::rqtStatic, R, nullptr))
-			++hits;
-	}
-	m_indoor_last = hits >= 4;
-	m_indoor_time = Device.fTimeGlobal;
-	m_indoor_pos = p;
-	return m_indoor_last;
+	::luabind::functor<::luabind::object> funct;
+	if (!ai().script_engine().functor("_G.CWeapon_ShotIndoors", funct))
+		return false;
+	::luabind::object r = funct(lua_game_object(), get_LastFP());
+	return r.is_valid() && r.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(r);
 }
 
 // A shot sound's indoor version (<alias>Indoor) when this shot is indoors and the gun has one; else the alias

@@ -44,6 +44,13 @@
 		t.handled = true to take the key: the engine then does nothing more. Unhandled, the engine does
 		vanilla's alternative aim or launcher. The Gunsmith Framework's sight switching is a handler
 		(gunsmith_sights).
+
+	weapon_shot_indoors(weapon, pos, t)
+		A queue of shots starts (its first shot) on a weapon whose shot sounds have indoor twins (<key>_indoor):
+		is it indoors? pos is the fire point. Set t.indoor = true for the indoor sounds (the single shot, the
+		firing loop and its tail, for that whole queue); left false, the outdoor ones. The player's and NPCs'
+		guns. The engine doesn't decide this itself (since 10 Nov 2026, roadmap So6); the Gunsmith Framework's
+		gunsmith_indoor answers it.
 --]]
 
 AddScriptCallback("on_gs_part_attached")
@@ -52,6 +59,7 @@ AddScriptCallback("on_gs_part_failed")
 AddScriptCallback("weapon_on_recalc_stats")
 AddScriptCallback("weapon_on_alt_aim_key")
 AddScriptCallback("weapon_on_shot")
+AddScriptCallback("weapon_shot_indoors")
 
 _G.CWeapon_gs_part_attached = function(weapon, node, section)
 	SendScriptCallback("on_gs_part_attached", weapon, node, section)
@@ -77,4 +85,10 @@ end
 
 _G.CWeapon_OnShot = function(weapon, owner, t)
 	SendScriptCallback("weapon_on_shot", weapon, owner, t)
+end
+
+_G.CWeapon_ShotIndoors = function(weapon, pos)
+	local t = { indoor = false }
+	SendScriptCallback("weapon_shot_indoors", weapon, pos, t)
+	return t.indoor == true
 end

@@ -38,13 +38,10 @@ protected:
 	void UpdateShotLoop(bool force_end = false);
 	float ShotPitch() const;
 
-	// Tarkov's indoor shots (each shot key's <key>_indoor, alias <alias>Indoor): played when the shooter is under a
-	// roof (ShotIndoors), chosen on a queue's first shot
+	// Tarkov's indoor shots (each shot key's <key>_indoor, alias <alias>Indoor): played when a script says the shot
+	// is indoors (ShotIndoors: _G.CWeapon_ShotIndoors), asked on a queue's first shot
 	bool m_shot_has_indoor = false;
 	bool m_shot_indoor = false;
-	bool m_indoor_last = false;     // ShotIndoors' last answer, its time and place
-	float m_indoor_time = -1.f;
-	Fvector m_indoor_pos = {0.f, 0.f, 0.f};
 	bool ShotIndoors();
 	LPCSTR ShotAlias(LPCSTR alias, string128& buf);
 
