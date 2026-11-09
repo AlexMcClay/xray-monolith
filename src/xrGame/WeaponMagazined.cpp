@@ -148,7 +148,6 @@ void CWeaponMagazined::Load(LPCSTR section)
 	load_loop(actor_sect("snd_shoot_actor_loop"), "snd_shoot_actor_loop", "sndShotActorLoop");
 	load_loop(actor_sect("snd_shoot_actor_tail"), "snd_shoot_actor_tail", "sndShotActorTail");
 	m_shot_loop_rpm = m_shot_loop_rpm_actor = READ_IF_EXISTS(pSettings, r_float, actor_sect("snd_shoot_loop_rpm"), "snd_shoot_loop_rpm", 0.f);
-	m_shot_pitch_random = READ_IF_EXISTS(pSettings, r_float, actor_sect("snd_shoot_pitch_random"), "snd_shoot_pitch_random", 0.f);
 
 	//misfire shot
 	if (WeaponSoundExist(section, "snd_shot_misfire"))
@@ -247,32 +246,6 @@ void CWeaponMagazined::Load(LPCSTR section)
 		m_shot_has_indoor = true;
 	}
 
-	// Tarkov's sonic crack (PlayBulletCrack)
-	m_has_crack = false;
-	m_crack = SBulletCrack();
-	if (pSettings->line_exist(actor_sect("snd_bullet_crack"), "snd_bullet_crack"))
-	{
-		LPCSTR cs = actor_sect("snd_bullet_crack");
-		m_sounds.LoadSound(cs, "snd_bullet_crack", "sndBulletCrack", false, SOUND_TYPE_NO_SOUND);
-		m_has_crack = true;
-		m_crack.speed = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_speed", m_crack.speed);
-		m_crack.min_dist = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_min_dist", m_crack.min_dist);
-		m_crack.cone = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_cone", m_crack.cone);
-		m_crack.rolloff = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_rolloff", 0.f);
-		m_crack.rolloff_silencer = READ_IF_EXISTS(pSettings, r_float, cs, "snd_bullet_crack_rolloff_silencer",
-		                                          m_crack.rolloff);
-		auto read_curve = [&](LPCSTR line, xr_vector<Fvector2>& out)
-		{
-			if (!pSettings->line_exist(cs, line))
-				return;
-			LPCSTR c = pSettings->r_string(cs, line);
-			string64 x, v;
-			for (int i = 0; i + 1 < _GetItemCount(c); i += 2)
-				out.push_back(Fvector2().set((float)atof(_GetItem(c, i, x)), (float)atof(_GetItem(c, i + 1, v))));
-		};
-		read_curve("snd_bullet_crack_curve", m_crack.curve);
-		read_curve("snd_bullet_crack_rolloff_curve", m_crack.rolloff_curve);
-	}
 
 	m_iBaseDispersionedBulletsCount = READ_IF_EXISTS(pSettings, r_u8, section, "base_dispersioned_bullets_count", 0);
 	m_fBaseDispersionedBulletsSpeed = READ_IF_EXISTS(pSettings, r_float, section, "base_dispersioned_bullets_speed",
@@ -1037,12 +1010,6 @@ void CWeaponMagazined::UpdateShotLoop(bool force_end)
 	m_shot_loop.loop = nullptr;
 }
 
-// A single shot's pitch: Tarkov varies it by up to 3% (snd_shoot_pitch_random), not in automatic fire
-float CWeaponMagazined::ShotPitch() const
-{
-	return m_shot_pitch_random > 0.f ? 1.f + ::Random.randF(-m_shot_pitch_random, m_shot_pitch_random) : 1.f;
-}
-
 // Is this shot indoors? Tarkov picks a shot's indoor clips by the shooter's environment (volumes placed by hand in its
 // levels). The engine doesn't decide: it asks _G.CWeapon_ShotIndoors(weapon, fire point) (gunsmith_callbacks.script
 // forwards it to the weapon_shot_indoors callback; the Gunsmith Framework's gunsmith_indoor answers it). No script, or
@@ -1071,7 +1038,6 @@ void CWeaponMagazined::PlaySoundShot()
 		m_shot_indoor = m_shot_has_indoor && ShotIndoors();
 	if (PlayShotLoop(ParentIsActor()))
 		return;
-	const float pitch = ShotPitch();
 	string128 indoor;
 
 	if (ParentIsActor())
@@ -1082,7 +1048,7 @@ void CWeaponMagazined::PlaySoundShot()
 			strconcat(sizeof(sndNameMisfire), sndNameMisfire, m_sSndShotCurrent.c_str(), "MisfireActor");
 			if (m_sounds.FindSoundItem(sndNameMisfire, false))
 			{
-				m_sounds.PlaySound(sndNameMisfire, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
+				m_sounds.PlaySound(sndNameMisfire, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
 				return;
 			}
 		}
@@ -1091,7 +1057,7 @@ void CWeaponMagazined::PlaySoundShot()
 		strconcat(sizeof(sndNameFirst), sndNameFirst, m_sSndShotCurrent.c_str(), "ActorFirst");
 		if (m_iShotNum == 1 && m_sounds.FindSoundItem(sndNameFirst, false))
 		{
-			m_sounds.PlaySound(sndNameFirst, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
+			m_sounds.PlaySound(sndNameFirst, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
 			return;
 		}
 
@@ -1099,7 +1065,7 @@ void CWeaponMagazined::PlaySoundShot()
 		strconcat(sizeof(sndName), sndName, m_sSndShotCurrent.c_str(), "Actor");
 		if (m_sounds.FindSoundItem(sndName, false))
 		{
-			m_sounds.PlaySound(ShotAlias(sndName, indoor), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
+			m_sounds.PlaySound(ShotAlias(sndName, indoor), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
 			return;
 		}
 	}
@@ -1110,12 +1076,12 @@ void CWeaponMagazined::PlaySoundShot()
 		strconcat(sizeof(sndNameMisfire), sndNameMisfire, m_sSndShotCurrent.c_str(), "Misfire");
 		if (m_sounds.FindSoundItem(sndNameMisfire, false))
 		{
-			m_sounds.PlaySound(sndNameMisfire, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
+			m_sounds.PlaySound(sndNameMisfire, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
 			return;
 		}
 	}
 
-	m_sounds.PlaySound(ShotAlias(m_sSndShotCurrent.c_str(), indoor), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, 1.f, pitch);
+	m_sounds.PlaySound(ShotAlias(m_sSndShotCurrent.c_str(), indoor), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
 }
 
 void CWeaponMagazined::OnShot()
@@ -2537,64 +2503,5 @@ void CWeaponMagazined::FireBullet(const Fvector& pos,
 
 	inherited::FireBullet(pos, shot_dir, fire_disp, cartridge, parent_id, weapon_id, send_hit, GetAmmoElapsed());
 
-	if (m_has_crack && cartridge.param_s.buckShot <= 1)     // (Tarkov: single-projectile rounds only)
-		PlayBulletCrack(m_vCurrentShootPos, m_vCurrentShootDir, m_fLastBulletSpeed);
 }
 
-// A curve of (x, y) pairs, linear between them and flat past its ends (empty: 1)
-static float crack_curve(const xr_vector<Fvector2>& c, float x)
-{
-	if (c.empty())
-		return 1.f;
-	if (x <= c.front().x)
-		return c.front().y;
-	for (u32 i = 1; i < c.size(); ++i)
-		if (x <= c[i].x)
-			return c[i - 1].y + (c[i].y - c[i - 1].y) * (x - c[i - 1].x) / _max(c[i].x - c[i - 1].x, EPS_L);
-	return c.back().y;
-}
-
-// Tarkov's sonic crack (SonicBulletSoundPlayer.FireBullet; Gunsmith Docs research/35-tarkov-gunshots.md): a shot by
-// someone else whose bullet is supersonic and passes within cone x the shooter's distance of the camera, from a shooter
-// at least min_dist away and not behind geometry; an automatic gun's only on a burst's first shot (Tarkov's firing loop
-// skips it). The crack plays at the shot, with the shot (X-Ray delays both by distance), its volume by the curve over
-// how close the bullet passes (0 through the camera, 1 at the cone's edge) and by its reach. (Tarkov's bullet line has
-// no start, so it also cracks for someone behind the shooter; here only ahead.)
-void CWeaponMagazined::PlayBulletCrack(const Fvector& pos, const Fvector& dir, float speed)
-{
-	if (speed < m_crack.speed || !H_Parent() || Level().CurrentViewEntity() == H_Parent())
-		return;
-	if (m_iShotNum > 1 && m_shot_loop.loop.size())
-		return;
-	const Fvector& cam = Device.vCameraPosition;
-	const float dist = cam.distance_to(pos);
-	if (dist < _max(m_crack.min_dist, EPS_L))
-		return;
-	float reach_gain = 1.f;
-	const float rolloff = IsSilencerAttached() ? m_crack.rolloff_silencer : m_crack.rolloff;
-	if (rolloff > 0.f)
-	{
-		const float max_dist = 2000.f + (rolloff - 2000.f) * dist / rolloff;
-		if (dist > max_dist || max_dist <= 0.f)
-			return;
-		reach_gain = crack_curve(m_crack.rolloff_curve, dist / max_dist);
-	}
-	Fvector to_cam;
-	to_cam.sub(cam, pos);
-	const float t = to_cam.dotproduct(dir);
-	if (t <= 0.f)
-		return;                     // (going away)
-	Fvector closest;
-	closest.mad(pos, dir, t);
-	const float edge = m_crack.cone * dist;
-	const float miss = cam.distance_to(closest);
-	if (miss > edge)
-		return;
-	Fvector back;
-	back.sub(pos, cam).normalize_safe();
-	if (Level().ObjectSpace.RayTest(cam, back, dist - 0.5f, collide::rqtStatic, nullptr, nullptr))
-		return;                     // (the shooter behind geometry: Tarkov's occluded shots have no crack)
-	const float vol = crack_curve(m_crack.curve, miss / edge) * reach_gain;
-	if (vol > EPS_S)
-		m_sounds.PlaySound("sndBulletCrack", pos, H_Root(), false, false, (u8)-1, vol);
-}
