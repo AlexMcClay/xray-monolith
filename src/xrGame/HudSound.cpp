@@ -141,7 +141,8 @@ void HUD_SOUND_ITEM::PlaySound(HUD_SOUND_ITEM& hud_snd,
 	}
 
 	//hud_snd.m_activeSnd->snd.set_volume		(hud_snd.m_activeSnd->volume * b_hud_mode?psHUDSoundVolume:1.0f);
-	hud_snd.m_activeSnd->snd.set_volume(hud_snd.m_activeSnd->volume * (b_hud_mode ? psHUDSoundVolume : 1.0f) * volume_mult);
+	hud_snd.m_play_volume = hud_snd.m_activeSnd->volume * (b_hud_mode ? psHUDSoundVolume : 1.0f) * volume_mult;
+	hud_snd.m_activeSnd->snd.set_volume(hud_snd.m_play_volume);
 
 	if ((hud_snd.m_b_exclusive || hud_snd.m_b_tracked) && frequency != 1.f)
 		hud_snd.m_activeSnd->snd.set_frequency(frequency);
@@ -300,6 +301,18 @@ void HUD_SOUND_COLLECTION_LAYERED::SetTracked(LPCSTR alias, bool tracked)
 	}
 }
 
+void HUD_SOUND_COLLECTION_LAYERED::SetVolumeMult(LPCSTR alias, float k)
+{
+	for (auto& c : m_sound_items)
+	{
+		if (!(c.m_alias == alias))
+			continue;
+		for (auto& i : c.m_sound_items)
+			if (i.m_activeSnd && i.m_activeSnd->snd._feedback())
+				i.m_activeSnd->snd.set_volume(i.m_play_volume * k);
+	}
+}
+
 void HUD_SOUND_COLLECTION_LAYERED::SetPosition(LPCSTR alias, const Fvector& pos)
 {
 	xr_vector<HUD_SOUND_COLLECTION>::iterator it = m_sound_items.begin();
@@ -388,6 +401,10 @@ shared_str HUD_SOUND_COLLECTION_LAYERED::PlaySound(LPCSTR alias, const Fvector& 
 						{
 							alias_to_play = new_alias.c_str();
 							LoadSound(section, line, alias_to_play, old_sound->m_b_exclusive, old_sound->m_type);
+							// (a tracked sound's stand-in is tracked too: a firing loop swapped for its headset twin can
+							// still be stopped, checked and crossfaded)
+							if (old_sound->m_b_tracked)
+								SetTracked(alias_to_play);
 
 							// Crash if override sound was defined but wasn't loaded correctly
 							R_ASSERT2(FindSoundItem(alias_to_play, false), make_string("!_G.COnBeforePlayHudSound callback, HUD_SOUND_COLLECTION_LAYERED::PlaySound, failed to override sound item %s with %s, failed to load section %s line %s", alias, alias_to_play, section, line));

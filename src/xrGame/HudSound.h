@@ -2,7 +2,7 @@
 
 struct HUD_SOUND_ITEM
 {
-	HUD_SOUND_ITEM() : m_activeSnd(NULL), m_b_exclusive(false), m_b_tracked(false)
+	HUD_SOUND_ITEM() : m_activeSnd(NULL), m_b_exclusive(false), m_b_tracked(false), m_play_volume(0.f)
 	{
 	}
 
@@ -61,6 +61,9 @@ struct HUD_SOUND_ITEM
 	// tracked: played with feedback as an exclusive sound (it can be stopped and checked), but other sounds of the
 	// collection starting don't stop it (a firing loop)
 	bool m_b_tracked;
+	// the volume the playing sound started at (line volume x HUD factor x the caller's and the layer's), so a tracked
+	// sound's volume can be scaled while it plays (HUD_SOUND_COLLECTION_LAYERED::SetVolumeMult)
+	float m_play_volume;
 	int m_type;
 	xr_vector<SSnd> sounds;
 
@@ -108,6 +111,8 @@ public:
 	void StopAllSounds();
 	void LoadSound(LPCSTR section, LPCSTR line, LPCSTR alias, bool exclusive = false, int type = sg_SourceType);
 	void SetTracked(LPCSTR alias, bool tracked = true); // every layer's item of the alias (HUD_SOUND_ITEM::m_b_tracked)
+	// a playing tracked sound's volume, every layer of the alias: k x the volume it started at (a crossfade)
+	void SetVolumeMult(LPCSTR alias, float k);
 	void LoadSound(CInifile const* ini, LPCSTR section, LPCSTR line, LPCSTR alias, bool exclusive = false,
 	               int type = sg_SourceType);
 	void SetPosition(LPCSTR alias, const Fvector& pos);
