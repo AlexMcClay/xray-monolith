@@ -15,6 +15,11 @@ PARTICLES_API IParticleManager* PAPI::ParticleManager() { return &PM; }
 // 
 CParticleManager::CParticleManager()
 {
+	// effects are looked up by index from parallel updates while child effects are added (CParticlesObject::
+	// UpdateAllMT): room for this many, so adding never moves the lists under a reader. Freed slots are reused,
+	// so this is the most effects alive at once
+	effect_vec.reserve(32768);
+	m_alist_vec.reserve(32768);
 }
 
 CParticleManager::~CParticleManager()

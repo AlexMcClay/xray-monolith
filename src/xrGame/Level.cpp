@@ -1302,6 +1302,9 @@ void CLevel::OnRender()
 		}
 	}
 
+	// particle effects due this frame, in parallel, before the world is drawn (r__mt_particles)
+	CParticlesObject::UpdateAllMT();
+
 	inherited::OnRender();
 	if (!game)
 		return;
