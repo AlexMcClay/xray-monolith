@@ -52,11 +52,28 @@ void PS::OnEffectParticleBirth(void* owner, u32, PAPI::Particle& m, u32)
 	{
 		if (PED->m_Flags.is(CPEDef::dfRandomFrame))
 			m.frame = (u16)iFloor(Random.randI(PED->m_Frame.m_iFrameCount) * 255.f);
+		if (PED->m_iFrameRowLength > 0)
+		{
+			const int rows = _max(1, PED->m_Frame.m_iFrameCount / PED->m_iFrameRowLength);
+			m.frame = (u16)(Random.randI(rows) * PED->m_iFrameRowLength * 255);
+		}
 		if (PED->m_Flags.is(CPEDef::dfAnimated) && PED->m_Flags.is(CPEDef::dfRandomPlayback) && Random.randI(2))
 			m.flags.set(Particle::ANIMATE_CCW,TRUE);
 		// the script's speed scale (particles_object:set_speed_scale)
 		if (PE->m_SpeedK != 1.f)
 			m.vel.mul(PE->m_SpeedK);
+		if (PED->m_Flags.is(CPEDef::dfRandomDirection) && PED->m_fRandomDirection > 0.f)
+		{
+			const float speed = m.vel.magnitude();
+			if (speed > EPS)
+			{
+				Fvector random;
+				random.random_dir();
+				m.vel.mul(1.f - PED->m_fRandomDirection).mad(random, speed * PED->m_fRandomDirection);
+				m.vel.normalize_safe().mul(speed);
+			}
+		}
+		m.sizeB = m.size;
 		// per-particle growth factor (dfSizeGrowth + [size_growth] random): a seed 0-255 in the flags' high byte
 		if (PED->m_Flags.is(CPEDef::dfSizeGrowth) && PED->m_SizeGrowthRandom.x != PED->m_SizeGrowthRandom.y)
 			m.flags.flags = u16((m.flags.flags & 0x00ff) | (u16(Random.randI(256)) << 8));
@@ -261,6 +278,8 @@ void CParticleEffect::OnFrame(u32 frame_dt)
 			if (m_Def->m_Flags.is(CPEDef::dfFramed | CPEDef::dfAnimated))
 				m_Def->ExecuteAnimate(
 					particles, p_cnt, fDT_STEP);
+			if (m_Def->m_Flags.is(CPEDef::dfSizeCurve))
+				m_Def->ExecuteSizeCurve(particles, p_cnt);
 			if (m_Def->m_Flags.is(CPEDef::dfCollision))
 				m_Def->ExecuteCollision(
 					particles, p_cnt, fDT_STEP, this, m_CollisionCallback);
@@ -585,7 +604,14 @@ u32 ParticleRenderStream(FVF::LIT* pv, u32 count, PAPI::Particle * particles, CP
 			{
 				frame_f = ff - float(frame_a);
 				const int fcount = pPE->m_Def->m_Frame.m_iFrameCount;
-				frame_b = fcount > 0 ? (frame_a + 1) % fcount : frame_a;
+				if (pPE->m_Def->m_iFrameRowLength > 0)
+				{
+					const int row_len = pPE->m_Def->m_iFrameRowLength;
+					const int row_start = (frame_a / row_len) * row_len;
+					frame_b = row_start + (frame_a - row_start + 1) % row_len;
+				}
+				else
+					frame_b = fcount > 0 ? (frame_a + 1) % fcount : frame_a;
 			}
 		}
 

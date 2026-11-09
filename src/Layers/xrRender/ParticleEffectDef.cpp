@@ -32,6 +32,8 @@ CPEDef::CPEDef()
 	m_fCollideOneMinusFriction = 1.f;
 	m_fCollideResilience = 0.f;
 	m_fCollideSqrCutoff = 0.f;
+	m_fCollisionLifeLoss = 0.f;
+	m_fParticleLife = 0.f;
 	// velocity scale
 	m_VelocityScale.set(0.f, 0.f, 0.f);
 	// align to path
@@ -119,14 +121,54 @@ void CPEDef::pTimeLimit(float time_limit)
 */
 void CPEDef::ExecuteAnimate(Particle* particles, u32 p_cnt, float dt)
 {
+	auto sample = [](const xr_vector<Fvector2>& keys, float t)
+	{
+		if (keys.empty()) return t;
+		if (t <= keys.front().x) return keys.front().y;
+		for (u32 k = 1; k < keys.size(); ++k)
+			if (t <= keys[k].x)
+			{
+				const float span = keys[k].x - keys[k - 1].x;
+				const float u = span > EPS ? (t - keys[k - 1].x) / span : 0.f;
+				return keys[k - 1].y + (keys[k].y - keys[k - 1].y) * u;
+			}
+		return keys.back().y;
+	};
 	float speedFac = m_Frame.m_fSpeed * dt;
 	for (u32 i = 0; i < p_cnt; i++)
 	{
 		Particle& m = particles[i];
-		float f = (float(m.frame) / 255.f + ((m.flags.is(Particle::ANIMATE_CCW)) ? -1.f : 1.f) * speedFac);
-		if (f > m_Frame.m_iFrameCount)f -= m_Frame.m_iFrameCount;
-		if (f < 0.f) f += m_Frame.m_iFrameCount;
+		const int row_len = m_iFrameRowLength > 0 ? m_iFrameRowLength : m_Frame.m_iFrameCount;
+		const float old_f = float(m.frame) / 255.f;
+		const float row = m_iFrameRowLength > 0 ? float(iFloor(old_f / row_len) * row_len) : 0.f;
+		float f;
+		if (m_Flags.is(dfFrameCurve) && !m_FrameCurve.empty() && m_fParticleLife > EPS)
+			f = row + sample(m_FrameCurve, clampr(m.age / m_fParticleLife, 0.f, 1.f)) * float(row_len - 1);
+		else
+			f = old_f + ((m.flags.is(Particle::ANIMATE_CCW)) ? -1.f : 1.f) * speedFac;
+		if (f >= row + row_len) f = row + fmodf(f - row, float(row_len));
+		if (f < row) f = row + row_len - fmodf(row - f, float(row_len));
 		m.frame = (u16)iFloor(f * 255.f);
+	}
+}
+
+void CPEDef::ExecuteSizeCurve(Particle* particles, u32 p_cnt)
+{
+	if (m_SizeCurve.empty() || m_fParticleLife <= EPS) return;
+	for (u32 i = 0; i < p_cnt; ++i)
+	{
+		Particle& p = particles[i];
+		const float t = clampr(p.age / m_fParticleLife, 0.f, 1.f);
+		float v = m_SizeCurve.back().y;
+		if (t <= m_SizeCurve.front().x) v = m_SizeCurve.front().y;
+		else for (u32 k = 1; k < m_SizeCurve.size(); ++k) if (t <= m_SizeCurve[k].x)
+		{
+			const float span = m_SizeCurve[k].x - m_SizeCurve[k - 1].x;
+			const float u = span > EPS ? (t - m_SizeCurve[k - 1].x) / span : 0.f;
+			v = m_SizeCurve[k - 1].y + (m_SizeCurve[k].y - m_SizeCurve[k - 1].y) * u;
+			break;
+		}
+		p.size.set(p.sizeB).mul(v);
 	}
 }
 
@@ -193,6 +235,8 @@ void CPEDef::ExecuteCollision(PAPI::Particle* particles, u32 p_cnt, float dt, CP
 							m.vel = vt * m_fCollideOneMinusFriction - vn * m_fCollideResilience;
 						}
 						m.pos = m.posB + m.vel * dt;
+						if (m_fCollisionLifeLoss > 0.f && m_fParticleLife > m.age)
+							m.age += (m_fParticleLife - m.age) * m_fCollisionLifeLoss;
 						pick_needed = true;
 					}
 				}
@@ -318,6 +362,7 @@ BOOL CPEDef::Load2(CInifile& ini)
 		m_Frame.m_iFrameDimX = ini.r_s32("frame", "dim_x");
 		m_Frame.m_iFrameCount = ini.r_s32("frame", "frame_count");
 		m_Frame.m_fSpeed = ini.r_float("frame", "speed");
+		m_iFrameRowLength = ini.line_exist("frame", "row_length") ? ini.r_s32("frame", "row_length") : 0;
 	}
 
 	if (m_Flags.is(dfTimeLimit))
@@ -330,6 +375,8 @@ BOOL CPEDef::Load2(CInifile& ini)
 		m_fCollideOneMinusFriction = ini.r_float("collision", "one_minus_friction");
 		m_fCollideResilience = ini.r_float("collision", "collide_resilence");
 		m_fCollideSqrCutoff = ini.r_float("collision", "collide_sqr_cutoff");
+		m_fCollisionLifeLoss = ini.line_exist("collision", "life_loss") ? ini.r_float("collision", "life_loss") : 0.f;
+		m_fParticleLife = ini.line_exist("collision", "particle_life") ? ini.r_float("collision", "particle_life") : 0.f;
 	}
 
 	if (m_Flags.is(dfVelocityScale))
@@ -353,6 +400,23 @@ BOOL CPEDef::Load2(CInifile& ini)
 	{
 		m_RateRandom = ini.r_fvector2("rate_random", "value");
 	}
+	if (m_Flags.is(dfRandomDirection) && ini.section_exist("random_direction"))
+		m_fRandomDirection = clampr(ini.r_float("random_direction", "value"), 0.f, 1.f);
+	if (ini.section_exist("particle_life"))
+		m_fParticleLife = ini.r_float("particle_life", "value");
+	auto load_curve = [&ini](LPCSTR section, xr_vector<Fvector2>& out)
+	{
+		if (!ini.section_exist(section)) return;
+		const int count = ini.r_s32(section, "count");
+		for (int i = 0; i < count; ++i)
+		{
+			string32 key;
+			xr_sprintf(key, "key_%d", i);
+			out.push_back(ini.r_fvector2(section, key));
+		}
+	};
+	if (m_Flags.is(dfFrameCurve)) load_curve("frame_curve", m_FrameCurve);
+	if (m_Flags.is(dfSizeCurve)) load_curve("size_curve", m_SizeCurve);
 	//#ifdef _EDITOR
 	if (pCreateEAction)
 	{

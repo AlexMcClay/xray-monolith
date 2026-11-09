@@ -123,6 +123,7 @@ namespace PAPI
 		pVector posB; // 12
 		pVector vel; // 12  	
 		pVector size; // 12
+		pVector sizeB; // birth size, for exact size-over-life curves
 		float colorR; // 4
 		float colorG; // 4
 		float colorB; // 4

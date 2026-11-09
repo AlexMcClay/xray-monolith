@@ -91,6 +91,9 @@ namespace PS
 			// each play scales the Source rate by a random factor in m_RateRandom (a burst emits a random count
 			// between its min and max each time); [rate_random] value = min, max in a loose .pe
 			dfRandomRate = (1 << 28),
+			dfFrameCurve = (1 << 29),
+			dfSizeCurve = (1 << 30),
+			dfRandomDirection = (1u << 31),
 		};
 
 		shared_str m_Name;
@@ -112,15 +115,22 @@ namespace PS
 		float m_fSizeGrowth = 0.f; // dfSizeGrowth: ln of the size factor per second
 		Fvector2 m_SizeGrowthRandom = {1.f, 1.f}; // dfSizeGrowth: range of each particle's factor on that rate
 		Fvector2 m_RateRandom = {1.f, 1.f}; // dfRandomRate: the rate factor's range per play
+		float m_fRandomDirection = 0.f;
+		int m_iFrameRowLength = 0;
+		xr_vector<Fvector2> m_FrameCurve;
+		xr_vector<Fvector2> m_SizeCurve;
 		// collision
 		float m_fCollideOneMinusFriction;
 		float m_fCollideResilience;
 		float m_fCollideSqrCutoff;
+		float m_fCollisionLifeLoss = 0.f;
+		float m_fParticleLife = 0.f;
 	public:
 		BOOL SaveActionList(IWriter& F);
 		BOOL LoadActionList(IReader& F);
 		// execute
 		void ExecuteAnimate(PAPI::Particle* particles, u32 p_cnt, float dt);
+		void ExecuteSizeCurve(PAPI::Particle* particles, u32 p_cnt);
 		void ExecuteCollision(PAPI::Particle* particles, u32 p_cnt, float dt, CParticleEffect* owner,
 		                      CollisionCallback cb);
 	public:

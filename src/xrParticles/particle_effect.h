@@ -96,6 +96,7 @@ namespace PAPI
 				P.pos = pos;
 				P.posB = posB;
 				P.size = size;
+				P.sizeB = size;
 				P.rot.x = rot.x;
 				P.vel = vel;
 				float f = float(1.0) / float(255.0);
