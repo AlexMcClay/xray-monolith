@@ -938,6 +938,12 @@ static const float SHOT_MIX_FLOOR = 0.0005f;
 static const float SHOT_MIX_ASK = 0.2f;
 static const float SHOT_MIX_EASE = 0.35f;
 static const float SHOT_MIX_FAR = 100.f;
+// -dbg_shot_blend on the command line: a log line per loop start and per answer while it plays
+static bool shot_blend_debug()
+{
+	static const bool on = !!strstr(Core.Params, "-dbg_shot_blend");
+	return on;
+}
 
 static void shot_mix_gains(float m, float& out, float& in)
 {
@@ -1000,6 +1006,9 @@ bool CWeaponMagazined::PlayShotLoop(bool actor)
 		m_sounds.SetVolumeMult(m_shot_loop.loop.c_str(), go);
 		m_sounds.SetVolumeMult(m_shot_loop.loop_in.c_str(), gi);
 	}
+	if (shot_blend_debug())
+		Msg("[shot blend] %s loop start: %s + %s, share %.2f", cNameSect().c_str(), m_shot_loop.loop.c_str(),
+			twin ? m_shot_loop.loop_in.c_str() : "(no indoor twin)", m_shot_loop.mix);
 	// the beat of the recording that plays (of its variants, the one picked)
 	if (const HUD_SOUND_ITEM* item = m_sounds.FindSoundItem(m_shot_loop.loop.c_str(), false))
 	{
@@ -1019,6 +1028,14 @@ void CWeaponMagazined::UpdateShotLoopMix()
 		m_shot_loop.next_ask = now + SHOT_MIX_ASK;
 		if (m_shot_loop.hud || Device.vCameraPosition.distance_to(get_LastFP()) < SHOT_MIX_FAR)
 			m_shot_loop.mix_target = ShotIndoorMix();
+		if (shot_blend_debug())
+		{
+			float o, i;
+			shot_mix_gains(m_shot_loop.mix, o, i);
+			Msg("[shot blend] %s ask: target %.2f, now %.2f, gains out %.3f in %.3f, playing %d/%d",
+				cNameSect().c_str(), m_shot_loop.mix_target, m_shot_loop.mix, o, i,
+				(int)m_sounds.IsPlaying(m_shot_loop.loop.c_str()), (int)m_sounds.IsPlaying(m_shot_loop.loop_in.c_str()));
+		}
 	}
 	const float k = 1.f - expf(-Device.fTimeDelta / SHOT_MIX_EASE);
 	m_shot_loop.mix += (m_shot_loop.mix_target - m_shot_loop.mix) * k;
