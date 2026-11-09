@@ -284,9 +284,16 @@ CLevel::CLevel() :
 }
 
 extern CAI_Space* g_ai_space;
+extern void flash_lights_update(); // level_script.cpp (E8)
+extern void flash_lights_clear();
+extern void ribbons_update(); // level_script.cpp (Gunsmith Docs vfx.md "Ribbons")
+extern void ribbons_render();
+extern void ribbons_clear();
 
 CLevel::~CLevel()
 {
+	flash_lights_clear(); // the one-shot lights belong to this level's renderer (E8)
+	ribbons_clear();
 	//crash_saving::save_impl = nullptr; // CLevel not available, disable crash save
 	xr_delete(g_player_hud);
 	gunsmith::CPreview::destroy();
@@ -975,9 +982,12 @@ void CLevel::MakeReconnect()
 	}
 }
 
+
 void CLevel::OnFrame()
 {
 	PROF_EVENT("CLevel::OnFrame()");
+	flash_lights_update();
+	ribbons_update();
 
 #ifdef DEBUG_MEMORY_MANAGER
     debug_memory_guard __guard__;
@@ -1292,11 +1302,15 @@ void CLevel::OnRender()
 		}
 	}
 
+	// particle effects due this frame, in parallel, before the world is drawn (r__mt_particles)
+	CParticlesObject::UpdateAllMT();
+
 	inherited::OnRender();
 	if (!game)
 		return;
 	Game().OnRender();
 	BulletManager().Render();
+	ribbons_render();
 
 	if (Device.m_SecondViewport.IsSVPFrame())
 		Render->RenderToTarget(Render->rtSVP);

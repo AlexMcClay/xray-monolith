@@ -1135,8 +1135,17 @@ public:
 	void reset_hud_offset(int index);
 	void reset_hud_offsets();
 	void set_hud_recoil(Fvector pos, Fvector rot, Fvector pivot);
+	void set_hud_recoil_screen(Fvector pos, Fvector rot, Fvector pivot);
 	void reset_hud_recoil();
 	void set_cam_recoil(bool on);
+	void set_weapon_particles(LPCSTR kind, LPCSTR name);
+	LPCSTR weapon_particles(LPCSTR kind);
+	void set_weapon_light(float r, float g, float b, float range, float time);
+	Fvector weapon_fire_point();
+	Fvector weapon_shell_point();
+	Fvector weapon_fire_dir();
+	void set_weapon_light_offset(float forward, float forward_hud);
+	bool weapon_hud_mode();
 	void set_owner_spread(bool on);
 	void set_spread_k(float k);
 	void set_pellet_spread(float metres_at_100);

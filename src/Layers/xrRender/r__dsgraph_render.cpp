@@ -838,6 +838,32 @@ void R_dsgraph_structure::r_dsgraph_render_wmarks()
 
 //////////////////////////////////////////////////////////////////////////
 // strict-sorted render
+//////////////////////////////////////////////////////////////////////////
+// particle bloom: the queued hot particles' bloom element, back to front (the caller binds the target)
+void R_dsgraph_structure::r_dsgraph_render_bloom()
+{
+	mapBloom.traverseRL(sorted_L1);
+	mapBloom.clear();
+
+	Fmatrix FTold = Device.mFullTransform;
+	Device.mFullTransform = Device.mFullTransformHud;
+	RCache.set_xform_project(Device.mProjectHud);
+
+	rmNear();
+	mapHUDBloom.traverseLR(sorted_L1);
+	mapHUDBloom.clear();
+	rmNormal();
+
+	Device.mFullTransform = FTold;
+	RCache.set_xform_project(Device.mProject);
+}
+
+void R_dsgraph_structure::r_dsgraph_clear_bloom()
+{
+	mapBloom.clear();
+	mapHUDBloom.clear();
+}
+
 void R_dsgraph_structure::r_dsgraph_render_distort()
 {
 	// Sorted (back to front)

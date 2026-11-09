@@ -65,6 +65,19 @@ void R_dsgraph_structure::r_dsgraph_insert_dynamic(dxRender_Visual* pVisual, Fve
 		N->val.se = sh_d; // 4=L_special
 	}
 
+	// Particle bloom: the l_special element of a bBloom shader, queued only during the forward pass
+	// (bloom_collect) and drawn into the bloom emissive buffer right after it, the same frame
+	if (bloom_collect && sh_d && sh_d->flags.bBloom && pmask[sh_d->flags.iPriority / 2])
+	{
+		mapSorted_T& bl = RI.val_bHUD ? mapHUDBloom : mapBloom;
+		mapSorted_Node* N = bl.insertInAnyWay(distSQ);
+		N->val.ssa = SSA;
+		N->val.pObject = RI.val_pObject;
+		N->val.pVisual = pVisual;
+		N->val.Matrix = *RI.val_pTransform;
+		N->val.se = sh_d;
+	}
+
 	// Select shader
 	ShaderElement* sh = RImplementation.rimp_select_sh_dynamic(pVisual, distSQ);
 	if (0 == sh) return;

@@ -274,6 +274,8 @@ namespace PAPI
 		virtual ParticleAction* CreateAction(PActionEnum type) =0;
 		virtual u32 LoadActions(int alist_id, IReader& R) =0;
 		virtual void SaveActions(int alist_id, IWriter& W) =0;
+		// every Source action of the list emits k times its rate (per effect instance)
+		virtual void SetSourceRateScale(int alist_id, float k) =0;
 	};
 
 	PARTICLES_API IParticleManager* ParticleManager();

@@ -2,6 +2,7 @@
 #pragma hdrstop
 
 #include "ParticleEffect.h"
+#include "light.h"
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 
@@ -53,6 +54,12 @@ void PS::OnEffectParticleBirth(void* owner, u32, PAPI::Particle& m, u32)
 			m.frame = (u16)iFloor(Random.randI(PED->m_Frame.m_iFrameCount) * 255.f);
 		if (PED->m_Flags.is(CPEDef::dfAnimated) && PED->m_Flags.is(CPEDef::dfRandomPlayback) && Random.randI(2))
 			m.flags.set(Particle::ANIMATE_CCW,TRUE);
+		// the script's speed scale (particles_object:set_speed_scale)
+		if (PE->m_SpeedK != 1.f)
+			m.vel.mul(PE->m_SpeedK);
+		// per-particle growth factor (dfSizeGrowth + [size_growth] random): a seed 0-255 in the flags' high byte
+		if (PED->m_Flags.is(CPEDef::dfSizeGrowth) && PED->m_SizeGrowthRandom.x != PED->m_SizeGrowthRandom.y)
+			m.flags.flags = u16((m.flags.flags & 0x00ff) | (u16(Random.randI(256)) << 8));
 	}
 }
 
@@ -74,6 +81,12 @@ CParticleEffect::CParticleEffect()
 	m_Def = 0;
 	m_fElapsedLimit = 0.f;
 	m_MemDT = 0;
+	m_ColorK.set(1.f, 1.f, 1.f, 1.f);
+	m_SizeK = 1.f;
+	m_TimeK = 1.f;
+	m_SpeedK = 1.f;
+	m_RateK = 1.f;
+	m_TimeCarry = 0.f;
 	m_InitialPosition.set(0, 0, 0);
 	m_DestroyCallback = 0;
 	m_CollisionCallback = 0;
@@ -92,6 +105,12 @@ void CParticleEffect::Play()
 {
 	m_RT_Flags.set(flRT_DefferedStop,FALSE);
 	m_RT_Flags.set(flRT_Playing,TRUE);
+	// a random emission amount per play (dfRandomRate): the burst's count between its min and max
+	if (m_Def && m_Def->m_Flags.is(CPEDef::dfRandomRate))
+	{
+		m_RateRandom = ::Random.randF(m_Def->m_RateRandom.x, m_Def->m_RateRandom.y);
+		ParticleManager()->SetSourceRateScale(m_HandleActionList, m_RateK * m_RateRandom);
+	}
 	ParticleManager()->PlayEffect(m_HandleEffect, m_HandleActionList);
 }
 
@@ -125,11 +144,63 @@ void CParticleEffect::UpdateParent(const Fmatrix& m, const Fvector& velocity, BO
 	}
 }
 
+BOOL CParticleEffect::IsLit()
+{
+	return m_Def && m_Def->m_Flags.is(CPEDef::dfLit);
+}
+
+void CParticleEffect::SetColorScale(float r, float g, float b, float a)
+{
+	m_ColorK.set(r, g, b, a);
+}
+
+void CParticleEffect::SetSizeScale(float k)
+{
+	m_SizeK = _max(k, 0.f);
+}
+
+void CParticleEffect::SetSpeedScale(float k)
+{
+	m_SpeedK = _max(k, 0.f);
+}
+
+void CParticleEffect::SetTimeScale(float k)
+{
+	m_TimeK = _max(k, 0.f);
+}
+
+void CParticleEffect::SetRateScale(float k)
+{
+	m_RateK = _max(k, 0.f);
+	ParticleManager()->SetSourceRateScale(m_HandleActionList, m_RateK * m_RateRandom);
+}
+
+void CParticleEffect::CopyScales(const CParticleEffect* from)
+{
+	if (!from)
+		return;
+	SetColorScale(from->m_ColorK.r, from->m_ColorK.g, from->m_ColorK.b, from->m_ColorK.a);
+	SetSizeScale(from->m_SizeK);
+	SetTimeScale(from->m_TimeK);
+	SetSpeedScale(from->m_SpeedK);
+	if (from->m_RateK != 1.f)
+		SetRateScale(from->m_RateK);
+}
+
 void CParticleEffect::OnFrame(u32 frame_dt)
 {
 	if (m_Def && m_RT_Flags.is(flRT_Playing))
 	{
-		m_MemDT += frame_dt;
+		if (m_TimeK == 1.f)
+			m_MemDT += frame_dt;
+		else
+		{
+			// time scale (E5): the fraction of a millisecond carries over
+			const float scaled = float(frame_dt) * m_TimeK + m_TimeCarry;
+			const s32 whole = iFloor(scaled);
+			m_TimeCarry = scaled - float(whole);
+			m_MemDT += whole;
+		}
 
 		int StepCount = 0;
 		u32 uDT_STEP = m_Def->GetUStep();
@@ -163,6 +234,28 @@ void CParticleEffect::OnFrame(u32 frame_dt)
 			PAPI::Particle* particles;
 			u32 p_cnt;
 			ParticleManager()->GetParticles(m_HandleEffect, particles, p_cnt);
+
+			// each particle grows by the same factor from its own size (dfSizeGrowth)
+			if (m_Def->m_Flags.is(CPEDef::dfSizeGrowth) && m_Def->m_fSizeGrowth != 0.f)
+			{
+				const Fvector2& rnd = m_Def->m_SizeGrowthRandom;
+				if (rnd.x == rnd.y)
+				{
+					const float k = expf(m_Def->m_fSizeGrowth * rnd.x * fDT_STEP);
+					for (u32 i = 0; i < p_cnt; ++i)
+						particles[i].size.mul(k);
+				}
+				else
+				{
+					// each particle's own rate: min..max by the seed set at its birth
+					const float g = m_Def->m_fSizeGrowth * fDT_STEP;
+					for (u32 i = 0; i < p_cnt; ++i)
+					{
+						const float t = float(particles[i].flags.flags >> 8) / 255.f;
+						particles[i].size.mul(expf(g * (rnd.x + (rnd.y - rnd.x) * t)));
+					}
+				}
+			}
 
 			// our actions
 			if (m_Def->m_Flags.is(CPEDef::dfFramed | CPEDef::dfAnimated))
@@ -447,12 +540,16 @@ __forceinline void magnitude_sse(Fvector& vec, float& res)
 	_mm_store_ss((float*)&res, tv);
 }
 
-void ParticleRenderStream(FVF::LIT* pv, u32 count, PAPI::Particle * particles, CParticleEffect * pPE)
+// returns the vertices written: 4 a particle, 8 with frame blending (the caller locks 16 a particle)
+u32 ParticleRenderStream(FVF::LIT* pv, u32 count, PAPI::Particle * particles, CParticleEffect * pPE)
 {
+	FVF::LIT* const pv_begin = pv;
 	float sina = 0.0f, cosa = 0.0f;
 	// Xottab_DUTY: changed angle to be float instead of DWORD
 	// But it must be 0xFFFFFFFF or otherwise some particles won't play
 	float angle = 0xFFFFFFFF;
+	const float lead = pPE->RenderLead();
+	const bool frame_blend = pPE->m_Def->m_Flags.is(CPEDef::dfFrameBlend) && pPE->m_Def->m_Flags.is(CPEDef::dfAnimated);
 
 
 	for (u32 i = 0; i != count; ++i)
@@ -473,11 +570,38 @@ void ParticleRenderStream(FVF::LIT* pv, u32 count, PAPI::Particle * particles, C
 
 		_mm_prefetch(64 + (char*)&particles[i + 1], _MM_HINT_NTA);
 
-		if (pPE->m_Def->m_Flags.is(CPEDef::dfFramed))
-			pPE->m_Def->m_Frame.CalculateTC(iFloor(float(m.frame) / 255.f), lt, rb);
+		// E2: draw where the particle is now, not where the last step left it
+		Fvector ppos;
+		ppos.mad(m.pos, m.vel, lead);
 
-		float r_x = m.size.x * 0.5f;
-		float r_y = m.size.y * 0.5f;
+		// E3: an animated flipbook's next frame cross-faded over the current one
+		int frame_a = 0, frame_b = -1;
+		float frame_f = 0.f;
+		if (pPE->m_Def->m_Flags.is(CPEDef::dfFramed))
+		{
+			const float ff = float(m.frame) / 255.f;
+			frame_a = iFloor(ff);
+			if (frame_blend)
+			{
+				frame_f = ff - float(frame_a);
+				const int fcount = pPE->m_Def->m_Frame.m_iFrameCount;
+				frame_b = fcount > 0 ? (frame_a + 1) % fcount : frame_a;
+			}
+		}
+
+		for (int pass = 0; pass < (frame_b >= 0 ? 2 : 1); ++pass)
+		{
+		float alpha_k = 1.f;
+		if (frame_b >= 0)
+			alpha_k = pass == 0 ? 1.f - frame_f : frame_f;
+		if (pPE->m_Def->m_Flags.is(CPEDef::dfFramed))
+			pPE->m_Def->m_Frame.CalculateTC(pass == 0 ? frame_a : frame_b, lt, rb);
+		const Fcolor& ck = pPE->m_ColorK;
+		const u32 clr = color_rgba_f(_min(m.colorR * ck.r, 1.f), _min(m.colorG * ck.g, 1.f), _min(m.colorB * ck.b, 1.f),
+		                             _min(m.colorA * alpha_k * ck.a, 1.f));
+
+		float r_x = m.size.x * 0.5f * pPE->m_SizeK;
+		float r_y = m.size.y * 0.5f * pPE->m_SizeK;
 		float speed = 0.f;
 		bool speed_calculated = false;
 
@@ -500,13 +624,13 @@ void ParticleRenderStream(FVF::LIT* pv, u32 count, PAPI::Particle * particles, C
 					if (pPE->m_RT_Flags.is(CParticleEffect::flRT_XFORM))
 					{
 						Fvector p;
-						pPE->m_XFORM.transform_tiny(p, m.pos);
+						pPE->m_XFORM.transform_tiny(p, ppos);
 						M.mulA_43(pPE->m_XFORM);
-						FillSprite(pv, M.k, M.i, p, lt, rb, r_x, r_y, color_rgba_f(m.colorR, m.colorG, m.colorB, m.colorA), sina, cosa);
+						FillSprite(pv, M.k, M.i, p, lt, rb, r_x, r_y, clr, sina, cosa);
 					}
 					else
 					{
-						FillSprite(pv, M.k, M.i, m.pos, lt, rb, r_x, r_y, color_rgba_f(m.colorR, m.colorG, m.colorB, m.colorA), sina, cosa);
+						FillSprite(pv, M.k, M.i, ppos, lt, rb, r_x, r_y, clr, sina, cosa);
 					}
 				}
 				else if ((speed >= EPS_S) && pPE->m_Def->m_Flags.is(CPEDef::dfFaceAlign))
@@ -524,13 +648,13 @@ void ParticleRenderStream(FVF::LIT* pv, u32 count, PAPI::Particle * particles, C
 					if (pPE->m_RT_Flags.is(CParticleEffect::flRT_XFORM))
 					{
 						Fvector p;
-						pPE->m_XFORM.transform_tiny(p, m.pos);
+						pPE->m_XFORM.transform_tiny(p, ppos);
 						M.mulA_43(pPE->m_XFORM);
-						FillSprite(pv, M.j, M.i, p, lt, rb, r_x, r_y, color_rgba_f(m.colorR, m.colorG, m.colorB, m.colorA), sina, cosa);
+						FillSprite(pv, M.j, M.i, p, lt, rb, r_x, r_y, clr, sina, cosa);
 					}
 					else
 					{
-						FillSprite(pv, M.j, M.i, m.pos, lt, rb, r_x, r_y, color_rgba_f(m.colorR, m.colorG, m.colorB, m.colorA), sina, cosa);
+						FillSprite(pv, M.j, M.i, ppos, lt, rb, r_x, r_y, clr, sina, cosa);
 					}
 				}
 				else
@@ -543,13 +667,13 @@ void ParticleRenderStream(FVF::LIT* pv, u32 count, PAPI::Particle * particles, C
 					if (pPE->m_RT_Flags.is(CParticleEffect::flRT_XFORM))
 					{
 						Fvector p, d;
-						pPE->m_XFORM.transform_tiny(p, m.pos);
+						pPE->m_XFORM.transform_tiny(p, ppos);
 						pPE->m_XFORM.transform_dir(d, dir);
-						FillSprite(pv, p, d, lt, rb, r_x, r_y, color_rgba_f(m.colorR, m.colorG, m.colorB, m.colorA), sina, cosa);
+						FillSprite(pv, p, d, lt, rb, r_x, r_y, clr, sina, cosa);
 					}
 					else
 					{
-						FillSprite(pv, m.pos, dir, lt, rb, r_x, r_y, color_rgba_f(m.colorR, m.colorG, m.colorB, m.colorA), sina, cosa);
+						FillSprite(pv, ppos, dir, lt, rb, r_x, r_y, clr, sina, cosa);
 					}
 				}
 			}
@@ -558,15 +682,83 @@ void ParticleRenderStream(FVF::LIT* pv, u32 count, PAPI::Particle * particles, C
 				if (pPE->m_RT_Flags.is(CParticleEffect::flRT_XFORM))
 				{
 					Fvector p;
-					pPE->m_XFORM.transform_tiny(p, m.pos);
-					FillSprite(pv, RDEVICE.vCameraTop, RDEVICE.vCameraRight, p, lt, rb, r_x, r_y, color_rgba_f(m.colorR, m.colorG, m.colorB, m.colorA), sina, cosa);
+					pPE->m_XFORM.transform_tiny(p, ppos);
+					FillSprite(pv, RDEVICE.vCameraTop, RDEVICE.vCameraRight, p, lt, rb, r_x, r_y, clr, sina, cosa);
 				}
 				else
 				{
-					FillSprite(pv, RDEVICE.vCameraTop, RDEVICE.vCameraRight, m.pos, lt, rb, r_x, r_y, color_rgba_f(m.colorR, m.colorG, m.colorB, m.colorA), sina, cosa);
+					FillSprite(pv, RDEVICE.vCameraTop, RDEVICE.vCameraRight, ppos, lt, rb, r_x, r_y, clr, sina, cosa);
 				}
 			}
+		} // pass
 		}
+	return u32(pv - pv_begin);
+}
+
+
+// Lit effects (dfLit): the light of active lamps, torches and flashes near the effect, for the particle shader's
+// L_particle_lights (Tarkov lights every smoke puff with up to 8 nearby lights). Static and dynamic point and spot
+// lights whose range reaches the effect; falloff (1 - d / range)^2, spot cones; the 8 strongest; no occlusion.
+// First-person HUD lights are skipped (their position is in the HUD's space). Gunsmith Docs vfx.md "Engine".
+static Fvector particle_lights_at(const Fvector& P, float radius)
+{
+	static xr_vector<ISpatial*> found;
+	Fvector sum = {0.f, 0.f, 0.f};
+	if (!g_SpatialSpace)
+		return sum;
+	found.clear();
+	const Fvector box = {radius, radius, radius};
+	g_SpatialSpace->q_box(found, 0, STYPE_LIGHTSOURCE, P, box);
+	float best[8];
+	Fvector best_c[8];
+	u32 n = 0;
+	for (ISpatial* sp : found)
+	{
+		light* L = (light*)(sp->dcast_Light());
+		if (!L || !L->flags.bActive || L->flags.bHudMode || L->range <= 0.f)
+			continue;
+		Fvector d;
+		d.sub(P, L->position);
+		const float dist = d.magnitude();
+		if (dist >= L->range + radius)
+			continue;
+		float a = 1.f - _max(dist - radius * 0.5f, 0.f) / L->range;
+		clamp(a, 0.f, 1.f);
+		a *= a;
+		if (L->flags.type == IRender_Light::SPOT && dist > EPS_L)
+		{
+			d.div(dist);
+			const float edge = _cos(L->cone * 0.5f);
+			const float c = d.dotproduct(L->direction);
+			float k = (c - edge) / _max(1.f - edge, 0.001f) * 3.f;
+			clamp(k, 0.f, 1.f);
+			a *= k;
+		}
+		if (a <= 0.f)
+			continue;
+		Fvector c = {L->color.r * a, L->color.g * a, L->color.b * a};
+		const float w = c.x + c.y + c.z;
+		if (n < 8)
+		{
+			best[n] = w;
+			best_c[n++] = c;
+		}
+		else
+		{
+			u32 lo = 0;
+			for (u32 i = 1; i < 8; ++i)
+				if (best[i] < best[lo])
+					lo = i;
+			if (w > best[lo])
+			{
+				best[lo] = w;
+				best_c[lo] = c;
+			}
+		}
+	}
+	for (u32 i = 0; i < n; ++i)
+		sum.add(best_c[i]);
+	return sum;
 }
 
 void CParticleEffect::Render(float)
@@ -585,10 +777,20 @@ void CParticleEffect::Render(float)
 	{
 		if (m_Def && m_Def->m_Flags.is(CPEDef::dfSprite))
 		{
+			// back to front from the camera (dfSortParticles): a sorted copy
+			if (m_Def->m_Flags.is(CPEDef::dfSortParticles) && p_cnt > 1)
+			{
+				static xr_vector<PAPI::Particle> sorted;
+				sorted.assign(particles, particles + p_cnt);
+				const Fvector& cam = Device.vCameraPosition;
+				std::sort(sorted.begin(), sorted.end(), [&cam](const PAPI::Particle& a, const PAPI::Particle& b)
+				{
+					return a.pos.distance_to_sqr(cam) > b.pos.distance_to_sqr(cam);
+				});
+				particles = sorted.data();
+			}
 			FVF::LIT* pv_start = (FVF::LIT*)RCache.Vertex.Lock(p_cnt * 4 * 4, geom->vb_stride, dwOffset);
-			ParticleRenderStream(pv_start, p_cnt, particles, this);
-
-			dwCount = p_cnt << 2;
+			dwCount = ParticleRenderStream(pv_start, p_cnt, particles, this);
 
 			RCache.Vertex.Unlock(dwCount, geom->vb_stride);
 			if (dwCount)
@@ -606,6 +808,12 @@ void CParticleEffect::Render(float)
 
 				RCache.set_xform_world(Fidentity);
 				RCache.set_Geometry(geom);
+				// nearby lights for a lit effect's shader (L_particle_lights; 0 when none)
+				if (m_Def->m_Flags.is(CPEDef::dfLit) && !GetHudMode())
+				{
+					const Fvector lc = particle_lights_at(vis.sphere.P, _max(vis.sphere.R, 0.5f));
+					RCache.set_c("L_particle_lights", lc.x, lc.y, lc.z, 0.f);
+				}
 
 				RCache.set_CullMode(m_Def->m_Flags.is(CPEDef::dfCulling)
 					                    ? (m_Def->m_Flags.is(CPEDef::dfCullCCW) ? CULL_CCW : CULL_CW)

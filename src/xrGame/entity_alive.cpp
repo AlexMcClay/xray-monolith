@@ -20,6 +20,7 @@
 #include "game_object_space.h"
 #include "material_manager.h"
 #include "game_base_space.h"
+#include "wallmark_manager.h"
 
 #define SMALL_ENTITY_RADIUS		0.6f
 #define BLOOD_MARKS_SECT		"bloody_marks"
@@ -29,6 +30,7 @@ FactoryPtr<IWallMarkArray>* CEntityAlive::m_pBloodMarksVector = NULL;
 float CEntityAlive::m_fBloodMarkSizeMin = 0.f;
 float CEntityAlive::m_fBloodMarkSizeMax = 0.f;
 float CEntityAlive::m_fBloodMarkDistance = 0.f;
+float CEntityAlive::m_fBloodMarkTTL = 0.f;
 float CEntityAlive::m_fNominalHit = 0.f;
 
 //капание крови
@@ -119,6 +121,7 @@ void CEntityAlive::LoadBloodyWallmarks(LPCSTR section)
 	m_fBloodMarkSizeMin = pSettings->r_float(section, "min_size");
 	m_fBloodMarkSizeMax = pSettings->r_float(section, "max_size");
 	m_fBloodMarkDistance = pSettings->r_float(section, "dist");
+	m_fBloodMarkTTL = READ_IF_EXISTS(pSettings, r_float, section, "ttl", 0.f);
 	m_fNominalHit = pSettings->r_float(section, "nominal_hit");
 
 
@@ -415,7 +418,7 @@ void CEntityAlive::PlaceBloodWallmark(const Fvector& dir, const Fvector& start_p
                                       IWallMarkArray* pwallmarks_vector)
 {
 	collide::rq_result result;
-	BOOL reach_wall =
+	BOOL hit =
 		Level().ObjectSpace.RayPick(
 			start_pos,
 			dir,
@@ -423,9 +426,16 @@ void CEntityAlive::PlaceBloodWallmark(const Fvector& dir, const Fvector& start_p
 			collide::rqtBoth,
 			result,
 			this
-		)
-		&&
-		!result.O;
+		);
+	BOOL reach_wall = hit && !result.O;
+
+	// [wallmarks] dynamic_objects: blood that reaches a moving object (car, crate, body) marks it
+	if (hit && result.O && wallmark_game_settings().dynamic_objects)
+	{
+		place_object_wallmark(result.O, pwallmarks_vector, start_pos, dir, result.range, wallmark_size,
+		                      m_fBloodMarkTTL, false, true, u16(result.element));
+		return;
+	}
 
 	//если кровь долетела до статического объекта
 	if (reach_wall)
@@ -449,7 +459,7 @@ void CEntityAlive::PlaceBloodWallmark(const Fvector& dir, const Fvector& start_p
 			{
 				//добавить отметку на материале
 				//::Render->add_StaticWallmark(wallmarkShader, end_point, wallmark_size, pTri, pVerts);
-				::Render->add_StaticWallmark(pwallmarks_vector, end_point, wallmark_size, pTri, pVerts);
+				::Render->add_StaticWallmark(pwallmarks_vector, end_point, wallmark_size, pTri, pVerts, m_fBloodMarkTTL);
 			}
 		}
 	}

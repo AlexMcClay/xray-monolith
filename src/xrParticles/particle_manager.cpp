@@ -15,6 +15,11 @@ PARTICLES_API IParticleManager* PAPI::ParticleManager() { return &PM; }
 // 
 CParticleManager::CParticleManager()
 {
+	// effects are looked up by index from parallel updates while child effects are added (CParticlesObject::
+	// UpdateAllMT): room for this many, so adding never moves the lists under a reader. Freed slots are reused,
+	// so this is the most effects alive at once
+	effect_vec.reserve(32768);
+	m_alist_vec.reserve(32768);
 }
 
 CParticleManager::~CParticleManager()
@@ -31,6 +36,18 @@ ParticleActions* CParticleManager::GetActionListPtr(int a_list_num)
 {
 	R_ASSERT(a_list_num>=0&&a_list_num<(int)m_alist_vec.size());
 	return m_alist_vec[a_list_num];
+}
+
+void CParticleManager::SetSourceRateScale(int alist_id, float k)
+{
+	ParticleActions* pa = GetActionListPtr(alist_id);
+	if (!pa)
+		return;
+	pa->lock();
+	for (PAVecIt it = pa->begin(); it != pa->end(); ++it)
+		if (*it && (*it)->type == PASourceID)
+			static_cast<PASource*>(*it)->rate_scale = k;
+	pa->unlock();
 }
 
 // create

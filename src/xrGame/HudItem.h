@@ -171,8 +171,10 @@ public:
 	struct hud_recoil
 	{
 		Fvector pos, rot, pivot;
+		bool screen_rotation = false; // pitch/yaw use the camera axes; translation and roll stay item-local
 	};
 	void SetHudRecoil(const Fvector& pos, const Fvector& rot, const Fvector& pivot);
+	void SetHudRecoilScreen(const Fvector& pos, const Fvector& rot, const Fvector& pivot);
 	void ResetHudRecoil();
 	const hud_recoil* HudRecoil() const { return m_hud_recoil; } // null when not set
 	// The actor's shots leave this far above the barrel's line (radians, about the barrel's right axis, in world

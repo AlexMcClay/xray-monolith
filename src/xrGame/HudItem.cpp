@@ -111,6 +111,13 @@ void CHudItem::SetHudRecoil(const Fvector& pos, const Fvector& rot, const Fvecto
 	m_hud_recoil->pos.set(pos);
 	m_hud_recoil->rot.set(rot);
 	m_hud_recoil->pivot.set(pivot);
+	m_hud_recoil->screen_rotation = false;
+}
+
+void CHudItem::SetHudRecoilScreen(const Fvector& pos, const Fvector& rot, const Fvector& pivot)
+{
+	SetHudRecoil(pos, rot, pivot);
+	m_hud_recoil->screen_rotation = true;
 }
 
 void CHudItem::ResetHudRecoil()

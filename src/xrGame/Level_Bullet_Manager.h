@@ -13,6 +13,7 @@ struct SBullet_Hit
 {
 	float power; // power          * cartridge
 	float impulse; // impulse        * cartridge
+	u8 impact = 2; // what the bullet did (ObjectHit): 0 ricochet, 1 stopped in it, 2 went through
 };
 
 //структура, описывающая пулю и ее свойства в полете
@@ -198,11 +199,26 @@ protected:
 	float m_fCollisionEnergyMin;
 	//сколькол процентов энергии устанется у пули при любом столкновении
 	float m_fCollisionEnergyMax;
+	// the bullet_on_impact script set handled = true: this event's particles, decal and sound are skipped
+	// (FireShotmark), the hit itself is not (Gunsmith Docs vfx.md, E7)
+	bool m_skip_impact_fx = false;
+	// bullet_on_impact skip_particles = true: a script plays this hit's particles itself (decal and sound stay)
+	bool m_skip_impact_particles = false;
+	// bullet_on_impact skip_sound = true: a script plays this hit's sound itself (particles and decal stay;
+	// Tarkov SFX plays Tarkov's close or distant clip by distance, Gunsmith Docs sfx.md)
+	bool m_skip_impact_sound = false;
 
 	//параметры отрисовки трассеров
 	float m_fTracerWidth;
 	float m_fTracerLengthMax;
 	float m_fTracerLengthMin;
+	// optional [bullet_manager] keys (0 = off, vanilla): the width grows over the bullet's first
+	// tracer_width_grow_time seconds (1 - (1 - t)^2); the length is at most speed x tracer_length_speed_k
+	// (seconds of flight); the tracer fades out from tracer_fade_start and is gone at tracer_life seconds
+	float m_fTracerWidthGrow = 0.f;
+	float m_fTracerLengthSpeedK = 0.f;
+	float m_fTracerLife = 0.f;
+	float m_fTracerFadeStart = 0.f;
 protected:
 	void PlayWhineSound(SBullet* bullet, CObject* object, const Fvector& pos);
 	void PlayExplodePS(const Fmatrix& xf);

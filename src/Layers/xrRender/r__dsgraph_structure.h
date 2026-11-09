@@ -63,6 +63,12 @@ public:
 #endif
 	R_dsgraph::mapSorted_T										mapHUDDistort;
 
+	// particle bloom (ShaderElement flag bBloom): hot particles queued during the forward pass while bloom_collect
+	// is set, drawn and cleared right after it (r_dsgraph_render_bloom) in the same frame
+	R_dsgraph::mapSorted_T mapBloom;
+	R_dsgraph::mapSorted_T mapHUDBloom;
+	bool bloom_collect;
+
 	// Runtime structures 
 	xr_vector<R_dsgraph::mapNormalVS::TNode*,render_alloc<R_dsgraph::mapNormalVS::TNode*>> nrmVS;
 #if defined(USE_DX10) || defined(USE_DX11)
@@ -140,6 +146,7 @@ public:
 		val_feedback_breakp = 0;
 		val_recorder = 0;
 		marker = 0;
+		bloom_collect = false;
 		r_pmask(true, true);
 		b_loaded = FALSE;
 	};
@@ -186,6 +193,8 @@ public:
 		mapDistort.destroy();
 		mapHUDSorted.destroy();
 		mapHUDDistort.destroy();
+		mapBloom.destroy();
+		mapHUDBloom.destroy();
 		mapCamAttachedSorted.destroy();
 		mapLandscape.destroy();
 		//HUDMask.destroy(); // SSS 23: Deprecated
@@ -222,6 +231,8 @@ public:
 	void r_dsgraph_render_emissive(bool clear = true, bool renderHUD = false);
 	void r_dsgraph_render_wmarks();
 	void r_dsgraph_render_distort();
+	void r_dsgraph_render_bloom(); // draws and clears mapBloom / mapHUDBloom
+	void r_dsgraph_clear_bloom();
 	void r_dsgraph_render_subspace(IRender_Sector* _sector, CFrustum* _frustum, Fmatrix& mCombined, Fvector& _cop,
 	                               BOOL _dynamic, BOOL _precise_portals = FALSE);
 	void r_dsgraph_render_subspace(IRender_Sector* _sector, Fmatrix& mCombined, Fvector& _cop, BOOL _dynamic,

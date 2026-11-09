@@ -123,6 +123,7 @@ protected:
 	static float m_fBloodMarkSizeMax;
 	static float m_fBloodMarkSizeMin;
 	static float m_fBloodMarkDistance;
+	static float m_fBloodMarkTTL; // [bloody_marks] ttl: lifetime of blood marks and drops (0 = the engine's default)
 	static float m_fNominalHit;
 
 	//текстурки капель крови

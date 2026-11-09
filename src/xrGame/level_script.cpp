@@ -1034,6 +1034,293 @@ void reset_cam_offset()
 		A->Cameras().ResetScriptOffset();
 }
 
+// a particle effect or group of this name exists (creating one that doesn't is fatal; Gunsmith Docs vfx.md, E5)
+bool particles_exist(LPCSTR name) { return ::Render->particles_Exists(name); }
+
+// One-shot lights (Gunsmith Docs vfx.md, E8): level.flash_light(pos, r, g, b, range, seconds[, shadow]) lights a
+// point light that fades out (brightness (1 - t)^2) and frees itself. At most 32 at once (the oldest goes first).
+// Updated by CLevel::OnFrame, cleared with the level.
+namespace
+{
+	struct SFlashLight
+	{
+		ref_light light;
+		Fcolor color;
+		u32 start;
+		u32 duration;
+	};
+	xr_vector<SFlashLight> g_flash_lights;
+	const u32 g_flash_lights_max = 32;
+}
+
+void flash_light(const Fvector& pos, float r, float g, float b, float range, float seconds, bool shadow)
+{
+	if (seconds <= 0.f || range <= 0.f)
+		return;
+	if (g_flash_lights.size() >= g_flash_lights_max)
+		g_flash_lights.erase(g_flash_lights.begin());
+	SFlashLight f;
+	f.light = ::Render->light_create();
+	f.light->set_type(IRender_Light::POINT);
+	f.light->set_shadow(shadow);
+	f.light->set_position(pos);
+	f.light->set_range(range);
+	f.color.set(r, g, b, 1.f);
+	f.light->set_color(r, g, b);
+	f.light->set_active(true);
+	f.start = Device.dwTimeGlobal;
+	f.duration = _max(u32(seconds * 1000.f), u32(1));
+	g_flash_lights.push_back(f);
+}
+
+void flash_light(const Fvector& pos, float r, float g, float b, float range, float seconds)
+{
+	flash_light(pos, r, g, b, range, seconds, false);
+}
+
+void flash_lights_update()
+{
+	for (u32 i = 0; i < g_flash_lights.size();)
+	{
+		SFlashLight& f = g_flash_lights[i];
+		const u32 age = Device.dwTimeGlobal - f.start;
+		if (age >= f.duration)
+		{
+			f.light->set_active(false);
+			g_flash_lights.erase(g_flash_lights.begin() + i);
+			continue;
+		}
+		float k = 1.f - float(age) / float(f.duration);
+		k *= k;
+		f.light->set_color(f.color.r * k, f.color.g * k, f.color.b * k);
+		++i;
+	}
+}
+
+void flash_lights_clear()
+{
+	for (SFlashLight& f : g_flash_lights)
+		if (f.light)
+			f.light->set_active(false);
+	g_flash_lights.clear();
+}
+
+// Ribbons (Gunsmith Docs vfx.md "Ribbons"): a strip drawn through points that drift on their own, e.g. the smoke wisp
+// rising off a hot barrel (Tarkov's MuzzleSmoke). A script makes one and adds points; the engine moves them (rise,
+// drag, sway), ages them out and draws the strip facing the camera, in world space, after the scene (as tracers).
+//   level.ribbon_create(shader, texture, life, width_start, width_end, rise, drag, sway) -> id (0: none left)
+//     life s; widths m (over a point's life); rise m/s^2 (up); drag: the share of speed kept per second; sway m/s^2
+//   level.ribbon_color(id, r, g, b)            tint (0-1), white by default
+//   level.ribbon_add(id, pos, alpha[, hud])    a new point at pos (hud: pos is in the first-person HUD's space,
+//                                              moved to where it shows on screen at the same distance); alpha 0-1
+//   level.ribbon_release(id)                   no more points: removed when the last one is gone
+//   level.ribbon_points(id)                    points alive
+// A point fades in over its first 10 % of life and out over the last 50 %. At most 64 ribbons and 256 points each.
+// Updated by CLevel::OnFrame, drawn by CLevel::OnRender, cleared with the level.
+#include "ui_defs.h"
+namespace
+{
+	struct SRibbonPoint
+	{
+		Fvector pos;
+		Fvector vel;
+		float age;
+		float alpha;
+		float seed;
+	};
+	struct SRibbon
+	{
+		int id;
+		ui_shader sh;
+		float life, w0, w1, rise, drag, sway;
+		Fvector color;
+		bool released;
+		xr_deque<SRibbonPoint> pts;
+	};
+	xr_vector<SRibbon*> g_ribbons;
+	int g_ribbon_next = 1;
+	const u32 g_ribbons_max = 64;
+	const u32 g_ribbon_points_max = 256;
+
+	SRibbon* ribbon_find(int id)
+	{
+		for (SRibbon* r : g_ribbons)
+			if (r->id == id)
+				return r;
+		return nullptr;
+	}
+}
+
+int ribbon_create(LPCSTR shader, LPCSTR texture, float life, float w0, float w1, float rise, float drag, float sway)
+{
+	if (!shader || !texture || g_ribbons.size() >= g_ribbons_max)
+		return 0;
+	SRibbon* r = xr_new<SRibbon>();
+	r->id = g_ribbon_next++;
+	r->sh->create(shader, texture);
+	r->life = _max(life, 0.05f);
+	r->w0 = w0;
+	r->w1 = w1;
+	r->rise = rise;
+	r->drag = drag;
+	clamp(r->drag, 0.f, 1.f);
+	r->sway = sway;
+	r->color.set(1.f, 1.f, 1.f);
+	r->released = false;
+	g_ribbons.push_back(r);
+	return r->id;
+}
+
+void ribbon_color(int id, float red, float green, float blue)
+{
+	if (SRibbon* r = ribbon_find(id))
+		r->color.set(red, green, blue);
+}
+
+void ribbon_add(int id, const Fvector& pos, float alpha, bool hud)
+{
+	SRibbon* r = ribbon_find(id);
+	if (!r || r->released)
+		return;
+	SRibbonPoint p;
+	p.pos = pos;
+	if (hud)
+	{
+		// the HUD point where it shows on screen, at the same distance from the camera: in view space scale x and y
+		// by the HUD's projection over the world's (Device.hud_to_world keeps the screen spot but not the depth,
+		// which put the point far off: each turn of the view then drew a long horizontal streak; user, 7 Nov 2026)
+		Fvector v;
+		Device.mView.transform_tiny(v, p.pos);
+		if (Device.mProject._11 != 0.f && Device.mProject._22 != 0.f)
+		{
+			v.x *= Device.mProjectHud._11 / Device.mProject._11;
+			v.y *= Device.mProjectHud._22 / Device.mProject._22;
+		}
+		Device.mInvView.transform_tiny(p.pos, v);
+	}
+	p.vel.set(0.f, 0.f, 0.f);
+	p.age = 0.f;
+	p.alpha = alpha;
+	clamp(p.alpha, 0.f, 1.f);
+	p.seed = ::Random.randF(0.f, 100.f);
+	if (r->pts.size() >= g_ribbon_points_max)
+		r->pts.pop_front();
+	r->pts.push_back(p);
+}
+
+void ribbon_add3(int id, const Fvector& pos, float alpha)
+{
+	ribbon_add(id, pos, alpha, false);
+}
+
+void ribbon_release(int id)
+{
+	if (SRibbon* r = ribbon_find(id))
+		r->released = true;
+}
+
+u32 ribbon_points(int id)
+{
+	SRibbon* r = ribbon_find(id);
+	return r ? u32(r->pts.size()) : 0;
+}
+
+void ribbons_update()
+{
+	const float dt = _min(Device.fTimeDelta, 0.1f);
+	const float t = Device.fTimeGlobal;
+	for (u32 i = 0; i < g_ribbons.size();)
+	{
+		SRibbon* r = g_ribbons[i];
+		const float keep = r->drag > 0.f ? powf(r->drag, dt) : 0.f;
+		for (SRibbonPoint& p : r->pts)
+		{
+			p.age += dt;
+			p.vel.y += r->rise * dt;
+			p.vel.x += _sin(t * 1.7f + p.seed) * r->sway * dt;
+			p.vel.z += _cos(t * 1.3f + p.seed * 2.f) * r->sway * dt;
+			p.vel.mul(keep);
+			p.pos.mad(p.vel, dt);
+		}
+		while (!r->pts.empty() && r->pts.front().age >= r->life)
+			r->pts.pop_front();
+		if (r->released && r->pts.empty())
+		{
+			xr_delete(r);
+			g_ribbons.erase(g_ribbons.begin() + i);
+			continue;
+		}
+		++i;
+	}
+}
+
+void ribbons_render()
+{
+	if (g_ribbons.empty())
+		return;
+	const Fvector& cam = Device.vCameraPosition;
+	for (SRibbon* r : g_ribbons)
+	{
+		const u32 n = u32(r->pts.size());
+		if (n < 2)
+			continue;
+		UIRender->StartPrimitive((n - 1) * 6, IUIRender::ptTriList, IUIRender::pttLIT);
+		Fvector prev_a, prev_b;
+		u32 prev_c = 0;
+		float prev_v = 0.f;
+		for (u32 k = 0; k < n; ++k)
+		{
+			const SRibbonPoint& p = r->pts[k];
+			// tangent from the neighbours, side across it facing the camera
+			const Fvector& p0 = r->pts[k > 0 ? k - 1 : k].pos;
+			const Fvector& p1 = r->pts[k + 1 < n ? k + 1 : k].pos;
+			Fvector tan, view, side;
+			tan.sub(p1, p0);
+			if (tan.square_magnitude() < EPS_S)
+				tan.set(0.f, 1.f, 0.f);
+			view.sub(p.pos, cam);
+			side.crossproduct(tan, view);
+			if (side.square_magnitude() < EPS_S)
+				side.set(1.f, 0.f, 0.f);
+			side.normalize();
+			const float x = p.age / r->life;
+			const float w = 0.5f * (r->w0 + (r->w1 - r->w0) * x);
+			float a = p.alpha * (x < 0.1f ? x / 0.1f : 1.f) * (x > 0.5f ? (1.f - x) / 0.5f : 1.f);
+			clamp(a, 0.f, 1.f);
+			const u32 c = color_rgba_f(r->color.x, r->color.y, r->color.z, a);
+			Fvector va, vb;
+			va.mad(p.pos, side, -w);
+			vb.mad(p.pos, side, w);
+			const float v = x;
+			if (k > 0)
+			{
+				UIRender->PushPoint(prev_a.x, prev_a.y, prev_a.z, prev_c, 0.f, prev_v);
+				UIRender->PushPoint(prev_b.x, prev_b.y, prev_b.z, prev_c, 1.f, prev_v);
+				UIRender->PushPoint(va.x, va.y, va.z, c, 0.f, v);
+				UIRender->PushPoint(va.x, va.y, va.z, c, 0.f, v);
+				UIRender->PushPoint(prev_b.x, prev_b.y, prev_b.z, prev_c, 1.f, prev_v);
+				UIRender->PushPoint(vb.x, vb.y, vb.z, c, 1.f, v);
+			}
+			prev_a = va;
+			prev_b = vb;
+			prev_c = c;
+			prev_v = v;
+		}
+		UIRender->CacheSetCullMode(IUIRender::cmNONE);
+		UIRender->CacheSetXformWorld(Fidentity);
+		UIRender->SetShader(*r->sh);
+		UIRender->FlushPrimitive();
+		UIRender->CacheSetCullMode(IUIRender::cmCCW);
+	}
+}
+
+void ribbons_clear()
+{
+	for (SRibbon* r : g_ribbons)
+		xr_delete(r);
+	g_ribbons.clear();
+}
+
 // tan(HUD FOV / 2) / tan(world FOV / 2), last frame's: a small angle in the HUD's projection shows on screen as
 // angle / ratio would in the world's, and a barrel turned by it fires that far off (Device.hud_to_world)
 #include "../xrEngine/IInputReceiver.h"
@@ -2837,6 +3124,15 @@ void CLevel::script_register(lua_State* L)
 			def("remove_cam_effector", &remove_cam_effector),
 			def("set_cam_offset", &set_cam_offset),
 			def("reset_cam_offset", &reset_cam_offset),
+			def("flash_light", ((void (*)(const Fvector&, float, float, float, float, float))&flash_light)),
+			def("flash_light", ((void (*)(const Fvector&, float, float, float, float, float, bool))&flash_light)),
+			def("particles_exist", &particles_exist),
+			def("ribbon_create", &ribbon_create),
+			def("ribbon_color", &ribbon_color),
+			def("ribbon_add", &ribbon_add),
+			def("ribbon_add", &ribbon_add3),
+			def("ribbon_release", &ribbon_release),
+			def("ribbon_points", &ribbon_points),
 			def("hud_fov_ratio", &hud_fov_ratio),
 			def("set_mouse_sens_scale", &set_mouse_sens_scale),
 			def("get_mouse_sens_scale", &get_mouse_sens_scale),

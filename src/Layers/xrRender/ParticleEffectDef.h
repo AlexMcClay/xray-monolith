@@ -74,6 +74,23 @@ namespace PS
 			dfFaceAlign = (1 << 21),
 			dfCulling = (1 << 22),
 			dfCullCCW = (1 << 23),
+			// draw an animated flipbook's next frame over the current one, cross-faded by the frame's fraction
+			// (alpha split between the two; Gunsmith Docs vfx.md, E3)
+			dfFrameBlend = (1 << 24),
+			// the effect wants the object lighting probe (ROS: sky and sun visibility, hemi cube) for its shader
+			// (CParticlesObject turns it on; E1)
+			dfLit = (1 << 25),
+			// draw the effect's particles back to front from the camera (big alpha-blended smoke: no sorting pops
+			// between overlapping puffs); costs a sort per frame, so only flagged effects
+			dfSortParticles = (1 << 26),
+			// every particle's size grows by its own factor, exp(m_fSizeGrowth x seconds), keeping each puff's
+			// start size (TargetSize drives them all to one size); [size_growth] value in a loose .pe. Optional
+			// [size_growth] random = min, max: each particle's rate x its own factor in that range (some puffs swell
+			// more than others), kept as a seed in the particle's flags (high byte) from its birth
+			dfSizeGrowth = (1 << 27),
+			// each play scales the Source rate by a random factor in m_RateRandom (a burst emits a random count
+			// between its min and max each time); [rate_random] value = min, max in a loose .pe
+			dfRandomRate = (1 << 28),
 		};
 
 		shared_str m_Name;
@@ -92,6 +109,9 @@ namespace PS
 		int m_MaxParticles; // max particle count
 		Fvector m_VelocityScale; // velocity scale
 		Fvector m_APDefaultRotation; // align to path
+		float m_fSizeGrowth = 0.f; // dfSizeGrowth: ln of the size factor per second
+		Fvector2 m_SizeGrowthRandom = {1.f, 1.f}; // dfSizeGrowth: range of each particle's factor on that rate
+		Fvector2 m_RateRandom = {1.f, 1.f}; // dfRandomRate: the rate factor's range per play
 		// collision
 		float m_fCollideOneMinusFriction;
 		float m_fCollideResilience;

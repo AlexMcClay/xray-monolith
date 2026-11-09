@@ -458,12 +458,83 @@ void CScriptGameObject::set_hud_recoil(Fvector pos, Fvector rot, Fvector pivot)
 		item->SetHudRecoil(pos, rot, pivot);
 }
 
+// As set_hud_recoil, but pitch and yaw are about the camera's right and up axes. This keeps vertical recoil
+// vertical on screen while aiming through a canted sight; position and roll remain local to the weapon.
+void CScriptGameObject::set_hud_recoil_screen(Fvector pos, Fvector rot, Fvector pivot)
+{
+	if (CHudItem* item = get_script_hud_offset_item(this, "set_hud_recoil_screen", 0))
+		item->SetHudRecoilScreen(pos, rot, pivot);
+}
+
 void CScriptGameObject::set_cam_recoil(bool on)
 {
 	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
 		w->m_cam_recoil = on;
 	else
 		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError, "CGameObject : cannot access class member set_cam_recoil!");
+}
+
+// A weapon's flame or smoke particles from a script ("flame" / "smoke"; "" back to the config's), e.g. a
+// muzzle-device flash (CShootingObject::SetParticlesOverride; Gunsmith Docs research/40-vfx.md)
+void CScriptGameObject::set_weapon_particles(LPCSTR kind, LPCSTR name)
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	if (!w || !kind || !w->SetParticlesOverride(kind, name))
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError,
+		                                "CGameObject : set_weapon_particles needs a weapon and \"flame\" or \"smoke\"!");
+}
+
+// A weapon's shot light from a script: colour, range (m), time (s); range or time <= 0 back to the config's
+// (CShootingObject::SetLightOverride; Gunsmith Docs vfx.md)
+void CScriptGameObject::set_weapon_light(float r, float g, float b, float range, float time)
+{
+	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
+		w->SetLightOverride(r, g, b, range, time);
+	else
+		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError,
+		                                "CGameObject : set_weapon_light needs a weapon!");
+}
+
+// The weapon's current fire point (the silencer's when fitted): in the first-person HUD's space while
+// weapon_hud_mode() (level.ribbon_add's hud flag moves it to the world's), else in the world
+Fvector CScriptGameObject::weapon_fire_point()
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return w ? w->get_CurrentFirePoint() : Fvector().set(0.f, 0.f, 0.f);
+}
+
+// The weapon's shell ejection point (same space as weapon_fire_point), e.g. for smoke out of the ejection port
+Fvector CScriptGameObject::weapon_shell_point()
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return w ? w->get_LastSP() : Fvector().set(0.f, 0.f, 0.f);
+}
+
+// The weapon's fire direction (same space as weapon_fire_point), e.g. to aim a script muzzle effect along the bore
+Fvector CScriptGameObject::weapon_fire_dir()
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return w ? w->get_LastFD() : Fvector().set(0.f, 0.f, 1.f);
+}
+
+// Move a weapon's shot light along the fire direction: forward (m) for the world, forward_hud in first person,
+// e.g. off the hands; 0 = at the fire point (vanilla)
+void CScriptGameObject::set_weapon_light_offset(float forward, float forward_hud)
+{
+	if (CWeapon* w = smart_cast<CWeapon*>(&object()))
+		w->SetLightOffset(forward, forward_hud);
+}
+
+bool CScriptGameObject::weapon_hud_mode()
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return w && w->GetHUDmode();
+}
+
+LPCSTR CScriptGameObject::weapon_particles(LPCSTR kind)
+{
+	CWeapon* w = smart_cast<CWeapon*>(&object());
+	return (w && kind) ? w->GetParticlesName(kind) : "";
 }
 
 void CScriptGameObject::set_owner_spread(bool on)

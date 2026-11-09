@@ -1398,10 +1398,11 @@ void PASource::Execute(ParticleEffect* effect, const float dt, float& tm_max)
 {
 	if (m_Flags.is(flSilent)) return;
 
-	int rate = int(floor(particle_rate * dt));
+	const float scaled_rate = particle_rate * rate_scale;
+	int rate = int(floor(scaled_rate * dt));
 
 	// Dither the fraction particle in time.
-	if (drand48() < particle_rate * dt - float(rate))
+	if (drand48() < scaled_rate * dt - float(rate))
 		rate++;
 
 	// Don't emit more than it can hold.
@@ -1797,11 +1798,9 @@ void PATurbulence::Execute(ParticleEffect* effect, const float dt, float& tm_max
 		TAL_SCOPED_TASK_NAMED( "PATurbulence::Execute()" );
 #endif // _GPA_ENABLED
 
-	if (noise_start)
-	{
-		noise_start = 0;
-		noise3Init();
-	};
+	// set up once (thread-safe static init: effects may update in parallel, CParticlesObject::UpdateAllMT)
+	static const bool noise_ready = (noise3Init(), noise_start = 0, true);
+	(void)noise_ready;
 
 	age += dt;
 

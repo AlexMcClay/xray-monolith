@@ -12,7 +12,14 @@
 #include "../xrEngine/IGame_Persistent.h"
 #include "../xrEngine/environment.h"
 
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range.h>
+
 const Fvector zero_vel = {0.f, 0.f, 0.f};
+
+// console r__mt_particles: 1 = particle effects update in parallel once a frame (UpdateAllMT), 0 = one by one as
+// before (scheduler and draw)
+int ps_mt_particles = 1;
 
 CParticlesObject::CParticlesObject(LPCSTR p_name, BOOL bAutoRemove, bool destroy_on_game_load) :
 	inherited(destroy_on_game_load)
@@ -35,6 +42,8 @@ void CParticlesObject::Init(LPCSTR p_name, IRender_Sector* S, BOOL bAutoRemove)
 		IParticleCustom* V = smart_cast<IParticleCustom*>(renderable.visual);
 		VERIFY(V);
 		time_limit = V->GetTimeLimit();
+		// effects with a lit shader get the object lighting probe: sky and sun visibility at the effect (E1)
+		renderable.pROS_Allowed = V->IsLit();
 	}
 	else
 	{
@@ -70,6 +79,8 @@ void CParticlesObject::Init(LPCSTR p_name, IRender_Sector* S, BOOL bAutoRemove)
 
 	dwLastTime = Device.dwTimeGlobal;
 	mt_dt = 0;
+	m_mt_want = false;
+	m_mt_render_frame = 0;
 }
 
 CParticlesObject::~CParticlesObject()
@@ -182,6 +193,12 @@ void CParticlesObject::shedule_Update(u32 _dt)
 			fastdelegate::FastDelegate0<> delegate(this, &CParticlesObject::PerformAllTheWork_mt);
 			Device.seqParallel.push_back(delegate);
 		}
+		else if (ps_mt_particles)
+		{
+			// done with the others in UpdateAllMT before the world is drawn (it also updates the spatial)
+			m_mt_want = true;
+			return;
+		}
 		else
 		{
 			mt_dt = 0;
@@ -208,6 +225,57 @@ void CParticlesObject::PerformAllTheWork(u32 _dt)
 		dwLastTime = Device.dwTimeGlobal;
 	}
 	UpdateSpatial();
+}
+
+// Parallel particle update (r__mt_particles). Every effect the scheduler asked for and every effect drawn last frame
+// is updated here at once, spread over worker threads (tbb), instead of one by one (in shedule_Update and while
+// drawing). Each effect touches only its own data; what effects share is made safe in the renderer: child effects
+// created and deleted from inside an update go through the model pool's lock (CModelPool), the particle manager's
+// lists don't grow while this runs (reserved), collision ray picks lock the object space themselves, and the
+// turbulence noise is set up once. Spatial updates stay on this thread, after. Effects that come into view this
+// frame are still updated while drawing (renderable_Render), as before.
+void CParticlesObject::UpdateAllMT()
+{
+	if (!ps_mt_particles || g_dedicated_server || !g_pGamePersistent)
+		return;
+	static xr_vector<CParticlesObject*> due;
+	due.clear();
+	const u32 now = Device.dwTimeGlobal;
+	const u32 frame = Device.dwFrame;
+	for (CPS_Instance* psi : g_pGamePersistent->ps_active)
+	{
+		// CParticlesObject is the only CPS_Instance
+		CParticlesObject* P = static_cast<CParticlesObject*>(psi);
+		if (P->m_bDead || !P->renderable.visual || P->dwLastTime == now)
+			continue;
+		if (P->m_mt_want || P->m_mt_render_frame + 1 >= frame)
+			due.push_back(P);
+	}
+	if (due.empty())
+		return;
+
+	auto update = [now](CParticlesObject* P)
+	{
+		IParticleCustom* V = smart_cast<IParticleCustom*>(P->renderable.visual);
+		if (V)
+			V->OnFrame(now - P->dwLastTime);
+		P->dwLastTime = now;
+	};
+	if (due.size() == 1)
+		update(due[0]);
+	else
+		tbb::parallel_for(tbb::blocked_range<size_t>(0, due.size(), 2), [&](const tbb::blocked_range<size_t>& r)
+		{
+			for (size_t i = r.begin(); i != r.end(); ++i)
+				update(due[i]);
+		});
+
+	for (CParticlesObject* P : due)
+		if (P->m_mt_want)
+		{
+			P->m_mt_want = false;
+			P->UpdateSpatial();
+		}
 }
 
 void CParticlesObject::PerformAllTheWork_mt()
@@ -263,6 +331,7 @@ float CParticlesObject::shedule_Scale()
 void CParticlesObject::renderable_Render()
 {
 	VERIFY(renderable.visual);
+	m_mt_render_frame = Device.dwFrame; // due again next frame (UpdateAllMT)
 	u32 dt = Device.dwTimeGlobal - dwLastTime;
 	if (dt)
 	{

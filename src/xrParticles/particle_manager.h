@@ -42,6 +42,7 @@ namespace PAPI
 		virtual void SetCallback(int effect_id, OnBirthParticleCB b, OnDeadParticleCB d, void* owner, u32 param);
 		virtual void GetParticles(int effect_id, Particle*& particles, u32& cnt);
 		virtual u32 GetParticlesCount(int effect_id);
+		virtual void SetSourceRateScale(int alist_id, float k);
 
 		// action
 		virtual ParticleAction* CreateAction(PActionEnum action_id);

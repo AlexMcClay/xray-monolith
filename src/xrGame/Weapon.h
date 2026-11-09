@@ -567,6 +567,20 @@ protected:
 	virtual void UpdateXForm();
 	void InterpolateOffset(Fvector& current, const Fvector& target, const float factor) const;
 	virtual void UpdateHudAdditional(Fmatrix& trans);
+public:
+	// After this frame's HUD pose (CActor::UpdateCL, g_player_hud->update): the fire point, the flame particles and
+	// the shot light again, so the muzzle effects don't trail the gun by a frame while it moves (Gunsmith Docs vfx.md)
+	void RefreshHudFireEffects()
+	{
+		if (!GetHUDmode())
+			return;
+		dwFP_Frame = 0;
+		UpdateFireDependencies();
+		UpdateFlameParticles();
+		UpdateFlameParticles2();
+		UpdateLight();
+	}
+protected:
 	IC void UpdateFireDependencies()
 	{
 		if (dwFP_Frame == Device.dwFrame) return;
@@ -591,6 +605,12 @@ public:
 	{
 		UpdateFireDependencies();
 		return m_current_firedeps.vLastFPSilencer;
+	}
+
+	virtual bool get_LightDir(Fvector& d)
+	{
+		d = get_LastFD();
+		return true;
 	}
 
 	IC const Fvector& get_LastFD()

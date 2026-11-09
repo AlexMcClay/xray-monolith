@@ -23,6 +23,7 @@
 #include "actor.h"
 #include "ai/monsters/basemonster/base_monster.h"
 #include "script_game_object.h"
+#include "wallmark_manager.h"
 
 //константы ShootFactor, определяющие 
 //поведение пули при столкновении с объектом
@@ -183,6 +184,9 @@ void CBulletManager::FireShotmark(SBullet* bullet, const Fvector& vDir, const Fv
 {
 	SGameMtlPair* mtl_pair = GMLib.GetMaterialPair(bullet->bullet_material_idx, target_material);
 	Fvector particle_dir = vNormal;
+	// a script drew this impact itself (bullet_on_impact handled = true): no particles, decal or sound here
+	if (m_skip_impact_fx)
+		ShowMark = false;
 
 	if (R.O)
 	{
@@ -203,7 +207,8 @@ void CBulletManager::FireShotmark(SBullet* bullet, const Fvector& vDir, const Fv
 				                               &*mtl_pair->m_pCollideMarks,
 				                               p,
 				                               bullet->dir,
-				                               bullet->wallmark_size);
+				                               bullet->wallmark_size,
+				                               object_wallmark_ttl(R.O)); // [wallmarks] object_ttl, 0 = default
 		}
 	}
 	else
@@ -224,7 +229,7 @@ void CBulletManager::FireShotmark(SBullet* bullet, const Fvector& vDir, const Fv
 		                    : &mtl_pair->CollideSounds[::Random.randI(0, mtl_pair->CollideSounds.size())];
 
 	//проиграть звук
-	if (pSound && ShowMark)
+	if (pSound && ShowMark && !m_skip_impact_sound)
 	{
 		CObject* O = Level().Objects.net_Find(bullet->parent_id);
 		bullet->m_mtl_snd = *pSound;
@@ -248,7 +253,7 @@ void CBulletManager::FireShotmark(SBullet* bullet, const Fvector& vDir, const Fv
 		pos.k.normalize(particle_dir);
 		Fvector::generate_orthonormal_basis(pos.k, pos.j, pos.i);
 		pos.c.set(vEnd);
-		if (ps_name && ShowMark)
+		if (ps_name && ShowMark && !m_skip_impact_particles)
 		{
 			//отыграть партиклы попадания в материал
 			CParticlesObject* ps = CParticlesObject::Create(ps_name,TRUE);
@@ -513,6 +518,7 @@ bool CBulletManager::ObjectHit(SBullet_Hit* hit_res, SBullet* bullet, const Fvec
 		bullet->dir.set(tgt_dir);
 		bullet->bullet_pos = end_point;
 		bullet->flags.ricochet_was = 1;
+		hit_res->impact = 0;
 
 #ifdef DEBUG
 		bullet_state = 0;
@@ -522,6 +528,7 @@ bool CBulletManager::ObjectHit(SBullet_Hit* hit_res, SBullet* bullet, const Fvec
 	{
 		//застрявание пули в материале
 		speed_scale = 0.0f;
+		hit_res->impact = 1;
 #ifdef DEBUG
 		bullet_state = 1;
 #endif
@@ -530,6 +537,7 @@ bool CBulletManager::ObjectHit(SBullet_Hit* hit_res, SBullet* bullet, const Fvec
 	{
 		//пробивание материала
 		speed_scale = shoot_factor; //mtl->fShootFactor;
+		hit_res->impact = 2;
 
 		bullet->bullet_pos.mad(bullet->bullet_pos, bullet->dir, EPS); //fake
 		//ввести коэффициент случайности при простреливании

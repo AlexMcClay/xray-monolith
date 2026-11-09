@@ -437,6 +437,7 @@ public:
 	void phase_hdao();
 	void phase_downsamp();
 	void phase_wallmarks();
+	void phase_wallmarks_gbuffer(); // decals that also write the G-buffer normal (Shader flag bWmarkGBuffer)
 	void phase_smap_direct(light* L, u32 sub_phase);
 	void phase_smap_direct_tsh(light* L, u32 sub_phase);
 	void phase_smap_spot_clear();

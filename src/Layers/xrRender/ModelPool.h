@@ -46,6 +46,9 @@ private:
 private:
 	xr_vector<ModelDef> Models; // Reference / Base
 	xr_vector<dxRender_Visual*> ModelsToDelete; // 
+	// particle effects and groups are created and deleted from parallel particle updates (child effects;
+	// CParticlesObject::UpdateAllMT): CreatePE / CreatePG / Delete / DeleteQueue hold this (recursive)
+	xrCriticalSection m_ps_lock;
 	REGISTRY Registry; // Just pairing of pointer / Name
 	POOL Pool; // Unused / Inactive
 	BOOL bLogging;

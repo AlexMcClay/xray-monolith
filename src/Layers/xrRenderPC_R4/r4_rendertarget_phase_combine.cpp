@@ -424,6 +424,28 @@ void CRenderTarget::phase_combine()
 		if (g_pGamePersistent) g_pGamePersistent->OnRenderPPUI_main(); // PP-UI
 	}
 
+	// Particle bloom: hot particles' bloom element (Lua :bloom(true)) added into SSS's bloom emissive buffer,
+	// depth-tested against the scene, so phase_ssfx_bloom makes them glow. Queued by the forward pass above and
+	// always cleared here, the same frame (an emissive particle left queued to the next frame crashed).
+	if (RImplementation.o.ssfx_bloom && (RImplementation.mapBloom.size() + RImplementation.mapHUDBloom.size()))
+	{
+		PIX_EVENT(Particle_bloom);
+		if (!RImplementation.o.dx10_msaa)
+			u_setrt(rt_ssfx_bloom_emissive, 0, 0, HW.pBaseZB);
+		else
+			u_setrt(rt_ssfx_bloom_emissive, 0, 0, RImplementation.Target->rt_MSAADepth->pZRT);
+		RCache.set_CullMode(CULL_CCW);
+		RCache.set_Stencil(FALSE);
+		RCache.set_ColorWriteEnable();
+		RImplementation.r_dsgraph_render_bloom();
+		// back to the forward targets
+		if (!RImplementation.o.dx10_msaa)
+			u_setrt(rt_Generic_0, rt_Heat, rt_ssfx_motion_vectors, HW.pBaseZB);
+		else
+			u_setrt(rt_Generic_0_r, rt_Heat, rt_ssfx_motion_vectors, RImplementation.Target->rt_MSAADepth->pZRT);
+	}
+	RImplementation.r_dsgraph_clear_bloom();
+
 	//	Igor: for volumetric lights
 	//	combine light volume here
 	if (RImplementation.o.ssfx_volumetric)
@@ -866,6 +888,20 @@ void CRenderTarget::phase_wallmarks()
 	RCache.set_Stencil(TRUE, D3DCMP_LESSEQUAL, 0x01, 0xff, 0x00);
 	RCache.set_CullMode(CULL_CCW);
 	RCache.set_ColorWriteEnable(D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE);
+}
+
+// Decals with a G-buffer shader (Lua blender :wmark_gbuffer(true)): target 0 = rt_Color (albedo RGB, gloss A),
+// target 1 = rt_Position (packed normal XY, depth Z, hemi/material W). The shader's own per-target write masks
+// (dx10color_write_enable_rt) decide what it touches; it must leave depth and hemi/material alone.
+void CRenderTarget::phase_wallmarks_gbuffer()
+{
+	if (!RImplementation.o.dx10_msaa)
+		u_setrt(rt_Color, rt_Position, NULL, HW.pBaseZB);
+	else
+		u_setrt(rt_Color, rt_Position, NULL, rt_MSAADepth->pZRT);
+	// Stencil	- draw only where stencil >= 0x1 (as phase_wallmarks)
+	RCache.set_Stencil(TRUE, D3DCMP_LESSEQUAL, 0x01, 0xff, 0x00);
+	RCache.set_CullMode(CULL_CCW);
 }
 
 void CRenderTarget::phase_combine_volumetric()

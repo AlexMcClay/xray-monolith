@@ -212,6 +212,7 @@ void CParticleGroup::SItem::StartRelatedChild(CParticleEffect* emitter, LPCSTR e
 	CParticleEffect* C = static_cast<CParticleEffect*>(RImplementation.model_CreatePE(eff_name));
 
 	C->SetHudMode(emitter->GetHudMode());
+	C->CopyScales(emitter);
 
 	Fmatrix M;
 	M.identity();
@@ -245,6 +246,7 @@ void CParticleGroup::SItem::StartFreeChild(CParticleEffect* emitter, LPCSTR nm, 
 {
 	CParticleEffect* C = static_cast<CParticleEffect*>(RImplementation.model_CreatePE(nm));
 	C->SetHudMode(emitter->GetHudMode());
+	C->CopyScales(emitter);
 	if (!C->IsLooped())
 	{
 		Fmatrix M;
@@ -606,6 +608,57 @@ void CParticleGroup::OnDeviceCreate()
 void CParticleGroup::OnDeviceDestroy()
 {
 	for (SItemVecIt i_it = items.begin(); i_it != items.end(); i_it++) i_it->OnDeviceDestroy();
+}
+
+// E1, E5: what a group's effects and their children answer and get
+BOOL CParticleGroup::IsLit()
+{
+	for (SItemVecIt i_it = items.begin(); i_it != items.end(); ++i_it)
+	{
+		CParticleEffect* E = static_cast<CParticleEffect*>(i_it->_effect);
+		if (E && E->IsLit())
+			return TRUE;
+	}
+	return FALSE;
+}
+
+template <typename F>
+static void for_each_group_effect(CParticleGroup::SItemVec& items, F f)
+{
+	xr_vector<dxRender_Visual*> visuals;
+	for (CParticleGroup::SItemVecIt i_it = items.begin(); i_it != items.end(); ++i_it)
+	{
+		visuals.clear();
+		i_it->GetVisuals(visuals);
+		for (dxRender_Visual* v : visuals)
+			if (v)
+				f(static_cast<CParticleEffect*>(v));
+	}
+}
+
+void CParticleGroup::SetColorScale(float r, float g, float b, float a)
+{
+	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetColorScale(r, g, b, a); });
+}
+
+void CParticleGroup::SetSizeScale(float k)
+{
+	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetSizeScale(k); });
+}
+
+void CParticleGroup::SetSpeedScale(float k)
+{
+	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetSpeedScale(k); });
+}
+
+void CParticleGroup::SetTimeScale(float k)
+{
+	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetTimeScale(k); });
+}
+
+void CParticleGroup::SetRateScale(float k)
+{
+	for_each_group_effect(items, [&](CParticleEffect* E) { E->SetRateScale(k); });
 }
 
 u32 CParticleGroup::ParticlesCount()

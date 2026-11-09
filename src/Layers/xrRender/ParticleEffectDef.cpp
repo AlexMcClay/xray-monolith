@@ -341,6 +341,18 @@ BOOL CPEDef::Load2(CInifile& ini)
 	{
 		m_APDefaultRotation = ini.r_fvector3("align_to_path", "default_rotation");
 	}
+
+	if (m_Flags.is(dfSizeGrowth) && ini.section_exist("size_growth"))
+	{
+		m_fSizeGrowth = ini.r_float("size_growth", "value");
+		if (ini.line_exist("size_growth", "random"))
+			m_SizeGrowthRandom = ini.r_fvector2("size_growth", "random");
+	}
+
+	if (m_Flags.is(dfRandomRate) && ini.section_exist("rate_random"))
+	{
+		m_RateRandom = ini.r_fvector2("rate_random", "value");
+	}
 	//#ifdef _EDITOR
 	if (pCreateEAction)
 	{

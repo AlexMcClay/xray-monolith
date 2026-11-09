@@ -1427,6 +1427,7 @@ void CWeapon::renderable_Render()
 {
 	UpdateXForm();
 
+	m_light_hud = GetHUDmode(); // the shot light lights the first-person hands and gun
 	//íàðèñîâàòü ïîäñâåòêó
 	RenderLight();
 	gs_render_world();
@@ -3275,6 +3276,7 @@ u8 CWeapon::GetCurrentHudOffsetIdx()
 
 void CWeapon::render_hud_mode()
 {
+	m_light_hud = GetHUDmode();
 	RenderLight();
 }
 

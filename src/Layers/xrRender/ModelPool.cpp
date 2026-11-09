@@ -341,6 +341,7 @@ void CModelPool::DeleteInternal(dxRender_Visual* & V, BOOL bDiscard)
 void CModelPool::Delete(dxRender_Visual* & V, BOOL bDiscard)
 {
 	if (NULL == V) return;
+	xrCriticalSection::raii guard(&m_ps_lock);
 	if (g_bRendering)
 	{
 		VERIFY(!bDiscard);
@@ -355,6 +356,7 @@ void CModelPool::Delete(dxRender_Visual* & V, BOOL bDiscard)
 
 void CModelPool::DeleteQueue()
 {
+	xrCriticalSection::raii guard(&m_ps_lock);
 	for (u32 it = 0; it < ModelsToDelete.size(); it++)
 		DeleteInternal(ModelsToDelete[it]);
 	ModelsToDelete.clear();
@@ -463,6 +465,7 @@ bool CModelPool::Exists(LPCSTR N)
 
 dxRender_Visual* CModelPool::CreatePE(PS::CPEDef* source)
 {
+	xrCriticalSection::raii guard(&m_ps_lock);
 	PS::CParticleEffect* V = (PS::CParticleEffect*)Instance_Create(MT_PARTICLE_EFFECT);
 	V->Compile(source);
 	return V;
@@ -470,6 +473,7 @@ dxRender_Visual* CModelPool::CreatePE(PS::CPEDef* source)
 
 dxRender_Visual* CModelPool::CreatePG(PS::CPGDef* source)
 {
+	xrCriticalSection::raii guard(&m_ps_lock);
 	PS::CParticleGroup* V = (PS::CParticleGroup*)Instance_Create(MT_PARTICLE_GROUP);
 	V->Compile(source);
 	return V;

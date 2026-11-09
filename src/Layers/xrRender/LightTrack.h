@@ -45,6 +45,9 @@ public:
 	u32 MODE;
 	u32 dwFrame;
 	u32 dwFrameSmooth;
+	// the smoothed values start at the first real reading, not at the defaults: short-lived objects (an impact's
+	// lit particles; E1) would otherwise spend their whole life easing in from them
+	bool smooth_snapped = false;
 
 	// 
 	xr_vector<Item> track; // everything what touches

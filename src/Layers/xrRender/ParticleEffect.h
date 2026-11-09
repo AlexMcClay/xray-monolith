@@ -44,6 +44,15 @@ namespace PS
 		};
 
 		Flags8 m_RT_Flags;
+
+		// per-instance controls (E5)
+		Fcolor m_ColorK;
+		float m_SizeK;
+		float m_TimeK;
+		float m_RateK;
+		float m_SpeedK;
+	float m_RateRandom = 1.f; // this play's random rate factor (dfRandomRate)
+		float m_TimeCarry;
 	protected:
 		BOOL SaveActionList(IWriter& F);
 		BOOL LoadActionList(IReader& F);
@@ -54,6 +63,12 @@ namespace PS
 		virtual ~CParticleEffect();
 
 		void OnFrame(u32 dt);
+		// seconds of motion not simulated yet (the time since the last step): drawing particles that much further
+		// along their velocity removes the stepping between updates (E2)
+		float RenderLead() const
+		{
+			return m_Def && m_Def->m_uStep ? m_Def->m_fStep * float(m_MemDT) / float(m_Def->m_uStep) : 0.f;
+		}
 
 		u32 RenderTO();
 		virtual void Render(float LOD);
@@ -94,6 +109,14 @@ namespace PS
 		void SetBirthDeadCB(PAPI::OnBirthParticleCB bc, PAPI::OnDeadParticleCB dc, void* owner, u32 p);
 
 		virtual u32 ParticlesCount();
+
+		virtual BOOL IsLit();
+		virtual void SetColorScale(float r, float g, float b, float a);
+		virtual void SetSizeScale(float k);
+		virtual void SetSpeedScale(float k);
+		virtual void SetTimeScale(float k);
+		virtual void SetRateScale(float k);
+		void CopyScales(const CParticleEffect* from);
 	};
 
 	void OnEffectParticleBirth(void* owner, u32 param, PAPI::Particle& m, u32 idx);

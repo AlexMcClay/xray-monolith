@@ -119,11 +119,16 @@ void CTracer::Render(const Fvector& pos,
                      float width,
                      u8 colorID,
                      float speed,
-                     bool bActor)
+                     bool bActor,
+                     float alpha_k)
 {
 	if (::Render->ViewBase.testSphere_dirty((Fvector&)center, length * .5f))
 	{
 		R_ASSERT(colorID < m_aColors.size());
+		u32 color = m_aColors[colorID];
+		if (alpha_k < 1.f) // burning out (tracer_life): the additive tracer fades by its alpha
+			color = color_rgba(color_get_R(color), color_get_G(color), color_get_B(color),
+			                   iFloor(float(color_get_A(color)) * _max(alpha_k, 0.f)));
 
 		if (bActor)
 		{
@@ -131,9 +136,9 @@ void CTracer::Render(const Fvector& pos,
 			//			float f_distance	= Device.vCameraPosition.distance_to(pos);
 
 			FillSprite_Circle(pos, k_speed * width * m_circle_size_k, k_speed * width * m_circle_size_k,
-			                  m_aColors[colorID]);
+			                  color);
 		}
 
-		FillSprite_Line(center, dir, width * .5f, length * .5f * m_tracer_length_k, m_aColors[colorID]);
+		FillSprite_Line(center, dir, width * .5f, length * .5f * m_tracer_length_k, color);
 	}
 }

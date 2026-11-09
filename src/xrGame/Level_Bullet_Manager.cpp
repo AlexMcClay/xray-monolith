@@ -203,6 +203,10 @@ void CBulletManager::Load()
 	m_fTracerWidth = pSettings->r_float(bullet_manager_sect, "tracer_width");
 	m_fTracerLengthMax = pSettings->r_float(bullet_manager_sect, "tracer_length_max");
 	m_fTracerLengthMin = pSettings->r_float(bullet_manager_sect, "tracer_length_min");
+	m_fTracerWidthGrow = READ_IF_EXISTS(pSettings, r_float, bullet_manager_sect, "tracer_width_grow_time", 0.f);
+	m_fTracerLengthSpeedK = READ_IF_EXISTS(pSettings, r_float, bullet_manager_sect, "tracer_length_speed_k", 0.f);
+	m_fTracerLife = READ_IF_EXISTS(pSettings, r_float, bullet_manager_sect, "tracer_life", 0.f);
+	m_fTracerFadeStart = READ_IF_EXISTS(pSettings, r_float, bullet_manager_sect, "tracer_fade_start", 0.f);
 
 	m_fGravityConst = pSettings->r_float(bullet_manager_sect, "gravity_const");
 	m_fAirResistanceK = pSettings->r_float(bullet_manager_sect, "air_resistance_k");
@@ -1204,8 +1208,31 @@ void CBulletManager::Render()
 
 		if (length > m_fTracerLengthMax)
 			length = m_fTracerLengthMax;
+		// optional tracer shape over the bullet's life (Gunsmith Docs vfx.md, Tarkov's TracersLight)
+		if (m_fTracerLengthSpeedK > 0.f)
+		{
+			const float by_speed = bullet->speed * m_fTracerLengthSpeedK;
+			if (length > by_speed)
+				length = by_speed;
+		}
+		float alpha_k = 1.f;
+		if (m_fTracerLife > 0.f)
+		{
+			if (bullet->life_time >= m_fTracerLife)
+				continue;
+			if (bullet->life_time > m_fTracerFadeStart && m_fTracerLife > m_fTracerFadeStart)
+				alpha_k = (m_fTracerLife - bullet->life_time) / (m_fTracerLife - m_fTracerFadeStart);
+		}
 
 		float width = m_fTracerWidth;
+		if (m_fTracerWidthGrow > 0.f)
+		{
+			float x = bullet->life_time / m_fTracerWidthGrow;
+			clamp(x, 0.f, 1.f);
+			width *= 1.f - (1.f - x) * (1.f - x);
+			if (width <= 0.f)
+				continue;
+		}
 		float dist2segSqr = SqrDistancePointToSegment(Device.vCameraPosition, bullet->bullet_pos, tracer);
 		//---------------------------------------------
 		float MaxDistSqr = 1.0f;
@@ -1229,7 +1256,7 @@ void CBulletManager::Render()
 			bActor = (bullet->parent_id == Level().CurrentViewEntity()->ID());
 		}
 		tracers.Render(bullet->bullet_pos, center, tracer_direction, length, width, bullet->m_u8ColorID, bullet->speed,
-		               bActor);
+		               bActor, alpha_k);
 	}
 
 	UIRender->CacheSetCullMode(IUIRender::cmNONE);
@@ -1286,11 +1313,29 @@ void CBulletManager::CommitEvents() // @ the start of frame
 						bullet->life_time,
 						E.R.element
 					);
+					// Gunsmith Docs vfx.md, E7: the surface normal, what the bullet did there (ricochet, stop,
+					// pierce), its launch speed; a handler sets handled = true to draw the impact itself
+					table["normal"] = E.normal;
+					static const char* impacts[] = {"ricochet", "stop", "pierce"};
+					table["impact"] = impacts[E.hit_result.impact < 3 ? E.hit_result.impact : 2];
+					table["start_speed"] = bullet->max_speed;
+					table["handled"] = false;
+					table["skip_particles"] = false;
+					table["skip_sound"] = false;
 					funct(table);
+					::luabind::object h = table["handled"];
+					m_skip_impact_fx = h.is_valid() && h.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(h);
+					::luabind::object sp = table["skip_particles"];
+					m_skip_impact_particles = sp.is_valid() && sp.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(sp);
+					::luabind::object ss = table["skip_sound"];
+					m_skip_impact_sound = ss.is_valid() && ss.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(ss);
 				}
 
 				if (E.dynamic) DynamicObjectHit(E);
 				else StaticObjectHit(E);
+				m_skip_impact_fx = false;
+				m_skip_impact_particles = false;
+				m_skip_impact_sound = false;
 			}
 
 			break;
