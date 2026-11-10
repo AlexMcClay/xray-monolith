@@ -44,6 +44,16 @@
 		t.handled = true to take the key: the engine then does nothing more. Unhandled, the engine does
 		vanilla's alternative aim or launcher. The Gunsmith Framework's sight switching is a handler
 		(gunsmith_sights).
+
+	weapon_shot_indoors(weapon, pos, t)
+		A queue of shots starts (its first shot) on a weapon whose shot sounds have indoor twins (<key>_indoor):
+		how much is it indoors? pos is the fire point. Set t.mix, the indoor share from 0 (outdoors) to 1
+		(indoors): the engine crossfades the outdoor and indoor sounds by it (the single shot, the firing loop and
+		its tail; for a firing loop it asks again every 0.2 s while the loop plays). Several handlers: take the
+		largest (t.mix = math.max(t.mix or 0, yours)). t.indoor = true is the older yes or no, for an engine
+		without the crossfade (and the share 1 when no handler sets t.mix). The player's and NPCs' guns. The
+		engine doesn't decide this itself (since 10 Nov 2026, roadmap So6); the Gunsmith Framework's
+		gunsmith_indoor answers it.
 --]]
 
 AddScriptCallback("on_gs_part_attached")
@@ -52,6 +62,7 @@ AddScriptCallback("on_gs_part_failed")
 AddScriptCallback("weapon_on_recalc_stats")
 AddScriptCallback("weapon_on_alt_aim_key")
 AddScriptCallback("weapon_on_shot")
+AddScriptCallback("weapon_shot_indoors")
 
 _G.CWeapon_gs_part_attached = function(weapon, node, section)
 	SendScriptCallback("on_gs_part_attached", weapon, node, section)
@@ -77,4 +88,20 @@ end
 
 _G.CWeapon_OnShot = function(weapon, owner, t)
 	SendScriptCallback("weapon_on_shot", weapon, owner, t)
+end
+
+_G.CWeapon_ShotIndoors = function(weapon, pos)
+	local t = { indoor = false }
+	SendScriptCallback("weapon_shot_indoors", weapon, pos, t)
+	return t.indoor == true
+end
+
+-- the crossfade's question (engine branch feature/shot-blend): the indoor share 0..1
+_G.CWeapon_ShotIndoorMix = function(weapon, pos)
+	local t = { indoor = false, mix = nil }
+	SendScriptCallback("weapon_shot_indoors", weapon, pos, t)
+	if type(t.mix) == "number" then
+		return math.min(math.max(t.mix, 0), 1)
+	end
+	return t.indoor == true and 1 or 0
 end
