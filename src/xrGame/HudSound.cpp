@@ -570,7 +570,11 @@ float HUD_SOUND_COLLECTION_LAYERED::IndoorMix(const Fvector& pos, const CObject*
 	if (!ai().script_engine().functor("_G.CSound_IndoorMix", funct))
 		return 0.f;
 	const CGameObject* go = smart_cast<const CGameObject*>(obj);
-	::luabind::object r = go ? funct(pos, go->lua_game_object()) : funct(pos);
+	::luabind::object r;
+	if (go)
+		r = funct(pos, go->lua_game_object());
+	else
+		r = funct(pos);
 	if (r.is_valid() && r.type() == LUA_TNUMBER)
 		return _min(_max(::luabind::object_cast<float>(r), 0.f), 1.f);
 	if (r.is_valid() && r.type() == LUA_TBOOLEAN)
