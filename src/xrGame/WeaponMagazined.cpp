@@ -218,7 +218,7 @@ void CWeaponMagazined::Load(LPCSTR section)
 
 	}
 
-	// Tarkov's indoor shots: each shot key's <key>_indoor, as alias <alias>Indoor (ShotAlias picks them)
+	// Tarkov's indoor shots: each shot key's <key>_indoor, as alias <alias>Indoor (crossfaded with the outdoor key, PlayShotMixed)
 	static const struct { LPCSTR line, alias; bool loop; } indoor_keys[] = {
 		{"snd_shoot", "sndShot", false}, {"snd_shoot_actor", "sndShotActor", false},
 		{"snd_shoot_loop", "sndShotLoop", true}, {"snd_shoot_tail", "sndShotTail", true},
@@ -930,6 +930,28 @@ void CWeaponMagazined::SetDefaults()
 static const float SHOT_LOOP_BEATS = 16.f;
 static const float SHOT_LOOP_FADE = 0.005f;     // seconds: the loop's fade-out at its cut (ref_sound::stop_fade)
 
+// The indoor/outdoor crossfade (roadmap So6): equal-power gains for the indoor share m (0 outdoors, 1 indoors), each
+// at least SHOT_MIX_FLOOR so a silent loop keeps its voice's place and comes back in step; the share is asked again
+// every SHOT_MIX_ASK s while a loop plays (not for a shooter farther than SHOT_MIX_FAR from the camera) and eased to
+// over SHOT_MIX_EASE s.
+static const float SHOT_MIX_FLOOR = 0.0005f;
+static const float SHOT_MIX_ASK = 0.2f;
+static const float SHOT_MIX_EASE = 0.35f;
+static const float SHOT_MIX_FAR = 100.f;
+// -dbg_shot_blend on the command line: a log line per loop start and per answer while it plays
+static bool shot_blend_debug()
+{
+	static const bool on = !!strstr(Core.Params, "-dbg_shot_blend");
+	return on;
+}
+
+static void shot_mix_gains(float m, float& out, float& in)
+{
+	m = _min(_max(m, 0.f), 1.f);
+	out = _max(_cos(m * PI_DIV_2), SHOT_MIX_FLOOR);
+	in = _max(_sin(m * PI_DIV_2), SHOT_MIX_FLOOR);
+}
+
 bool CWeaponMagazined::PlayShotLoop(bool actor)
 {
 	if (m_iQueueSize == 1)
@@ -944,29 +966,49 @@ bool CWeaponMagazined::PlayShotLoop(bool actor)
 	string128 loop_o, tail_o, loop_i, tail_i;
 	strconcat(sizeof(loop_o), loop_o, m_sSndShotCurrent.c_str(), actor ? "ActorLoop" : "Loop");
 	strconcat(sizeof(tail_o), tail_o, m_sSndShotCurrent.c_str(), actor ? "ActorTail" : "Tail");
+	strconcat(sizeof(loop_i), loop_i, loop_o, "Indoor");
+	strconcat(sizeof(tail_i), tail_i, tail_o, "Indoor");
 	const float rpm = actor ? m_shot_loop_rpm_actor : m_shot_loop_rpm;
 	if (rpm <= 0.f || !m_sounds.FindSoundItem(loop_o, false))
 		return false;
-	LPCSTR loop = ShotAlias(loop_o, loop_i);
-	LPCSTR tail = ShotAlias(tail_o, tail_i);
+	const bool twin = m_shot_has_indoor && m_sounds.FindSoundItem(loop_i, false);
 
-	if (m_shot_loop.loop.size() && m_shot_loop.base == loop && m_sounds.IsPlaying(m_shot_loop.loop.c_str()))
+	if (m_shot_loop.loop.size() && m_shot_loop.base == loop_o && m_sounds.IsPlaying(m_shot_loop.loop.c_str()))
 	{
 		m_shot_loop.end_at = 0.f;       // (a shot after all: the loop carries on)
 		return true;
 	}
 	if (m_shot_loop.loop.size())
 		UpdateShotLoop(true);
-	m_shot_loop.base = loop;
-	m_shot_loop.tail = m_sounds.FindSoundItem(tail, false) ? tail : "";
+	m_shot_loop.base = loop_o;
+	m_shot_loop.tail = m_sounds.FindSoundItem(tail_o, false) ? tail_o : "";
+	m_shot_loop.tail_in = twin && m_sounds.FindSoundItem(tail_i, false) ? tail_i : "";
 	m_shot_loop.beat = 60.f / rpm;
 	m_shot_loop.start = Device.fTimeGlobal;
 	m_shot_loop.end_at = 0.f;
 	m_shot_loop.hud = !!GetHUDmode();
-	// (the alias that played: a script may have swapped in another sound, on_before_play_hud_sound)
-	m_shot_loop.loop = m_sounds.PlaySound(loop, get_LastFP(), H_Root(), m_shot_loop.hud, true, (u8)-1);
+	m_shot_loop.mix = m_shot_loop.mix_target = twin ? m_shot_mix : 0.f;
+	m_shot_loop.next_ask = Device.fTimeGlobal + SHOT_MIX_ASK;
+	// (the alias that played: a script may have swapped in another sound, on_before_play_hud_sound). With a twin both
+	// loops start now, together, so they run in step (tools\gs_loop_regrid.py gives every indoor loop its outdoor
+	// loop's length), each at its crossfade gain.
+	m_shot_loop.loop = m_sounds.PlaySound(loop_o, get_LastFP(), H_Root(), m_shot_loop.hud, true, (u8)-1);
 	if (!m_shot_loop.loop.size())
-		m_shot_loop.loop = loop;
+		m_shot_loop.loop = loop_o;
+	m_shot_loop.loop_in = nullptr;
+	if (twin)
+	{
+		m_shot_loop.loop_in = m_sounds.PlaySound(loop_i, get_LastFP(), H_Root(), m_shot_loop.hud, true, (u8)-1);
+		if (!m_shot_loop.loop_in.size())
+			m_shot_loop.loop_in = loop_i;
+		float go, gi;
+		shot_mix_gains(m_shot_loop.mix, go, gi);
+		m_sounds.SetVolumeMult(m_shot_loop.loop.c_str(), go);
+		m_sounds.SetVolumeMult(m_shot_loop.loop_in.c_str(), gi);
+	}
+	if (shot_blend_debug())
+		Msg("[shot blend] %s loop start: %s + %s, share %.2f", cNameSect().c_str(), m_shot_loop.loop.c_str(),
+			twin ? m_shot_loop.loop_in.c_str() : "(no indoor twin)", m_shot_loop.mix);
 	// the beat of the recording that plays (of its variants, the one picked)
 	if (const HUD_SOUND_ITEM* item = m_sounds.FindSoundItem(m_shot_loop.loop.c_str(), false))
 	{
@@ -977,19 +1019,51 @@ bool CWeaponMagazined::PlayShotLoop(bool actor)
 	return true;
 }
 
+// While a loop with an indoor twin plays: ask the script again every SHOT_MIX_ASK s and ease the two loops' gains
+void CWeaponMagazined::UpdateShotLoopMix()
+{
+	const float now = Device.fTimeGlobal;
+	if (now >= m_shot_loop.next_ask)
+	{
+		m_shot_loop.next_ask = now + SHOT_MIX_ASK;
+		if (m_shot_loop.hud || Device.vCameraPosition.distance_to(get_LastFP()) < SHOT_MIX_FAR)
+			m_shot_loop.mix_target = ShotIndoorMix();
+		if (shot_blend_debug())
+		{
+			float o, i;
+			shot_mix_gains(m_shot_loop.mix, o, i);
+			Msg("[shot blend] %s ask: target %.2f, now %.2f, gains out %.3f in %.3f, playing %d/%d",
+				cNameSect().c_str(), m_shot_loop.mix_target, m_shot_loop.mix, o, i,
+				(int)m_sounds.IsPlaying(m_shot_loop.loop.c_str()), (int)m_sounds.IsPlaying(m_shot_loop.loop_in.c_str()));
+		}
+	}
+	const float k = 1.f - expf(-Device.fTimeDelta / SHOT_MIX_EASE);
+	m_shot_loop.mix += (m_shot_loop.mix_target - m_shot_loop.mix) * k;
+	float go, gi;
+	shot_mix_gains(m_shot_loop.mix, go, gi);
+	m_sounds.SetVolumeMult(m_shot_loop.loop.c_str(), go);
+	m_sounds.SetVolumeMult(m_shot_loop.loop_in.c_str(), gi);
+}
+
 // Once no more shots will come (the trigger let go, the queue or the magazine done, a jam), the loop is cut on its
 // next beat and the tail plays from there (Tarkov's StopFiringLoop: n = floor(elapsed / beat) + 1, no crossfade). It
 // is checked each frame, so the cut comes up to a frame early rather than letting the next beat's shot through. The
-// cut fades over SHOT_LOOP_FADE (a hard stop clicks mid-wave).
+// cut fades over SHOT_LOOP_FADE (a hard stop clicks mid-wave). With an indoor twin both loops are cut together and
+// both tails play at the crossfade's gains.
 void CWeaponMagazined::UpdateShotLoop(bool force_end)
 {
 	if (!m_shot_loop.loop.size())
 		return;
 	if (!m_sounds.IsPlaying(m_shot_loop.loop.c_str()))
 	{
+		if (m_shot_loop.loop_in.size())
+			m_sounds.StopSound(m_shot_loop.loop_in.c_str(), SHOT_LOOP_FADE);
 		m_shot_loop.loop = nullptr;     // stopped by someone else (hidden, dropped)
+		m_shot_loop.loop_in = nullptr;
 		return;
 	}
+	if (m_shot_loop.loop_in.size())
+		UpdateShotLoopMix();
 	if (!force_end)
 	{
 		const bool more = GetState() == eFire && IsWorking() && iAmmoElapsed > 0 && !bMisfire &&
@@ -1005,40 +1079,73 @@ void CWeaponMagazined::UpdateShotLoop(bool force_end)
 			return;
 	}
 	m_sounds.StopSound(m_shot_loop.loop.c_str(), SHOT_LOOP_FADE);
-	if (m_shot_loop.tail.size())
-		m_sounds.PlaySound(m_shot_loop.tail.c_str(), get_LastFP(), H_Root(), m_shot_loop.hud, false, (u8)-1);
+	float go = 1.f, gi = 0.f;
+	if (m_shot_loop.loop_in.size())
+	{
+		m_sounds.StopSound(m_shot_loop.loop_in.c_str(), SHOT_LOOP_FADE);
+		if (m_shot_loop.tail_in.size())
+			shot_mix_gains(m_shot_loop.mix, go, gi);
+	}
+	if (m_shot_loop.tail.size() && go > SHOT_MIX_FLOOR)
+		m_sounds.PlaySound(m_shot_loop.tail.c_str(), get_LastFP(), H_Root(), m_shot_loop.hud, false, (u8)-1, go);
+	if (m_shot_loop.tail_in.size() && gi > SHOT_MIX_FLOOR)
+		m_sounds.PlaySound(m_shot_loop.tail_in.c_str(), get_LastFP(), H_Root(), m_shot_loop.hud, false, (u8)-1, gi);
 	m_shot_loop.loop = nullptr;
+	m_shot_loop.loop_in = nullptr;
 }
 
-// Is this shot indoors? Tarkov picks a shot's indoor clips by the shooter's environment (volumes placed by hand in its
-// levels). The engine doesn't decide: it asks _G.CWeapon_ShotIndoors(weapon, fire point) (gunsmith_callbacks.script
-// forwards it to the weapon_shot_indoors callback; the Gunsmith Framework's gunsmith_indoor answers it). No script, or
-// no answer: outdoors. (Until 10 Nov 2026 the engine cast five rays itself; moved to Lua, roadmap So6.)
-bool CWeaponMagazined::ShotIndoors()
+// How much is this shot indoors (0 outdoors, 1 indoors)? Tarkov picks a shot's indoor clips by the shooter's
+// environment (volumes placed by hand in its levels). The engine doesn't decide: it asks
+// _G.CWeapon_ShotIndoorMix(weapon, fire point) (a number), else _G.CWeapon_ShotIndoors (true or false; Lua older
+// than the crossfade). gunsmith_callbacks.script forwards both to the weapon_shot_indoors callback; the Gunsmith
+// Framework's gunsmith_indoor answers it. No script, or no answer: outdoors. (Until 10 Nov 2026 the engine cast five
+// rays itself; moved to Lua, roadmap So6.)
+float CWeaponMagazined::ShotIndoorMix()
 {
 	::luabind::functor<::luabind::object> funct;
+	if (ai().script_engine().functor("_G.CWeapon_ShotIndoorMix", funct))
+	{
+		::luabind::object r = funct(lua_game_object(), get_LastFP());
+		if (r.is_valid() && r.type() == LUA_TNUMBER)
+			return _min(_max(::luabind::object_cast<float>(r), 0.f), 1.f);
+		if (r.is_valid() && r.type() == LUA_TBOOLEAN)
+			return ::luabind::object_cast<bool>(r) ? 1.f : 0.f;
+		return 0.f;
+	}
 	if (!ai().script_engine().functor("_G.CWeapon_ShotIndoors", funct))
-		return false;
+		return 0.f;
 	::luabind::object r = funct(lua_game_object(), get_LastFP());
-	return r.is_valid() && r.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(r);
+	return r.is_valid() && r.type() == LUA_TBOOLEAN && ::luabind::object_cast<bool>(r) ? 1.f : 0.f;
 }
 
-// A shot sound's indoor version (<alias>Indoor) when this shot is indoors and the gun has one; else the alias
-LPCSTR CWeaponMagazined::ShotAlias(LPCSTR alias, string128& buf)
+// A single shot: the alias, and its indoor twin (<alias>Indoor) alongside at the crossfade's gains for this queue's
+// indoor share (only the one needed at 0 or 1)
+void CWeaponMagazined::PlayShotMixed(LPCSTR alias)
 {
-	if (!m_shot_indoor)
-		return alias;
-	strconcat(sizeof(buf), buf, alias, "Indoor");
-	return m_sounds.FindSoundItem(buf, false) ? buf : alias;
+	string128 in;
+	strconcat(sizeof(in), in, alias, "Indoor");
+	if (m_shot_mix <= 0.f || !m_sounds.FindSoundItem(in, false))
+	{
+		m_sounds.PlaySound(alias, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+		return;
+	}
+	if (m_shot_mix >= 1.f)
+	{
+		m_sounds.PlaySound(in, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+		return;
+	}
+	float go, gi;
+	shot_mix_gains(m_shot_mix, go, gi);
+	m_sounds.PlaySound(alias, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, go);
+	m_sounds.PlaySound(in, get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1, gi);
 }
 
 void CWeaponMagazined::PlaySoundShot()
 {
-	if (m_iShotNum <= 1)        // (once per queue, so a burst doesn't change its loop midway)
-		m_shot_indoor = m_shot_has_indoor && ShotIndoors();
+	if (m_iShotNum <= 1)        // (a queue's first shot; a firing loop asks again while it plays)
+		m_shot_mix = m_shot_has_indoor ? ShotIndoorMix() : 0.f;
 	if (PlayShotLoop(ParentIsActor()))
 		return;
-	string128 indoor;
 
 	if (ParentIsActor())
 	{
@@ -1065,7 +1172,7 @@ void CWeaponMagazined::PlaySoundShot()
 		strconcat(sizeof(sndName), sndName, m_sSndShotCurrent.c_str(), "Actor");
 		if (m_sounds.FindSoundItem(sndName, false))
 		{
-			m_sounds.PlaySound(ShotAlias(sndName, indoor), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+			PlayShotMixed(sndName);
 			return;
 		}
 	}
@@ -1081,7 +1188,7 @@ void CWeaponMagazined::PlaySoundShot()
 		}
 	}
 
-	m_sounds.PlaySound(ShotAlias(m_sSndShotCurrent.c_str(), indoor), get_LastFP(), H_Root(), !!GetHUDmode(), false, (u8)-1);
+	PlayShotMixed(m_sSndShotCurrent.c_str());
 }
 
 void CWeaponMagazined::OnShot()

@@ -31,17 +31,25 @@ protected:
 		float beat = 0.f;       // the recording's shot period
 		float end_at = 0.f;     // when it is cut, once known
 		bool hud = false;
+		// the indoor twin playing alongside (roadmap So6: the two crossfaded by the indoor share), its tail; empty
+		// when the gun has none
+		shared_str loop_in, tail_in;
+		float mix = 0.f;        // the indoor share now (0 outdoors, 1 indoors), eased toward mix_target
+		float mix_target = 0.f;
+		float next_ask = 0.f;   // when the script is asked again during the burst
 	} m_shot_loop;
 	float m_shot_loop_rpm = 0.f, m_shot_loop_rpm_actor = 0.f;
 	bool PlayShotLoop(bool actor);
 	void UpdateShotLoop(bool force_end = false);
 
-	// Tarkov's indoor shots (each shot key's <key>_indoor, alias <alias>Indoor): played when a script says the shot
-	// is indoors (ShotIndoors: _G.CWeapon_ShotIndoors), asked on a queue's first shot
+	// Tarkov's indoor shots (each shot key's <key>_indoor, alias <alias>Indoor), crossfaded with the outdoor ones by
+	// the indoor share a script gives (ShotIndoorMix: _G.CWeapon_ShotIndoorMix, 0..1), asked on a queue's first shot
+	// and, for a firing loop, again while it plays (roadmap So6)
 	bool m_shot_has_indoor = false;
-	bool m_shot_indoor = false;
-	bool ShotIndoors();
-	LPCSTR ShotAlias(LPCSTR alias, string128& buf);
+	float m_shot_mix = 0.f;         // this queue's indoor share at its first shot
+	float ShotIndoorMix();
+	void PlayShotMixed(LPCSTR alias);
+	void UpdateShotLoopMix();
 
 
 	//дополнительная информация о глушителе
