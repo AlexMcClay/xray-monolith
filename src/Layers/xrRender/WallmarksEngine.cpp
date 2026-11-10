@@ -342,6 +342,43 @@ void CWallmarksEngine::AddWallmark_internal(CDB::TRI* pTri, const Fvector* pVert
 	}
 	RecurseTri(0, mView, *W);
 
+	// Static level geometry is not always topologically welded across terrain chunks. RecurseTri follows edge
+	// adjacency, so a large floor mark could stop at an otherwise invisible chunk/T-junction and expose a straight
+	// polygon edge. Project onto disconnected candidates too, but only when they are near the seed plane and face
+	// broadly the same way. The lateral frustum clip in RecurseTri still limits them to the decal square; the depth
+	// guard prevents a mark leaking through a floor or onto another nearby parallel surface.
+	const float disconnected_cos = 0.70710678f; // 45 degrees
+	const float disconnected_depth = _min(_max(sz * 0.15f, 0.025f), 0.12f);
+	const u32 collected_count = sml_collector.getTS();
+	for (u32 t = 1; t < collected_count; ++t)
+	{
+		CDB::TRI* candidate = sml_collector.getT() + t;
+		if (candidate->dummy)
+			continue; // already reached through normal adjacency
+
+		u32* ids = candidate->verts;
+		Fvector* verts = sml_collector.getV();
+		Fvector candidate_normal;
+		candidate_normal.mknormal(verts[ids[0]], verts[ids[1]], verts[ids[2]]);
+		if (candidate_normal.dotproduct(sml_normal) < disconnected_cos)
+			continue;
+
+		float dmin = flt_max;
+		float dmax = -flt_max;
+		for (u32 v = 0; v < 3; ++v)
+		{
+			Fvector delta;
+			delta.sub(verts[ids[v]], contact_point);
+			const float d = delta.dotproduct(sml_normal);
+			dmin = _min(dmin, d);
+			dmax = _max(dmax, d);
+		}
+		if (dmin > disconnected_depth || dmax < -disconnected_depth)
+			continue;
+
+		RecurseTri(t, mView, *W);
+	}
+
 	// calc sphere
 	if (W->verts.size() < 3)
 	{
