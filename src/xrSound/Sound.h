@@ -438,18 +438,6 @@ public:
 
 	virtual void object_relcase(CObject* obj) = 0;
 	virtual const Fvector& listener_position() = 0;
-
-	// Gunsmith (Tarkov SFX, P6): a mix over every sound, eased over fade_sec: a volume and a high-frequency level
-	// (the EFX low-pass, so it needs snd_efx) on top of each sound's own; except_2d leaves 2D sounds (the player's
-	// own, the UI) as they are. 1, 1 is no change.
-	virtual void set_mix(float volume, float hf, float fade_sec, bool except_2d) = 0;
-	virtual void get_mix(float& volume, float& hf) = 0;
-	// Gunsmith (Tarkov SFX, P13): the reverb from a script: preset a (gamedata\sEnvironment.xr), or a mixed into b by
-	// f (0 = a, 1 = b), eased over blend_sec (< 0: snd_efx_environment_change_time); a empty: the level's own reverb
-	// zones again. False when a preset isn't found. Needs snd_efx.
-	virtual bool set_script_env(LPCSTR a, LPCSTR b, float f, float blend_sec) = 0;
-	virtual LPCSTR get_level_env(const Fvector& P) = 0; // the level zone's preset at P ("" when none)
-	virtual LPCSTR get_env_names() = 0; // every preset's name, comma-separated
 #ifdef __BORLANDC__
 	virtual SoundEnvironment_LIB*	get_env_library			()																						= 0;
 	virtual void					refresh_env_library		()																						= 0;

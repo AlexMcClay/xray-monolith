@@ -506,7 +506,27 @@ void HUD_SOUND_COLLECTION_LAYERED::LoadSound(CInifile const* ini, LPCSTR section
 
 	if (ini->section_exist(buf_str))
 	{
-		LoadLayers(ini, buf_str, alias, exclusive, type);
+		string256 sound_line;
+		xr_strcpy(sound_line, "snd_1_layer");
+		int k = 1;
+		while (ini->line_exist(buf_str, sound_line))
+		{
+			m_sound_items.resize(m_sound_items.size() + 1);
+			HUD_SOUND_COLLECTION& snd_item = m_sound_items.back();
+			snd_item.LoadSound(buf_str, sound_line, alias, exclusive, type);
+			snd_item.m_alias = alias;
+			string256 blend_line;
+			xr_sprintf(blend_line, "%s_blend", sound_line);
+			if (ini->line_exist(buf_str, blend_line))
+			{
+				LPCSTR b = ini->r_string(buf_str, blend_line);
+				string64 v;
+				for (int i = 0; i < 4 && i < _GetItemCount(b); ++i)
+					snd_item.m_blend[i] = (float)atof(_GetItem(b, i, v));
+				snd_item.m_has_blend = true;
+			}
+			xr_sprintf(sound_line, "snd_%d_layer", ++k);
+		}
 	}
 	else //For compatibility with normal HUD_SOUND_COLLECTION sounds
 	{
@@ -514,32 +534,6 @@ void HUD_SOUND_COLLECTION_LAYERED::LoadSound(CInifile const* ini, LPCSTR section
 		HUD_SOUND_COLLECTION& snd_item = m_sound_items.back();
 		snd_item.LoadSound(section, line, alias, exclusive, type);
 		snd_item.m_alias = alias;
-	}
-}
-
-void HUD_SOUND_COLLECTION_LAYERED::LoadLayers(CInifile const* ini, LPCSTR layers_section, LPCSTR alias, bool exclusive,
-                                              int type)
-{
-	string256 sound_line;
-	xr_strcpy(sound_line, "snd_1_layer");
-	int k = 1;
-	while (ini->line_exist(layers_section, sound_line))
-	{
-		m_sound_items.resize(m_sound_items.size() + 1);
-		HUD_SOUND_COLLECTION& snd_item = m_sound_items.back();
-		snd_item.LoadSound(layers_section, sound_line, alias, exclusive, type);
-		snd_item.m_alias = alias;
-		string256 blend_line;
-		xr_sprintf(blend_line, "%s_blend", sound_line);
-		if (ini->line_exist(layers_section, blend_line))
-		{
-			LPCSTR b = ini->r_string(layers_section, blend_line);
-			string64 v;
-			for (int i = 0; i < 4 && i < _GetItemCount(b); ++i)
-				snd_item.m_blend[i] = (float)atof(_GetItem(b, i, v));
-			snd_item.m_has_blend = true;
-		}
-		xr_sprintf(sound_line, "snd_%d_layer", ++k);
 	}
 }
 

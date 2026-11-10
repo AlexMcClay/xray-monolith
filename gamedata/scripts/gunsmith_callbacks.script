@@ -56,15 +56,9 @@
 		gunsmith_indoor answers it.
 
 	sound_indoor_mix(pos, obj, t)
-		Any other sound with an indoor twin (an explosive's snd_explode_indoor, engine 11 Nov 2026; a script's
-		sound_layers through its own choice): how much is a sound at pos indoors? obj is its owner or nil. Set
+		Any other sound with an indoor twin (an explosive's snd_explode_indoor, engine 11 Nov 2026): how much is
+		a sound at pos indoors? obj is its owner or nil. Set
 		t.mix (0..1) as for weapon_shot_indoors (several handlers: the largest). Nobody answering: outdoors.
-
-	creature_on_footstep(obj, material, power, foot, t)
-		An NPC's or a monster's step (engine 11 Nov 2026; the actor's is actor_on_footstep): material is the
-		ground's (materials\concrete ...), power the legs animation's (crouch 0.1, walk 0.25, run 0.8-1,
-		sprint 1.3 and up), foot its index. t.play = false keeps the engine from playing the step;
-		t.volume_mult and t.frequency_mult change it. Only within step_sound_distance of the camera.
 --]]
 
 AddScriptCallback("on_gs_part_attached")
@@ -75,7 +69,6 @@ AddScriptCallback("weapon_on_alt_aim_key")
 AddScriptCallback("weapon_on_shot")
 AddScriptCallback("weapon_shot_indoors")
 AddScriptCallback("sound_indoor_mix")
-AddScriptCallback("creature_on_footstep")
 
 _G.CWeapon_gs_part_attached = function(weapon, node, section)
 	SendScriptCallback("on_gs_part_attached", weapon, node, section)
@@ -124,14 +117,4 @@ _G.CSound_IndoorMix = function(pos, obj)
 	local t = { mix = 0 }
 	SendScriptCallback("sound_indoor_mix", pos, obj, t)
 	return math.min(math.max(tonumber(t.mix) or 0, 0), 1)
-end
-
--- an NPC's or monster's step (engine step_manager.cpp): nil plays it as it is
-_G.CEntity__FootstepCallback = function(obj, material, power, foot)
-	local t = { play = true, volume_mult = 1, frequency_mult = 1 }
-	SendScriptCallback("creature_on_footstep", obj, material, power, foot, t)
-	if t.play ~= false and t.volume_mult == 1 and t.frequency_mult == 1 then
-		return nil
-	end
-	return t
 end

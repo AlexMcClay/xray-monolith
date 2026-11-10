@@ -45,7 +45,6 @@ void CSoundRender_Core::update(const Fvector& P, const Fvector& D, const Fvector
 	fTimer_Value = new_tm;
 
 	s_emitters_u ++;
-	update_mix(dt_sec); // Gunsmith (Tarkov SFX, P6)
 
 	// Firstly update emitters, which are now being rendered
 	//Msg	("! update: r-emitters");
@@ -130,9 +129,7 @@ void CSoundRender_Core::update(const Fvector& P, const Fvector& D, const Fvector
 
 		// demonized: Interpolate from e_current to 95% of e_target in close to exact time
 		constexpr float percent = 0.95f;
-		// Gunsmith (Tarkov SFX, P13): a script's reverb eases over its own time
-		const float change_time = m_env_blend_time >= 0.f ? _max(m_env_blend_time, 0.01f) : snd_efx_environment_change_time;
-		float alpha = 1.0f - std::exp(std::log(1.0f - percent) * dt_sec / change_time);
+		float alpha = 1.0f - std::exp(std::log(1.0f - percent) * dt_sec / snd_efx_environment_change_time);
 		clamp(alpha, 0.f, 1.f);
 		//Msg("interpolating from e_current to e_target %.2f", std::min(e_current.Reverb, e_target_ptr->Reverb) / std::max(e_current.Reverb, e_target_ptr->Reverb));
 		e_current.lerp(e_current, *e_target_ptr, alpha);

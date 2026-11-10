@@ -119,10 +119,7 @@ public:
 	void UpdateAllSoundsPositions(const Fvector& P);
 	bool IsPlaying(LPCSTR alias); // any layer of it still sounding (2D ones too, unlike HUD_SOUND_ITEM::playing)
 
-	// Gunsmith (Tarkov SFX, P9): a section of layers (snd_1_layer, snd_1_layer_blend, ...) loaded directly as alias
-	void LoadLayers(CInifile const* ini, LPCSTR layers_section, LPCSTR alias, bool exclusive = false,
-	                int type = sg_SourceType);
-	// alias and its indoor twin (<alias>Indoor, if loaded) together at equal-power gains for indoor (0 outdoor, 1
+	// Gunsmith (Tarkov SFX, P9): alias and its indoor twin (<alias>Indoor, if loaded) together at equal-power gains for indoor (0 outdoor, 1
 	// indoor), as a gun's shots are; only the one needed at 0 or 1
 	void PlayMixed(LPCSTR alias, float indoor, const Fvector& position, const CObject* parent, bool hud_mode,
 	               float volume_mult = 1.f, float frequency = 1.f);

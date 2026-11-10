@@ -129,21 +129,7 @@ public:
 
 	virtual float get_occlusion_to(const Fvector& hear_pt, const Fvector& snd_pt, float dispersion = 0.2f);
 	float get_occlusion(Fvector& P, float R, Fvector* occ) override;
-	CSoundRender_Environment* get_environment(const Fvector& P, bool level_only = false);
-
-	// Gunsmith (Tarkov SFX): the script mix (P6) and reverb (P13); see Sound.h
-	float m_mix_volume = 1.f, m_mix_hf = 1.f; // now
-	float m_mix_volume_to = 1.f, m_mix_hf_to = 1.f; // where they ease to
-	float m_mix_volume_rate = 0.f, m_mix_hf_rate = 0.f; // per second (0: at once)
-	bool m_mix_except_2d = false;
-	float m_env_blend_time = -1.f; // the script reverb's blend time (< 0: snd_efx_environment_change_time)
-	xr_string m_env_names;
-	void set_mix(float volume, float hf, float fade_sec, bool except_2d) override;
-	void get_mix(float& volume, float& hf) override;
-	bool set_script_env(LPCSTR a, LPCSTR b, float f, float blend_sec) override;
-	LPCSTR get_level_env(const Fvector& P) override;
-	LPCSTR get_env_names() override;
-	void update_mix(float dt);
+	CSoundRender_Environment* get_environment(const Fvector& P);
 
 	void env_load();
 	void env_unload();
