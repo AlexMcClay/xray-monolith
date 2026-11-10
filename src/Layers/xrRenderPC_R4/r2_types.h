@@ -96,6 +96,10 @@
 #define		r2_RT_ssfx_sss_ext2		"$user$ssfx_sss_ext2" // SSS Acc
 #define		r2_RT_ssfx_sss_tmp		"$user$ssfx_sss_tmp" // SSS Acc
 #define		r2_RT_ssfx_bloom1		"$user$ssfx_bloom1" // Bloom
+#define		r2_RT_scene_light		"$user$scene_light" // scene light copy (1/32, blurred, smoothed)
+#define		r2_RT_scene_light_prev	"$user$scene_light_prev" // its last frame
+#define		r2_RT_scene_light_a		"$user$scene_light_a" // work targets
+#define		r2_RT_scene_light_b		"$user$scene_light_b"
 #define		r2_RT_ssfx_bloom_emissive	"$user$ssfx_bloom_emissive" // Bloom
 #define		r2_RT_ssfx_bloom_lens	"$user$ssfx_bloom_lens" // Bloom
 #define		r2_RT_ssfx_rain			"$user$ssfx_rain" // Rain refraction buffer

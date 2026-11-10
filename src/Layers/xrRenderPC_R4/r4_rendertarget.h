@@ -216,6 +216,18 @@ public:
 
 	ref_shader s_ssfx_water;
 	ref_shader s_ssfx_water_blur;
+
+	// scene light copy (phase_scene_light): Lua shaders effects\scene_light_* from a mod; empty = off
+	ref_shader s_scene_light_down;
+	ref_shader s_scene_light_blur_a;
+	ref_shader s_scene_light_blur_b;
+	ref_shader s_scene_light_accum;
+	ref_rt rt_scene_light;
+	ref_rt rt_scene_light_prev;
+	ref_rt rt_scene_light_a;
+	ref_rt rt_scene_light_b;
+	float m_scene_light_time = 0.f; // last update (Device.fTimeGlobal), 0 = start over
+	bool m_scene_light_clear = true; // the targets need clearing (turned off or not built yet)
 	ref_shader s_ssfx_water_ssr;
 	ref_shader s_ssfx_ao;
 	//ref_shader s_ssfx_hud[5]; // SSS23: DEPRECATED
@@ -459,6 +471,9 @@ public:
 	void phase_ssfx_ssr(); // SSR Phase
 	void phase_ssfx_volumetric_blur(); // Volumetric Blur
 	void phase_ssfx_water_blur(); // Water Blur
+	// a 1/32 blurred, time-smoothed copy of the lit scene before see-through particles draw
+	// ($user$scene_light: rgb = light, a = how much of it is real scene; 0 = none)
+	void phase_scene_light();
 	void phase_ssfx_water_waves(); // Water Waves
 	void phase_ssfx_ao(); // AO
 	void phase_ssfx_il(); // IL

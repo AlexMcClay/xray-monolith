@@ -136,6 +136,9 @@ Fvector ps_r__Tree_Wave = {.1f, .01f, .11f};
 float ps_r__Tree_SBC = 1.5f; // scale bias correct
 
 float ps_r__WallmarkTTL = 50.f;
+// scene light copy (R4 phase_scene_light): on/off, and the seconds it takes to follow a change (time constant)
+int ps_r__scene_light = 1;
+float ps_r__scene_light_time = 0.3f;
 float ps_r__WallmarkSHIFT = 0.0001f;
 float ps_r__WallmarkSHIFT_V = 0.0001f;
 
@@ -1307,6 +1310,8 @@ void xrRender_initconsole()
 	CMD1(CCC_ModelPoolStat,"stat_models"		);
 #endif // DEBUG
 	CMD4(CCC_Float, "r__wallmark_ttl", &ps_r__WallmarkTTL, 1.0f, 10.f*60.f);
+	CMD4(CCC_Integer, "r__scene_light", &ps_r__scene_light, 0, 1);
+	CMD4(CCC_Float, "r__scene_light_time", &ps_r__scene_light_time, 0.f, 10.f);
 
 	CMD4(CCC_Integer, "r__supersample", &ps_r__Supersample, 1, 8);
 

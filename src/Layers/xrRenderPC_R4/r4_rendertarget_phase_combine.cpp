@@ -404,6 +404,9 @@ void CRenderTarget::phase_combine()
 			HW.pContext->CopyResource(rt_Generic_temp->pTexture->surface_get(), rt_Generic_0_r->pTexture->surface_get());
 	}
 
+	// scene light copy for lit see-through particles (smoke takes the light of what is around and behind it)
+	phase_scene_light();
+
 	// Forward rendering
 	{
 		PIX_EVENT(Forward_rendering);
@@ -939,4 +942,79 @@ void CRenderTarget::phase_combine_volumetric()
 		RCache.Render(D3DPT_TRIANGLELIST, Offset, 0, 4, 0, 2);
 	}
 	RCache.set_ColorWriteEnable();
+}
+
+
+// Scene light copy (HollywoodFX's "lit smoke": its ShadowMapCopy). Before see-through particles draw, the lit scene
+// (rt_Generic_0: sky, lit geometry, water) is shrunk to 1/32 of the screen (64 taps a texel; the first-person gun and
+// anything nearer than about a metre left out), blurred twice and blended with the last frame (time constant
+// r__scene_light_time), into $user$scene_light: rgb = the light around that spot of the screen, a = how much of it was
+// real scene (0 = none: off, or all of it masked). Particle shaders that bind it can take their light from it. The
+// four passes are Lua shaders a mod ships (effects\scene_light_down, _blur_a, _blur_b, _accum); without them, with
+// r__scene_light 0, MSAA, or on a second-viewport (3D scope) frame, nothing is drawn and the copy is cleared to 0.
+void CRenderTarget::phase_scene_light()
+{
+	if (!rt_scene_light)
+		return;
+	const bool on = ps_r__scene_light && s_scene_light_down && s_scene_light_blur_a && s_scene_light_blur_b &&
+		s_scene_light_accum && !RImplementation.o.dx10_msaa;
+	if (Device.m_SecondViewport.IsSVPFrame())
+		return; // keep the main view's copy
+	if (!on)
+	{
+		if (!m_scene_light_clear)
+		{
+			FLOAT zero[4] = {0.f, 0.f, 0.f, 0.f};
+			HW.pContext->ClearRenderTargetView(rt_scene_light->pRT, zero);
+			HW.pContext->ClearRenderTargetView(rt_scene_light_prev->pRT, zero);
+			m_scene_light_clear = true;
+		}
+		m_scene_light_time = 0.f;
+		return;
+	}
+	PIX_EVENT(Scene_light);
+
+	// blend toward the new copy by 1 - exp(-dt / time): the same speed at any frame rate; a jump (load, pause, just
+	// turned on) takes the new one whole
+	const float now = Device.fTimeGlobal;
+	const float dt = now - m_scene_light_time;
+	float k = 1.f;
+	if (!m_scene_light_clear && m_scene_light_time > 0.f && dt > 0.f && dt < 0.5f && ps_r__scene_light_time > 0.f)
+		k = 1.f - expf(-dt / ps_r__scene_light_time);
+	m_scene_light_time = now;
+	m_scene_light_clear = false;
+
+	const float w = float(Device.dwWidth), h = float(Device.dwHeight);
+	const float sw = float(rt_scene_light->dwWidth), sh = float(rt_scene_light->dwHeight);
+	u32 C = color_rgba(0, 0, 0, 255);
+	auto pass = [&](ref_shader& S, const ref_rt& target, float bx, float by)
+	{
+		u32 Offset = 0;
+		u_setrt(target, 0, 0, NULL);
+		set_viewport_size(HW.pContext, sw, sh);
+		RCache.set_CullMode(CULL_NONE);
+		RCache.set_Stencil(FALSE);
+		FVF::TL* pv = (FVF::TL*)RCache.Vertex.Lock(4, g_combine->vb_stride, Offset);
+		pv->set(0, h, EPS_S, 1.0f, C, 0.0f, 1.0f); pv++;
+		pv->set(0, 0, EPS_S, 1.0f, C, 0.0f, 0.0f); pv++;
+		pv->set(w, h, EPS_S, 1.0f, C, 1.0f, 1.0f); pv++;
+		pv->set(w, 0, EPS_S, 1.0f, C, 1.0f, 0.0f); pv++;
+		RCache.Vertex.Unlock(4, g_combine->vb_stride);
+		RCache.set_Element(S->E[0]);
+		// x, y: the blur step (uv); z: the time blend; w: the small target's texel width
+		RCache.set_c("scene_light_params", bx, by, k, 1.f / sw);
+		RCache.set_Geometry(g_combine);
+		RCache.Render(D3DPT_TRIANGLELIST, Offset, 0, 4, 0, 2);
+	};
+
+	HW.pContext->CopyResource(rt_scene_light_prev->pTexture->surface_get(), rt_scene_light->pTexture->surface_get());
+	pass(s_scene_light_down, rt_scene_light_a, 0.f, 0.f); // scene -> a (premultiplied by the mask, a = mask)
+	pass(s_scene_light_blur_a, rt_scene_light_b, 1.f / sw, 0.f); // a -> b, across
+	pass(s_scene_light_blur_b, rt_scene_light_a, 0.f, 1.f / sh); // b -> a, down
+	pass(s_scene_light_blur_a, rt_scene_light_b, 1.f / sw, 0.f);
+	pass(s_scene_light_blur_b, rt_scene_light_a, 0.f, 1.f / sh);
+	pass(s_scene_light_accum, rt_scene_light, 0.f, 0.f); // a + prev -> scene_light
+
+	set_viewport_size(HW.pContext, w, h);
+	RCache.set_CullMode(CULL_CCW);
 }

@@ -603,6 +603,16 @@ CRenderTarget::CRenderTarget()
 		rt_ssfx_ao.create(r2_RT_ssfx_ao, w, h, D3DFMT_A8R8G8B8); // AO Acc
 		rt_ssfx_il.create(r2_RT_ssfx_il, w, h, D3DFMT_A8R8G8B8); // IL Acc
 
+		// scene light copy: 1/32 of the screen, float (the slow time blend needs the precision)
+		{
+			const u32 sw = _max((w + 31) / 32, 1u), sh = _max((h + 31) / 32, 1u);
+			rt_scene_light.create(r2_RT_scene_light, sw, sh, D3DFMT_A16B16G16R16F);
+			rt_scene_light_prev.create(r2_RT_scene_light_prev, sw, sh, D3DFMT_A16B16G16R16F);
+			rt_scene_light_a.create(r2_RT_scene_light_a, sw, sh, D3DFMT_A16B16G16R16F);
+			rt_scene_light_b.create(r2_RT_scene_light_b, sw, sh, D3DFMT_A16B16G16R16F);
+			m_scene_light_clear = true;
+		}
+
 		if (RImplementation.o.ssfx_sss)
 		{
 			rt_ssfx_sss.create(r2_RT_ssfx_sss, w, h, D3DFMT_A8R8G8B8); // SSS Acc
@@ -695,6 +705,17 @@ CRenderTarget::CRenderTarget()
 	s_ssfx_water_blur.create(b_ssfx_water_blur, "ssfx_water_blur"); // Water
 
 	s_ssfx_ao.create(b_ssfx_ao, "ssfx_ao"); // SSR
+
+	// scene light copy: only when a mod ships all four pass shaders (shaders\r3\effects_scene_light_*.s)
+	if (DEV->_lua_HasShader("effects\\scene_light_down") && DEV->_lua_HasShader("effects\\scene_light_blur_a")
+		&& DEV->_lua_HasShader("effects\\scene_light_blur_b") && DEV->_lua_HasShader("effects\\scene_light_accum"))
+	{
+		s_scene_light_down.create("effects\\scene_light_down");
+		s_scene_light_blur_a.create("effects\\scene_light_blur_a");
+		s_scene_light_blur_b.create("effects\\scene_light_blur_b");
+		s_scene_light_accum.create("effects\\scene_light_accum");
+		Msg("* scene light copy: on (r__scene_light)");
+	}
 
 	// SSS 23: Deprecated
 	/*string32 cskin_buffer;

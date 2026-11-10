@@ -83,6 +83,8 @@ extern ECORE_API float ps_r__Tree_SBC; // scale bias correct
 extern ECORE_API Fvector ps_r__Tree_Wave;
 
 extern ECORE_API float ps_r__WallmarkTTL;
+extern ECORE_API int ps_r__scene_light;
+extern ECORE_API float ps_r__scene_light_time;
 extern ECORE_API float ps_r__WallmarkSHIFT;
 extern ECORE_API float ps_r__WallmarkSHIFT_V;
 
