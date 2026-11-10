@@ -9,6 +9,8 @@
 #include "IKLimbsController.h"
 #include "GameObject.h"
 #include "../../xrServerEntities/script_engine.h"
+#include "pch_script.h"
+#include "script_game_object.h"
 
 #ifdef	DEBUG
 BOOL debug_step_info = FALSE;
@@ -219,7 +221,42 @@ void CStepManager::update(bool b_hud_view)
 					}
 					else
 					{
-						m_step_sound.play_next(mtl_pair, m_object, m_step_info.params.step[i].power, b_hud_view);
+						// Gunsmith (Tarkov SFX, P4): every other creature's step asks Lua first, as the actor's does:
+						// _G.CEntity__FootstepCallback(obj, ground material, power, foot) returns nothing (the step
+						// plays as it is) or a table { play = false (no engine step), volume_mult, frequency_mult }.
+						// The power is the legs animation's (crouch 0.1, walk 0.25, run 0.8-1, sprint 1.3 and up).
+						float power = m_step_info.params.step[i].power;
+						float freq = 1.f;
+						bool play = true;
+						::luabind::functor<::luabind::object> step_funct;
+						if (ai().script_engine().functor("_G.CEntity__FootstepCallback", step_funct))
+						{
+							SGameMtl* mt = GMLib.GetMaterialByID(mtl_pair->GetMtl1());
+							::luabind::object out = step_funct(object->lua_game_object(), mt ? *mt->m_Name : "",
+							                                   power, int(i));
+							if (out && out.type() == LUA_TTABLE)
+							{
+								::luabind::object v = out["play"];
+								if (v.type() == LUA_TBOOLEAN)
+									play = ::luabind::object_cast<bool>(v);
+								v = out["volume_mult"];
+								if (v.type() == LUA_TNUMBER)
+								{
+									float k = ::luabind::object_cast<float>(v);
+									if (_valid(k) && k >= 0.f)
+										power *= k;
+								}
+								v = out["frequency_mult"];
+								if (v.type() == LUA_TNUMBER)
+								{
+									float k = ::luabind::object_cast<float>(v);
+									if (_valid(k) && k > EPS_S)
+										freq = k;
+								}
+							}
+						}
+						if (play && power > 0.f)
+							m_step_sound.play_next(mtl_pair, m_object, power, b_hud_view, freq);
                      object->FootStepCallback(m_step_info.params.step[i].power, b_play_sound, is_on_ground(), b_hud_view);
 					}	
 				}
@@ -335,7 +372,7 @@ float CStepManager::get_blend_time()
 }
 
 void CStepManager::material_sound::play_next(SGameMtlPair* mtl_pair, CEntityAlive* object, float volume,
-                                             bool b_hud_mode)
+                                             bool b_hud_mode, float freq)
 {
 	if (mtl_pair->StepSounds.empty())
 		return;
@@ -365,5 +402,6 @@ void CStepManager::material_sound::play_next(SGameMtlPair* mtl_pair, CEntityAliv
 	                                                                b_hud_mode ? sm_2D : 0,
 	                                                                0,
 	                                                                &sound_pos,
-	                                                                &vol);
+	                                                                &vol,
+	                                                                freq != 1.f ? &freq : 0);
 }

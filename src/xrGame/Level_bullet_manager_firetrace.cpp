@@ -231,9 +231,11 @@ void CBulletManager::FireShotmark(SBullet* bullet, const Fvector& vDir, const Fv
 	//проиграть звук
 	if (pSound && ShowMark && !m_skip_impact_sound)
 	{
+		// each impact on a voice of its own: the pair's sounds are shared handles, and playing one again rewound
+		// the last bullet's impact on the same clip (full auto cut its own impacts short)
 		CObject* O = Level().Objects.net_Find(bullet->parent_id);
-		bullet->m_mtl_snd = *pSound;
-		bullet->m_mtl_snd.play_at_pos(O, vEnd, 0);
+		Fvector at = vEnd;
+		pSound->play_no_feedback(O, 0, 0.f, &at);
 	}
 
 	LPCSTR ps_name = (!mtl_pair || mtl_pair->CollideParticles.empty())

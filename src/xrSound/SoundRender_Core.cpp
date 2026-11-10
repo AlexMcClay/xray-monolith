@@ -440,12 +440,12 @@ void CSoundRender_Core::_destroy_data(ref_sound_data& S)
 	S.handle = NULL;
 }
 
-CSoundRender_Environment* CSoundRender_Core::get_environment(const Fvector& P)
+CSoundRender_Environment* CSoundRender_Core::get_environment(const Fvector& P, bool level_only)
 {
 	PROF_EVENT();
 	static CSoundRender_Environment identity;
 
-	if (bUserEnvironment)
+	if (bUserEnvironment && !level_only)
 	{
 		return &s_user_environment;
 	}
@@ -499,6 +499,101 @@ CSoundRender_Environment* CSoundRender_Core::get_environment(const Fvector& P)
 void CSoundRender_Core::env_apply()
 {
 	bListenerMoved = TRUE;
+}
+
+// Gunsmith (Tarkov SFX, P6): the script mix
+void CSoundRender_Core::set_mix(float volume, float hf, float fade_sec, bool except_2d)
+{
+	clamp(volume, 0.f, 1.f);
+	clamp(hf, 0.f, 1.f);
+	m_mix_volume_to = volume;
+	m_mix_hf_to = hf;
+	m_mix_except_2d = except_2d;
+	if (fade_sec > EPS_L)
+	{
+		m_mix_volume_rate = _abs(volume - m_mix_volume) / fade_sec;
+		m_mix_hf_rate = _abs(hf - m_mix_hf) / fade_sec;
+	}
+	else
+	{
+		m_mix_volume = volume;
+		m_mix_hf = hf;
+		m_mix_volume_rate = m_mix_hf_rate = 0.f;
+	}
+}
+
+void CSoundRender_Core::get_mix(float& volume, float& hf)
+{
+	volume = m_mix_volume;
+	hf = m_mix_hf;
+}
+
+static void ease_to(float& v, float to, float rate, float dt)
+{
+	if (rate <= 0.f)
+	{
+		v = to;
+		return;
+	}
+	const float step = rate * dt;
+	if (_abs(to - v) <= step)
+		v = to;
+	else
+		v += (to > v) ? step : -step;
+}
+
+void CSoundRender_Core::update_mix(float dt)
+{
+	ease_to(m_mix_volume, m_mix_volume_to, m_mix_volume_rate, dt);
+	ease_to(m_mix_hf, m_mix_hf_to, m_mix_hf_rate, dt);
+}
+
+// Gunsmith (Tarkov SFX, P13): the reverb from a script
+bool CSoundRender_Core::set_script_env(LPCSTR a, LPCSTR b, float f, float blend_sec)
+{
+	m_env_blend_time = blend_sec;
+	if (!a || !a[0])
+	{
+		bUserEnvironment = FALSE;
+		env_apply();
+		return true;
+	}
+	if (!s_environment)
+		return false;
+	CSoundRender_Environment* A = s_environment->Get(a);
+	CSoundRender_Environment* B = (b && b[0]) ? s_environment->Get(b) : nullptr;
+	if (!A || (b && b[0] && !B))
+		return false;
+	s_user_environment = *A;
+	if (B)
+	{
+		clamp(f, 0.f, 1.f);
+		s_user_environment.lerp(*A, *B, f);
+	}
+	bUserEnvironment = TRUE;
+	env_apply();
+	return true;
+}
+
+LPCSTR CSoundRender_Core::get_level_env(const Fvector& P)
+{
+	CSoundRender_Environment* E = get_environment(P, true);
+	return (E && E->name.size()) ? E->name.c_str() : "";
+}
+
+LPCSTR CSoundRender_Core::get_env_names()
+{
+	m_env_names.clear();
+	if (s_environment)
+		for (CSoundRender_Environment* E : s_environment->Library())
+		{
+			if (!E || !E->name.size())
+				continue;
+			if (!m_env_names.empty())
+				m_env_names += ",";
+			m_env_names += E->name.c_str();
+		}
+	return m_env_names.c_str();
 }
 
 void CSoundRender_Core::update_listener(const Fvector& P, const Fvector& D, const Fvector& N, float dt)

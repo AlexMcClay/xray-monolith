@@ -1397,6 +1397,26 @@ void set_snd_volume(float v)
 	clamp(psSoundVFactor, 0.0f, 1.0f);
 }
 
+// Gunsmith (Tarkov SFX, P6): a mix over every sound from a script, eased over fade seconds (xrSound Sound.h set_mix):
+// level.set_sound_mix(volume, hf, fade [, except_2d]); hf is the EFX low-pass gain at high frequencies (1 none, needs
+// snd_efx); except_2d leaves the player's own (2D) sounds alone. level.set_sound_mix(1, 1, fade) undoes it.
+void set_sound_mix3(float volume, float hf, float fade) { ::Sound->set_mix(volume, hf, fade, false); }
+void set_sound_mix4(float volume, float hf, float fade, bool except_2d) { ::Sound->set_mix(volume, hf, fade, except_2d); }
+float get_sound_mix_volume() { float v, h; ::Sound->get_mix(v, h); return v; }
+float get_sound_mix_hf() { float v, h; ::Sound->get_mix(v, h); return h; }
+
+// Gunsmith (Tarkov SFX, P13): the reverb from a script (needs snd_efx). level.set_sound_env(preset [, blend_s]),
+// level.set_sound_env(a, b, f, blend_s) (a mixed into b by f), level.set_sound_env() or ("") the level's own zones;
+// returns false when a preset isn't found. level.get_sound_env([pos]) the level zone's preset ("" none) at pos or the
+// camera; level.sound_env_names() every preset, comma-separated.
+bool set_sound_env0() { return ::Sound->set_script_env("", "", 0.f, -1.f); }
+bool set_sound_env1(LPCSTR a) { return ::Sound->set_script_env(a, "", 0.f, -1.f); }
+bool set_sound_env2(LPCSTR a, float blend) { return ::Sound->set_script_env(a, "", 0.f, blend); }
+bool set_sound_env4(LPCSTR a, LPCSTR b, float f, float blend) { return ::Sound->set_script_env(a, b, f, blend); }
+LPCSTR get_sound_env0() { return ::Sound->get_level_env(Device.vCameraPosition); }
+LPCSTR get_sound_env1(const Fvector& P) { return ::Sound->get_level_env(P); }
+LPCSTR sound_env_names() { return ::Sound->get_env_names(); }
+
 float get_music_volume() {
 	return psSoundVMusicFactor;
 }
@@ -3104,6 +3124,17 @@ void CLevel::script_register(lua_State* L)
 			def("get_snd_volume", &get_snd_volume),
 			def("get_rain_volume", &get_rain_volume),
 			def("set_snd_volume", &set_snd_volume),
+			def("set_sound_mix", &set_sound_mix3),
+			def("set_sound_mix", &set_sound_mix4),
+			def("get_sound_mix_volume", &get_sound_mix_volume),
+			def("get_sound_mix_hf", &get_sound_mix_hf),
+			def("set_sound_env", &set_sound_env0),
+			def("set_sound_env", &set_sound_env1),
+			def("set_sound_env", &set_sound_env2),
+			def("set_sound_env", &set_sound_env4),
+			def("get_sound_env", &get_sound_env0),
+			def("get_sound_env", &get_sound_env1),
+			def("sound_env_names", &sound_env_names),
 			def("get_music_volume", &get_music_volume),
 			def("set_music_volume", &set_music_volume),
 

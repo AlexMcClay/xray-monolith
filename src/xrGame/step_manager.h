@@ -26,7 +26,7 @@ class CStepManager
 		{
 		}
 
-		void play_next(SGameMtlPair* mtl_pair, CEntityAlive* object, float volume, bool b_hud_mode);
+		void play_next(SGameMtlPair* mtl_pair, CEntityAlive* object, float volume, bool b_hud_mode, float freq = 1.f);
 	} m_step_sound;
 
 	u32 m_time_anim_started;

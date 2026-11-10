@@ -352,6 +352,9 @@ BOOL CSoundRender_Emitter::update_culling(float dt)
 	PROF_EVENT("CSoundRender_Emitter::update_culling");
 	float volume_att = 1.f;
 	const float fade_speed = bStopping ? fade_rate : 10.f;
+	// the user's volume slider for this sound; the cull compares the gain before it (snd_cull), so a quiet layer
+	// (a crouched step, gear) still plays when the effects slider is low, instead of only loud sounds getting through
+	const float slider = owner_data->s_type == st_Effect ? psSoundVEffects * psSoundVFactor : psSoundVMusic * psSoundVMusicFactor;
 
 	if (b2D)
 	{
@@ -375,7 +378,7 @@ BOOL CSoundRender_Emitter::update_culling(float dt)
 		volume_att = (p_source.max_distance - dist) / min_max;
 		clamp(volume_att, 0.f, p_source.volume);
 
-		float fade_scale = bStopping || (p_source.base_volume * p_source.volume * (owner_data->s_type == st_Effect ? psSoundVEffects * psSoundVFactor : psSoundVMusic * psSoundVMusicFactor) < psSoundCull) ? -1.f : 1.f;
+		float fade_scale = bStopping || slider <= 0.f || (p_source.base_volume * p_source.volume < psSoundCull) ? -1.f : 1.f;
 		fade_volume += dt * fade_speed * fade_scale;
 		//LostAlphaRus out
 
@@ -393,10 +396,10 @@ BOOL CSoundRender_Emitter::update_culling(float dt)
 
 	// Update smoothing
 	//LostAlphaRus in
-	smooth_volume = (p_source.base_volume * volume_att * (owner_data->s_type == st_Effect ? psSoundVEffects * psSoundVFactor : psSoundVMusic * psSoundVMusicFactor) * occluder_volume * fade_volume);
+	smooth_volume = (p_source.base_volume * volume_att * slider * occluder_volume * fade_volume);
 	//LostAlphaRus out
 
-	if (smooth_volume < psSoundCull)
+	if (slider <= 0.f || smooth_volume < psSoundCull * slider)
 		return (bStopping && bFadeHold && target) ? TRUE : FALSE;	// allow volume to go up (stop_fade: keep the voice)
 
 	// Here we has enought "PRIORITY" to be soundable

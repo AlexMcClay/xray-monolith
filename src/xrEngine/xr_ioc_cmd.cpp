@@ -1137,6 +1137,7 @@ void CCC_Register()
 	CMD4(CCC_Float, "snd_efx_environment_change_time", &snd_efx_environment_change_time, 0.f, 3.f);
 	CMD4(CCC_Float, "snd_occlusion_hf", &psSoundOcclusionHF, 0.f, 1.f); // Gunsmith: occluded sounds' highs (1 off)
 	CMD4(CCC_Integer, "snd_targets", &psSoundTargets, 32, 1024);
+	CMD4(CCC_Float, "snd_cull", &psSoundCull, 0.f, 0.1f); // the quietest gain that plays, before the volume sliders (0.01)
 	CMD4(CCC_Integer, "snd_cache_size", &psSoundCacheSizeMB, 8, 256);
 
 	// Distance based delay power

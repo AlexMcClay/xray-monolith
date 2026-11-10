@@ -185,6 +185,11 @@ void CSoundRender_TargetA::fill_parameters()
 
 	A_CHK(alSourcef (pSource, AL_ROLLOFF_FACTOR, psSoundRolloff));
 
+	// Gunsmith (Tarkov SFX, P6): the script mix (volume and highs over every sound, or every 3D one)
+	const bool mixed = !(m_pEmitter->b2D && SoundRender->m_mix_except_2d);
+	const float mix_volume = mixed ? SoundRender->m_mix_volume : 1.f;
+	const float mix_hf = mixed ? SoundRender->m_mix_hf : 1.f;
+
 	// Gunsmith (roadmap So5): an occluded 3D sound loses its highs as it loses volume (occluder_volume goes from 1
 	// to psSoundOcclusionScale behind geometry, smoothed), down to psSoundOcclusionHF fully occluded
 	if (pFilter)
@@ -196,6 +201,7 @@ void CSoundRender_TargetA::fill_parameters()
 			clamp(f, 0.f, 1.f);
 			hf = 1.f - f * (1.f - psSoundOcclusionHF);
 		}
+		hf *= mix_hf;
 		if (!fsimilar(hf, cache_hf, 0.01f))
 		{
 			cache_hf = hf;
@@ -204,7 +210,7 @@ void CSoundRender_TargetA::fill_parameters()
 	}
 
 	VERIFY2(m_pEmitter, SE->source()->file_name());
-	float _gain = m_pEmitter->smooth_volume;
+	float _gain = m_pEmitter->smooth_volume * mix_volume;
 	clamp(_gain, EPS_S, 1.f);
 	if (!fsimilar(_gain, cache_gain, 0.01f))
 	{

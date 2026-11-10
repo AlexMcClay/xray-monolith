@@ -257,11 +257,13 @@ void CBulletManager::PlayExplodePS(const Fmatrix& xf)
 void CBulletManager::PlayWhineSound(SBullet* bullet, CObject* object, const Fvector& pos)
 {
 	if (m_WhineSounds.empty()) return;
-	if (bullet->m_whine_snd._feedback() != NULL) return;
+	if (bullet->flags.whined) return;
 	if (bullet->hit_type != ALife::eHitTypeFireWound) return;
 
-	bullet->m_whine_snd = m_WhineSounds[Random.randI(0, m_WhineSounds.size())];
-	bullet->m_whine_snd.play_at_pos(object, pos);
+	// on a voice of its own (the whine files are shared handles: one bullet's whine stopped or rewound another's)
+	bullet->flags.whined = 1;
+	Fvector p = pos;
+	m_WhineSounds[Random.randI(0, m_WhineSounds.size())].play_no_feedback(object, 0, 0.f, &p);
 }
 
 void CBulletManager::Clear()
