@@ -2587,6 +2587,10 @@ void CCC_RegisterCommands()
 	CMD4(CCC_Float, "step_particle_distance", &g_step_particle_distance, 10.0f, 100.0f);
     CMD4(CCC_Float, "snd_max_distance_multiplier", &psSoundMaxDistanceMultiplier, 0.2f, 2.0f);
 	CMD4(CCC_Float, "snd_max_ai_distance_multiplier", &psSoundMaxAIDistanceMultiplier, 0.2f, 2.0f);
+	// 1: a non-exclusive HUD or layered sound (NPC shots, explosions) plays at its line's volume column and
+	// hud_sound_vol_k too, as an exclusive one does; 0: only the blend and script multipliers (before 11 Nov 2026)
+	extern int psHUDSoundVolumeColumn;
+	CMD4(CCC_Integer, "snd_hud_volume_column", &psHUDSoundVolumeColumn, 0, 1);
 	//#endif // DEBUG
 
 	// Demo

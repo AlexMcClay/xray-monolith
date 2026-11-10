@@ -54,6 +54,11 @@
 		without the crossfade (and the share 1 when no handler sets t.mix). The player's and NPCs' guns. The
 		engine doesn't decide this itself (since 10 Nov 2026, roadmap So6); the Gunsmith Framework's
 		gunsmith_indoor answers it.
+
+	sound_indoor_mix(pos, obj, t)
+		Any other sound with an indoor twin (an explosive's snd_explode_indoor, engine 11 Nov 2026): how much is
+		a sound at pos indoors? obj is its owner or nil. Set
+		t.mix (0..1) as for weapon_shot_indoors (several handlers: the largest). Nobody answering: outdoors.
 --]]
 
 AddScriptCallback("on_gs_part_attached")
@@ -63,6 +68,7 @@ AddScriptCallback("weapon_on_recalc_stats")
 AddScriptCallback("weapon_on_alt_aim_key")
 AddScriptCallback("weapon_on_shot")
 AddScriptCallback("weapon_shot_indoors")
+AddScriptCallback("sound_indoor_mix")
 
 _G.CWeapon_gs_part_attached = function(weapon, node, section)
 	SendScriptCallback("on_gs_part_attached", weapon, node, section)
@@ -104,4 +110,11 @@ _G.CWeapon_ShotIndoorMix = function(weapon, pos)
 		return math.min(math.max(t.mix, 0), 1)
 	end
 	return t.indoor == true and 1 or 0
+end
+
+-- any other sound's indoor share (an explosive's snd_explode_indoor; engine HUD_SOUND_COLLECTION_LAYERED::IndoorMix)
+_G.CSound_IndoorMix = function(pos, obj)
+	local t = { mix = 0 }
+	SendScriptCallback("sound_indoor_mix", pos, obj, t)
+	return math.min(math.max(tonumber(t.mix) or 0, 0), 1)
 end

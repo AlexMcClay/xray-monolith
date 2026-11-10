@@ -32,6 +32,7 @@ struct SBullet
 			//.			u16			skipped_frame	: 1	;			//пропуск первой отрисовки
 			u16 aim_bullet : 1; //прицеленная пуля( вылетевшая первой после длительного молчания оружия (1-3 сек.))
 			u16 magnetic_beam : 1;
+			u16 whined : 1; // its near-miss whine has played (each bullet once; the sound has no handle of its own)
 			//магнитный луч (нет отклонения после пробивания, не падает скорость после пробивания)
 		};
 
@@ -75,8 +76,6 @@ struct SBullet
 	ALife::EHitType hit_type;
 	//---------------------------------
 	u32 m_dwID;
-	ref_sound m_whine_snd;
-	ref_sound m_mtl_snd;
 	//---------------------------------
 	u16 targetID;
 	//---------------------------------

@@ -8,6 +8,7 @@
 
 float psHUDSoundVolume = 1.0f;
 float psHUDStepSoundVolume = 1.0f;
+int psHUDSoundVolumeColumn = 1; // snd_hud_volume_column: non-exclusive sounds keep their line's volume (see PlaySound)
 
 void InitHudSoundSettings()
 {
@@ -119,6 +120,11 @@ void HUD_SOUND_ITEM::PlaySound(HUD_SOUND_ITEM& hud_snd,
 	hud_snd.m_activeSnd = &hud_snd.sounds[index];
 
 	const float delay = hud_snd.m_activeSnd->delay * delay_mult;
+	hud_snd.m_play_volume = hud_snd.m_activeSnd->volume * (b_hud_mode ? psHUDSoundVolume : 1.0f) * volume_mult;
+	// A non-exclusive sound plays on a voice of its own (play_no_feedback), so the set_volume below never reaches
+	// it: give it the whole volume here, the line's column and hud_sound_vol_k included (snd_hud_volume_column 0:
+	// only volume_mult, as before 11 Nov 2026)
+	float nf_volume = psHUDSoundVolumeColumn ? hud_snd.m_play_volume : volume_mult;
 
 	if (hud_snd.m_b_exclusive || hud_snd.m_b_tracked)
 	{
@@ -135,13 +141,11 @@ void HUD_SOUND_ITEM::PlaySound(HUD_SOUND_ITEM& hud_snd,
 		                                          flags & sm_2D
 			                                          ? &Fvector().set(0, 0, 0)
 			                                          : &Fvector().set(position.x, position.y, position.z),
-		                                          &volume_mult,
+		                                          &nf_volume,
 		                                          frequency != 1.f ? &frequency : 0,
 		                                          0);
 	}
 
-	//hud_snd.m_activeSnd->snd.set_volume		(hud_snd.m_activeSnd->volume * b_hud_mode?psHUDSoundVolume:1.0f);
-	hud_snd.m_play_volume = hud_snd.m_activeSnd->volume * (b_hud_mode ? psHUDSoundVolume : 1.0f) * volume_mult;
 	hud_snd.m_activeSnd->snd.set_volume(hud_snd.m_play_volume);
 
 	if ((hud_snd.m_b_exclusive || hud_snd.m_b_tracked) && frequency != 1.f)
@@ -531,5 +535,44 @@ void HUD_SOUND_COLLECTION_LAYERED::LoadSound(CInifile const* ini, LPCSTR section
 		snd_item.LoadSound(section, line, alias, exclusive, type);
 		snd_item.m_alias = alias;
 	}
+}
+
+void HUD_SOUND_COLLECTION_LAYERED::PlayMixed(LPCSTR alias, float indoor, const Fvector& position, const CObject* parent,
+                                             bool hud_mode, float volume_mult, float frequency)
+{
+	string128 in;
+	strconcat(sizeof(in), in, alias, "Indoor");
+	if (!FindSoundItem(in, false))
+		indoor = 0.f;
+	indoor = _min(_max(indoor, 0.f), 1.f);
+	const float floor = 0.0005f; // as the shots' crossfade (WeaponMagazined.cpp SHOT_MIX_FLOOR)
+	if (indoor < 1.f)
+	{
+		const float g = indoor > 0.f ? _max(_cos(indoor * PI_DIV_2), floor) : 1.f;
+		PlaySound(alias, position, parent, hud_mode, false, u8(-1), volume_mult * g, frequency);
+	}
+	if (indoor > 0.f)
+	{
+		const float g = indoor < 1.f ? _max(_sin(indoor * PI_DIV_2), floor) : 1.f;
+		PlaySound(in, position, parent, hud_mode, false, u8(-1), volume_mult * g, frequency);
+	}
+}
+
+float HUD_SOUND_COLLECTION_LAYERED::IndoorMix(const Fvector& pos, const CObject* obj)
+{
+	::luabind::functor<::luabind::object> funct;
+	if (!ai().script_engine().functor("_G.CSound_IndoorMix", funct))
+		return 0.f;
+	const CGameObject* go = smart_cast<const CGameObject*>(obj);
+	::luabind::object r;
+	if (go)
+		r = funct(pos, go->lua_game_object());
+	else
+		r = funct(pos);
+	if (r.is_valid() && r.type() == LUA_TNUMBER)
+		return _min(_max(::luabind::object_cast<float>(r), 0.f), 1.f);
+	if (r.is_valid() && r.type() == LUA_TBOOLEAN)
+		return ::luabind::object_cast<bool>(r) ? 1.f : 0.f;
+	return 0.f;
 }
 //-Alundaio

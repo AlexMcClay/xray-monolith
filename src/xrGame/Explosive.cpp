@@ -139,6 +139,8 @@ void CExplosive::Load(CInifile const* ini, LPCSTR section)
 	m_fFragmentSpeed = ini->r_float(section, "fragment_speed");
 
 	m_layered_sounds.LoadSound(ini, section, "snd_explode", "sndExplode", false, m_eSoundExplode);
+	// Gunsmith (Tarkov SFX, P9): an indoor twin, crossfaded by _G.CSound_IndoorMix at the blast
+	m_layered_sounds.LoadSound(ini, section, "snd_explode_indoor", "sndExplodeIndoor", false, m_eSoundExplode);
 
 	m_fExplodeDurationMax = ini->r_float(section, "explode_duration");
 	if( ini->line_exist(section,"explode_effector_sect_name") )
@@ -377,7 +379,15 @@ void CExplosive::Explode()
 	OnBeforeExplosion();
 	//играем звук взрыва
 
-	m_layered_sounds.PlaySound("sndExplode", pos, smart_cast<CObject*>(this), false, false, (u8)-1);
+	{
+		CObject* self = smart_cast<CObject*>(this);
+		// Gunsmith (Tarkov SFX, P9): with snd_explode_indoor, the outdoor and the indoor blast crossfaded by how
+		// indoors the blast is (_G.CSound_IndoorMix); without it, as before
+		const float indoor = m_layered_sounds.FindSoundItem("sndExplodeIndoor", false)
+			                     ? HUD_SOUND_COLLECTION_LAYERED::IndoorMix(pos, self)
+			                     : 0.f;
+		m_layered_sounds.PlayMixed("sndExplode", indoor, pos, self, false);
+	}
 
 	//показываем эффекты
 
