@@ -11,6 +11,10 @@
 #include "../Include/xrRender/KinematicsAnimated.h"
 #include "../Include/xrRender/RenderVisual.h"
 
+// gs_part_draw (console): 1 the part models are drawn here (default); 0 they are placed but not drawn, for the
+// attachments prototype (research/44 phase 2), which draws them as script attachments instead
+int g_gs_part_draw = 1;
+
 namespace gunsmith
 {
 	namespace
@@ -687,19 +691,49 @@ namespace gunsmith
 		if (c.children.empty() || c.root != root)
 			return;
 		update_local(c, root);
+		const bool draw = g_gs_part_draw != 0;
 		for (SChild& ch : c.children)
 		{
 			IKinematicsAnimated* ka = ch.visual->dcast_PKinematicsAnimated();
-			if (ka)
+			if (draw && ka)
 				ka->UpdateTracks();
-			if (ka || !ch.follow.empty())
+			if (draw && (ka || !ch.follow.empty()))
 			{
 				ch.K->CalculateBones_Invalidate();
 				ch.K->CalculateBones(TRUE);
 			}
 			ch.xform.mul_43(root_xform, ch.local);
+			if (!draw)
+				continue;
 			::Render->set_Transform(&ch.xform);
 			::Render->add_Visual(ch.visual);
+		}
+	}
+
+	void CVisuals::attachment_mounts(int ctx, IKinematics* root, xr_vector<SAttMount>& out) const
+	{
+		out.clear();
+		const SContext& c = m_ctx[ctx];
+		if (c.children.empty() || c.root != root)
+			return;
+		for (const SChild& ch : c.children)
+		{
+			IKinematics* parentK = ch.parent < 0 ? root : c.children[ch.parent].K;
+			SAttMount m;
+			m.node = ch.node;
+			m.parent = ch.parent;
+			m.model = ctx == eHud ? ch.pv->hud_visual : ch.pv->visual;
+			m.bone = parentK->LL_BoneName_dbg(ch.mount_bone);
+			// update_local: parent x (bone pose x inverse bind) x mount; an attachment: parent x bone pose x offset
+			Fmatrix inv, t;
+			inv.invert(parentK->LL_GetTransform(ch.mount_bone));
+			t.mul_43(parentK->LL_GetTransform_R(ch.mount_bone), ch.mount);
+			m.offset.mul_43(inv, t);
+			for (u16 b = 0; b < ch.K->LL_BoneCount(); ++b)
+				if (!ch.K->LL_GetBoneVisible(b))
+					m.hidden.push_back(ch.K->LL_BoneName_dbg(b));
+			m.follow = !ch.follow.empty();
+			out.push_back(m);
 		}
 	}
 

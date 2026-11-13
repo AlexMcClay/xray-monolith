@@ -94,6 +94,8 @@ void register_gunsmith_console_commands()
 	CMD4(CCC_Integer, "gs_grip_ik", &g_gs_grip_ik, 0, 1);
 	CMD4(CCC_Integer, "gs_grip_type", &g_gs_grip_type, -1, 1);
 	CMD4(CCC_Integer, "gs_debug", &g_gs_debug, 0, 7);
+	extern int g_gs_part_draw; // gunsmith_visuals.cpp
+	CMD4(CCC_Integer, "gs_part_draw", &g_gs_part_draw, 0, 1);
 	CMD1(CCC_GsIconCacheClear, "gs_icon_cache_clear");
 	CMD1(CCC_GsIconBake, "gs_icon_bake");
 	CMD1(CCC_GsIconLook, "gs_icon_look");
