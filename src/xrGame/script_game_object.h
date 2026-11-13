@@ -1146,8 +1146,6 @@ public:
 	void set_hud_recoil_screen(Fvector pos, Fvector rot, Fvector pivot);
 	void reset_hud_recoil();
 	void set_cam_recoil(bool on);
-	void set_weapon_particles(LPCSTR kind, LPCSTR name);
-	LPCSTR weapon_particles(LPCSTR kind);
 	void set_weapon_light(float r, float g, float b, float range, float time);
 	Fvector weapon_fire_point();
 	Fvector weapon_shell_point();

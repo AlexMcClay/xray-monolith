@@ -292,22 +292,7 @@ protected:
 	//имя партиклов следа от пули
 	shared_str m_sShotParticles;
 
-	// Script overrides of the flame and smoke particles (game_object:set_weapon_particles): when set, they are played
-	// instead of the config's, suppressed or not; empty = the config's. Not saved: a script sets them again.
-	shared_str m_sFlameParticlesOverride;
-	shared_str m_sSmokeParticlesOverride;
-	const shared_str& FlameParticlesName() const
-	{
-		return m_sFlameParticlesOverride.size() ? m_sFlameParticlesOverride : m_sFlameParticlesCurrent;
-	}
-	const shared_str& SmokeParticlesName() const
-	{
-		return m_sSmokeParticlesOverride.size() ? m_sSmokeParticlesOverride : m_sSmokeParticlesCurrent;
-	}
 public:
-	// kind "flame" or "smoke"; name "" (or nil) clears the override. Returns false for another kind.
-	bool SetParticlesOverride(LPCSTR kind, LPCSTR name);
-	LPCSTR GetParticlesName(LPCSTR kind) const;
 	// shot light colour, range (m), time (s); range <= 0 or time <= 0 clears the override
 	void SetLightOverride(float r, float g, float b, float range, float time);
 	void SetLightOffset(float forward, float forward_hud)

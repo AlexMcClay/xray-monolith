@@ -475,16 +475,6 @@ void CScriptGameObject::set_cam_recoil(bool on)
 		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError, "CGameObject : cannot access class member set_cam_recoil!");
 }
 
-// A weapon's flame or smoke particles from a script ("flame" / "smoke"; "" back to the config's), e.g. a
-// muzzle-device flash (CShootingObject::SetParticlesOverride; Gunsmith Docs research/40-vfx.md)
-void CScriptGameObject::set_weapon_particles(LPCSTR kind, LPCSTR name)
-{
-	CWeapon* w = smart_cast<CWeapon*>(&object());
-	if (!w || !kind || !w->SetParticlesOverride(kind, name))
-		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError,
-		                                "CGameObject : set_weapon_particles needs a weapon and \"flame\" or \"smoke\"!");
-}
-
 // A weapon's shot light from a script: colour, range (m), time (s); range or time <= 0 back to the config's
 // (CShootingObject::SetLightOverride; Gunsmith Docs vfx.md)
 void CScriptGameObject::set_weapon_light(float r, float g, float b, float range, float time)
@@ -530,12 +520,6 @@ bool CScriptGameObject::weapon_hud_mode()
 {
 	CWeapon* w = smart_cast<CWeapon*>(&object());
 	return w && w->GetHUDmode();
-}
-
-LPCSTR CScriptGameObject::weapon_particles(LPCSTR kind)
-{
-	CWeapon* w = smart_cast<CWeapon*>(&object());
-	return (w && kind) ? w->GetParticlesName(kind) : "";
 }
 
 void CScriptGameObject::set_owner_spread(bool on)

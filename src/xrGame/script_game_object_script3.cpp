@@ -582,8 +582,6 @@ class_<CScriptGameObject> script_register_game_object2(class_<CScriptGameObject>
 		.def("set_hud_recoil_screen", SAFE_WRAP(&CScriptGameObject::set_hud_recoil_screen))
 		.def("reset_hud_recoil", SAFE_WRAP(&CScriptGameObject::reset_hud_recoil))
 		.def("set_cam_recoil", SAFE_WRAP(&CScriptGameObject::set_cam_recoil))
-		.def("set_weapon_particles", SAFE_WRAP(&CScriptGameObject::set_weapon_particles))
-		.def("weapon_particles", SAFE_WRAP(&CScriptGameObject::weapon_particles))
 		.def("set_weapon_light", SAFE_WRAP(&CScriptGameObject::set_weapon_light))
 		.def("weapon_fire_point", SAFE_WRAP(&CScriptGameObject::weapon_fire_point))
 		.def("weapon_shell_point", SAFE_WRAP(&CScriptGameObject::weapon_shell_point))
