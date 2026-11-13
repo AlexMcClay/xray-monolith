@@ -186,8 +186,10 @@ void CWeaponMagazined::Load(LPCSTR section)
 	m_sSndShotCurrent = IsSilencerAttached() ? "sndSilencerShot" : "sndShot";
 
 	//звуки и партиклы глушителя, еслит такой есть
-	// (also for guns without a silencer addon that may take a suppressor part)
+	// (also for guns without a silencer addon that may take a suppressor part, and for guns whose attachments a
+	// script handles: use_engine_attachments = false)
 	if (m_eSilencerStatus == ALife::eAddonAttachable || m_eSilencerStatus == ALife::eAddonPermanent ||
+		!m_bUseEngineAttachments ||
 		(pSettings->line_exist(section, "gs_slots") && WeaponSoundExist(actor_sect("snd_silncer_shot"), "snd_silncer_shot")))
 	{
 		if (pSettings->line_exist(section, "silencer_flame_particles"))
@@ -1221,7 +1223,7 @@ void CWeaponMagazined::OnShot()
 #ifdef EXTENDED_WEAPON_CALLBACKS
 	CGameObject* object = smart_cast<CGameObject*>(H_Parent());
 	if (object)
-		object->callback(GameObject::eOnWeaponFired)(object->lua_game_object(), this->lua_game_object(), iAmmoElapsed);
+		object->callback(GameObject::eOnWeaponFired)(object->lua_game_object(), this->lua_game_object(), iAmmoElapsed, 0, *m_ammoTypes[m_ammoType], 0);
 #endif
 
 	// Эффект сдвига (отдача)
@@ -1819,6 +1821,9 @@ bool CWeaponMagazined::Detach(const char* item_section_name, bool b_spawn_item)
 extern int scope_2dtexactive; //crookr
 void CWeaponMagazined::InitAddons()
 {
+	if (!m_bUseEngineAttachments)
+		return;
+
 	if (IsScopeAttached())
 	{
 		shared_str scope_tex_name;
@@ -2066,15 +2071,15 @@ void CWeaponMagazined::PlayAnimShoot()
 	}
 }
 
-void CWeaponMagazined::OnMotionMark(u32 state, const motion_marks& M)
+void CWeaponMagazined::OnMotionMark(u32 state, const motion_marks& M, float mark_start, float mark_end)
 {
-	inherited::OnMotionMark(state, M);
+	inherited::OnMotionMark(state, M, mark_start, mark_end);
 
     // Edited by Verdatim 18.4.2026
     shared_str reloadMarkName = READ_IF_EXISTS(pSettings, r_string, cNameSect(), "motion_mark_reload", "");
 	if (state == eReload && (reloadMarkName.size() == 0 || reloadMarkName == M.name))
 	{
-		if (bClearJamOnly)
+		if (bClearJamOnly && xr_strcmp(M.name.c_str(), "clear_jam") == 0)
 		{
 			bMisfire = false;
 			bClearJamOnly = false;
@@ -2098,7 +2103,7 @@ void CWeaponMagazined::OnMotionMark(u32 state, const motion_marks& M)
 		}
 		else
 		{
-			if (m_needReload)
+			if (m_needReload && xr_strcmp(M.name.c_str(), "reload") == 0)
 				ReloadMagazine();
 
             // Verdatim, fix for lmg with non-(lmg_reload) motion marks causing belts to disappear
@@ -2401,7 +2406,8 @@ bool CWeaponMagazined::install_upgrade_impl(LPCSTR section, bool test)
 	}
 	result |= result2;
 
-	if (m_eSilencerStatus == ALife::eAddonAttachable || m_eSilencerStatus == ALife::eAddonPermanent)
+	if (m_eSilencerStatus == ALife::eAddonAttachable || m_eSilencerStatus == ALife::eAddonPermanent ||
+		!m_bUseEngineAttachments)
 	{
 		result |= process_if_exists_set(section, "silencer_flame_particles", &CInifile::r_string,
 		                                m_sSilencerFlameParticles, test);

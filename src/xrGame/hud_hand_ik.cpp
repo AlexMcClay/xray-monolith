@@ -76,16 +76,40 @@ LPCSTR CHudHandIK::finger_bone(int f)
 void _BCL CHudHandIK::callback(CBoneInstance* B)
 {
 	SBone* b = static_cast<SBone*>(B->callback_param());
-	if (b && b->active)
+	if (!b)
+		return;
+	if (b->active)
+	{
 		B->mTransform.set(b->target);
+		return;
+	}
+	if (b->prev)
+	{
+		// the earlier callback reads its own parameter from the bone: put it back for the call
+		B->set_callback(b->prev_type, b->prev, b->prev_param, b->prev_overwrite);
+		b->prev(B);
+		B->set_callback(bctCustom, callback, b);
+	}
 }
 
 bool CHudHandIK::hook(SBone& b, LPCSTR name)
 {
 	b.id = m_arm->LL_BoneID(name);
 	b.active = false;
+	b.prev = nullptr;
+	b.prev_param = nullptr;
 	if (b.id != BI_NONE)
-		m_arm->LL_GetBoneInstance(b.id).set_callback(bctCustom, callback, &b);
+	{
+		CBoneInstance& bi = m_arm->LL_GetBoneInstance(b.id);
+		if (bi.callback() && bi.callback() != callback)
+		{
+			b.prev = bi.callback();
+			b.prev_param = bi.callback_param();
+			b.prev_type = bi.callback_type();
+			b.prev_overwrite = bi.callback_overwrite();
+		}
+		bi.set_callback(bctCustom, callback, &b);
+	}
 	return b.id != BI_NONE;
 }
 

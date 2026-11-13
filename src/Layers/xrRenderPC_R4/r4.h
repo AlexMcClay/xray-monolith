@@ -383,7 +383,7 @@ public:
 	virtual void models_Prefetch();
 	virtual void models_PrefetchOne(LPCSTR name, bool assert = true);
 	virtual void models_Clear(BOOL b_complete);
-	virtual bool models_Exists(LPCSTR name);
+	virtual bool models_Exists(LPCSTR name, bool no_prefetch = false);
 	virtual bool particles_Exists(LPCSTR name);
 	
 	// anglobes: Sun Values
@@ -427,6 +427,11 @@ public:
 	// Main
 	virtual void Calculate();
 	virtual void Render();
+	virtual void RenderUI3DDirect();
+	bool GetUI3DIconAtlasInfo(u32& width, u32& height, float& resolution) override;
+	bool BeginUI3DIconAtlas() override;
+	void BeginUI3DIconAtlasItem() override;
+	void EndUI3DIconAtlas() override;
 	virtual void Screenshot(ScreenshotMode mode = SM_NORMAL, LPCSTR name = 0);
 	virtual void Screenshot(ScreenshotMode mode, CMemoryWriter& memory_writer);
 	virtual void ScreenshotAsyncBegin();

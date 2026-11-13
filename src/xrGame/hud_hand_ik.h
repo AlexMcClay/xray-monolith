@@ -49,6 +49,12 @@ private:
 		u16 id = BI_NONE;
 		bool active = false;
 		Fmatrix target;
+		// The callback the bone had before this one (upstream's arm IK, IKHandCallback), run while this bone isn't
+		// active, so a script can still use level.set_arm_ik_enabled / set_hand_target_transform
+		BoneCallback prev = nullptr;
+		void* prev_param = nullptr;
+		u32 prev_type = 0;
+		BOOL prev_overwrite = FALSE;
 	};
 	static void _BCL callback(CBoneInstance* B);
 	bool hook(SBone& b, LPCSTR name);
