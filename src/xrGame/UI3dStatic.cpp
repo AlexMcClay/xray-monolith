@@ -48,6 +48,23 @@ bool IsEffectivelyVisible(CUIWindow* window)
     return true;
 }
 
+// An object that has never been drawn in the world (an item in a backpack) has never had its bones calculated:
+// its attachments would sit on unset bones and its box would lack them. Calculated before drawing (an early out
+// when done this frame), the object's model first, then each world attachment's.
+void CalculateVisualBones(IRenderVisual* visual)
+{
+	if (IKinematics* kinematics = visual ? visual->dcast_PKinematics() : nullptr)
+		kinematics->CalculateBones(TRUE);
+}
+
+void CalculateAttachmentBones(script_attachment* att)
+{
+	CalculateVisualBones(att->Visual());
+	for (auto& pair : *att->GetAttachments())
+		if (pair.second->GetType() == eSA_World)
+			CalculateAttachmentBones(pair.second);
+}
+
 void DeleteTemporaryVisuals()
 {
     for (IRenderVisual* visual : temp_visuals)
@@ -263,6 +280,10 @@ void CUI3dStatic::QueueVisuals(const Frect& target_rect, float target_width, flo
     if (ValidateCurrentItem())
     {
         IRenderVisual* visual = m_pCurrentItem->Visual();
+        CalculateVisualBones(visual);
+        for (auto pair : *m_pCurrentItem->GetAttachments())
+            if (pair.second->GetType() == eSA_World)
+                CalculateAttachmentBones(pair.second);
         vis_data& visual_data = m_pCurrentItem->Visual()->getVisData();
 
         Fmatrix matrix = DrawVisualIcon(visual, visual_data, target_rect,
@@ -328,6 +349,7 @@ Fvector2 CUI3dStatic::ProjectPoint(const Fvector& pos)
     IRenderVisual* visual = ValidateCurrentItem() ? m_pCurrentItem->Visual() : m_pFakeVisual;
     if (!visual)
         return res;
+    CalculateVisualBones(visual);
 
     // As the direct path draws it (the atlas draws the same picture into this rectangle)
     Frect rect;
