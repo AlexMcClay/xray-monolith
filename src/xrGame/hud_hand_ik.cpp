@@ -130,10 +130,26 @@ void player_hud::set_ik_fingers(u32 hand, LPCSTR pose, float weight)
 }
 
 // The arm model's transform (HUD space): hand 0 the right arm (m_transform), 1 the left (m_transform_2). Upstream's
-// level.get_hud_transform() gives the left one only.
+// hud_adjust.get_hud_transform() gives the left one only.
 Fmatrix player_hud::get_arm_transform(u32 hand)
 {
 	return hand == 0 ? m_transform : m_transform_2;
+}
+
+// The hand bone as animated (before any IK) in its arm model's space: hand 0 r_hand of the right arm, 1 l_hand of the
+// left (upstream's arm IK bones). Identity without the bone. Upstream's hud_adjust.hands_bone_anim_pos needs the bone's
+// id and picks the model by it (ids up to 20 the left arm), which Lua can't look up for the HUD hands.
+Fmatrix player_hud::get_hand_anim(u32 hand)
+{
+	Fmatrix res = Fidentity;
+	if (hand > 1)
+		return res;
+	const u16 bone = m_arm_ik[1 - hand].bones[3];
+	IKinematicsAnimated* model = hand == 0 ? m_model : m_model_2;
+	IKinematics* K = model ? model->dcast_PKinematics() : nullptr;
+	if (K && bone != BI_NONE && bone < K->LL_BoneCount())
+		K->Bone_GetAnimPos(res, bone, u8(-1), true);
+	return res;
 }
 
 // A HUD item in the hands (item 0 the main one, 1 the left hand's such as a detector, 2 the scope) and its model's

@@ -20,6 +20,7 @@ void player_hud::script_register(lua_State* L)
 		// the hands (hand 0 right, 1 left): this frame's finger pose, an arm model's transform (hud_hand_ik.script)
 		.def("set_ik_fingers", &player_hud::set_ik_fingers)
 		.def("get_arm_transform", &player_hud::get_arm_transform)
+		.def("get_hand_anim", &player_hud::get_hand_anim)
 		.def("item_attached", &player_hud::item_attached)
 		.def("get_item_transform", &player_hud::get_item_transform)
 		// animation layers: a HUD motion on one bone partition of a HUD item's model, over what the item plays

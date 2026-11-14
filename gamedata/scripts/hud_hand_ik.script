@@ -1,7 +1,7 @@
 --[=[
 	HUD hand IK for scripts (ships with the engine, like gunsmith_callbacks.script; not Gunsmith-specific).
 
-	Puts a first-person hand on a target with upstream's arm IK (level.set_hand_target_transform /
+	Puts a first-person hand on a target with upstream's arm IK (hud_adjust.set_hand_target_transform /
 	set_arm_ik_enabled, solved in player_hud::solve_hand_ik), and a finger pose on the left hand
 	(player_hud:set_ik_fingers). Everything here runs from upstream's per-frame IK hook, _G.COnHudIKTarget (chained:
 	another script's hook still runs first), where the hands' bones are calculated right after.
@@ -32,7 +32,6 @@
 --]=]
 
 local IK_BLEND = 4                       -- a target's weight moves at most this much a second
-local HAND_BONE = { [0] = "r_hand", [1] = "l_hand" }
 
 local state = {}
 for h = 0, 1 do
@@ -40,8 +39,8 @@ for h = 0, 1 do
 end
 local sources = {}                       -- { { name, fn } } in the order added
 local ours = { [0] = false, [1] = false } -- upstream's arm IK switched on here
-local bone_ids = {}
 local last_t
+local failed = false                     -- an error in update: logged once, then the hook stays quiet
 
 -- ---------------------------------------------------------------- matrices
 local function copy(m)
@@ -92,22 +91,10 @@ local function hud()
 	return get_player_hud and get_player_hud() or nil
 end
 
-local function hand_bone(hand)
-	local id = bone_ids[hand]
-	if id == nil and db.actor then
-		id = db.actor:bone_id(HAND_BONE[hand], true)
-		bone_ids[hand] = id
-	end
-	return id
-end
-
 -- the hand as animated (before any IK), in its arm model's space
 local function anim_hand(hand)
-	local id = hand_bone(hand)
-	if not id or id == 65535 then
-		return nil
-	end
-	return level.hands_bone_anim_pos(id)
+	local h = hud()
+	return h and h:get_hand_anim(hand) or nil
 end
 
 -- a HUD item's frame (its model space, or its HUD model bone's), in HUD space; nil without the item in the hands
@@ -265,16 +252,16 @@ local function update()
 			s.weight = 0
 		end
 		if target and w and w > 0 then
-			level.set_hand_target_transform(hand, blend(a, target, math.min(w, 1)))
-			if not level.get_arm_ik_enabled(hand) then
-				level.set_arm_ik_enabled(hand, true)
+			hud_adjust.set_hand_target_transform(hand, blend(a, target, math.min(w, 1)))
+			if not hud_adjust.get_arm_ik_enabled(hand) then
+				hud_adjust.set_arm_ik_enabled(hand, true)
 				ours[hand] = true
 			end
 			if fingers and fw and fw > 0 then
 				h:set_ik_fingers(hand, pose_string(fingers), math.min(fw, 1))
 			end
 		elseif ours[hand] then
-			level.set_arm_ik_enabled(hand, false)
+			hud_adjust.set_arm_ik_enabled(hand, false)
 			ours[hand] = false
 		end
 		if not s.set and s.weight <= 0 then
@@ -283,12 +270,26 @@ local function update()
 	end
 end
 
+-- upstream calls the hook unprotected from the engine: an error there is a crash, so it is caught here
 local prev_hook
 local function hook()
 	if prev_hook then
 		prev_hook()
 	end
-	update()
+	if failed then
+		return
+	end
+	local ok, err = pcall(update)
+	if not ok then
+		failed = true
+		printf("! hud_hand_ik: %s (hand IK off until the next load)", tostring(err))
+		for h = 0, 1 do
+			if ours[h] then
+				pcall(hud_adjust.set_arm_ik_enabled, h, false)
+				ours[h] = false
+			end
+		end
+	end
 end
 
 function on_game_start()
@@ -297,8 +298,8 @@ function on_game_start()
 		_G.COnHudIKTarget = hook
 	end
 	RegisterScriptCallback("on_game_load", function()
-		bone_ids = {}
 		last_t = nil
+		failed = false
 		for h = 0, 1 do
 			state[h] = { set = false, want = 1, weight = 0 }
 			ours[h] = false

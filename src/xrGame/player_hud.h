@@ -485,6 +485,7 @@ public:
 	// script (player_hud:...): hand 0 right, 1 left (hud_hand_ik.cpp)
 	void set_ik_fingers(u32 hand, LPCSTR pose, float weight);
 	Fmatrix get_arm_transform(u32 hand);
+	Fmatrix get_hand_anim(u32 hand);
 	bool item_attached(u32 item);
 	Fmatrix get_item_transform(u32 item);
 	// script (player_hud:...): animation layers on HUD item `item`'s model (attachable_hud_item::layer_play)
