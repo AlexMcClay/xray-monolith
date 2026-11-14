@@ -78,7 +78,8 @@ void CUIStatic::script_register(lua_State* L)
 		.def("SetRotation", &CUI3dStatic::SetRotation)
 		.def("SetScale", &CUI3dStatic::SetScale)
 		.def("ProjectPoint", &CUI3dStatic::ProjectPoint)
-		.def("SetFixedFit", &CUI3dStatic::SetFixedFit),
+		.def("SetFixedFit", &CUI3dStatic::SetFixedFit)
+		.def("GetModelRect", &CUI3dStatic::GetModelRect),
 
 		class_<CUISleepStatic, CUIStatic>("CUISleepStatic")
 		.def(constructor<>())

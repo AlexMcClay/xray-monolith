@@ -368,6 +368,35 @@ Fvector2 CUI3dStatic::ProjectPoint(const Fvector& pos)
     return res;
 }
 
+Frect CUI3dStatic::GetModelRect()
+{
+    Frect res;
+    res.set(-1.f, -1.f, -1.f, -1.f);
+    IRenderVisual* visual = ValidateCurrentItem() ? m_pCurrentItem->Visual() : m_pFakeVisual;
+    if (!visual)
+        return res;
+    CalculateVisualBones(visual);
+    Fbox box = visual->getVisData().box;
+    if (!box.is_valid())
+        return res;
+    for (u32 i = 0; i < 8; ++i)
+    {
+        Fvector p;
+        box.getpoint(i, p);
+        const Fvector2 s = ProjectPoint(p);
+        if (i == 0)
+            res.set(s.x, s.y, s.x, s.y);
+        else
+        {
+            res.x1 = _min(res.x1, s.x);
+            res.y1 = _min(res.y1, s.y);
+            res.x2 = _max(res.x2, s.x);
+            res.y2 = _max(res.y2, s.y);
+        }
+    }
+    return res;
+}
+
 Fmatrix CUI3dStatic::ItemTransform(vis_data& vis_data, const Frect& target_rect, float target_width,
     float target_height, float target_aspect)
 {

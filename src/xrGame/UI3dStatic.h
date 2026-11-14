@@ -29,6 +29,8 @@ public:
     // Where a point in the shown model's space (the object's or the visual's) is drawn, in UI coordinates (as
     // GetAbsoluteRect), for markers on the model. (-1, -1) with nothing shown.
     Fvector2 ProjectPoint(const Fvector& pos);
+    // The shown model's box as drawn, in UI coordinates (its 8 corners projected); all -1 with nothing shown.
+    Frect GetModelRect();
 
     virtual void Draw();
 
