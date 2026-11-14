@@ -101,6 +101,7 @@ private:
 	u16 m_script_light_bone;
 
 	bool m_bStopAtEndAnimIsRunning, m_bCamCollision;
+	bool m_bParentLighting = false; // set_parent_lighting: drawn with the parent's lighting (see renderable_Render)
 	u32 m_anim_end;
 
 	u16 m_type;
@@ -365,6 +366,8 @@ public:
 	void ResetShaderTexture(int id);
 
     void SetCamCollide(bool b) { m_bCamCollision = b; }
+    void SetParentLighting(bool b) { m_bParentLighting = b; }
+    bool GetParentLighting() { return m_bParentLighting; }
     bool GetCamCollide() { return m_bCamCollision; }
 
 	DECLARE_SCRIPT_REGISTER_FUNCTION

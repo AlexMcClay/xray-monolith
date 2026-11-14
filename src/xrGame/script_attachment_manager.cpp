@@ -404,7 +404,22 @@ void script_attachment::renderable_Render()
     if (!m_bVisible) return;
 	Visual()->getVisData().hom_frame = Device.dwFrame;
 
-    ::Render->set_Object(this);
+	// set_parent_lighting(true): lit as part of what it hangs on, as the parent's own child models are: a first-person
+	// attachment with the view entity's lighting (the HUD pass's object, CHUDManager::Render_First), a world one with
+	// its top-level parent object's. Its own lighting cache isn't used (no fade-in, no rays of its own).
+	IRenderable* lit = this;
+	if (m_bParentLighting)
+	{
+		if (m_type == eSA_HUD)
+		{
+			CObject* O = g_pGameLevel ? g_pGameLevel->CurrentViewEntity() : nullptr;
+			if (O && O->H_Root())
+				lit = O->H_Root();
+		}
+		else if (m_toplevel_parent)
+			lit = m_toplevel_parent;
+	}
+    ::Render->set_Object(lit);
 	::Render->set_CustomFOV(m_custom_fov);
 	::Render->set_Transform(&renderable.xform);
 	::Render->add_Visual(Visual());
@@ -884,6 +899,15 @@ void script_attachment::CopyLighting(IRenderable* to, IRenderable* from)
 	impl->approximate = src->approximate;
 	CopyMemory(impl->hemi_cube, src->hemi_cube, sizeof(impl->hemi_cube));
 	CopyMemory(impl->hemi_cube_smooth, src->hemi_cube_smooth, sizeof(impl->hemi_cube_smooth));
+	// the sky and sun rays already cast: without them the first update snaps the smoothed values to the few rays an
+	// object casts in its first frame and the lighting flickers while the rest come in
+	CopyMemory(impl->result, src->result, sizeof(impl->result));
+	impl->result_count = src->result_count;
+	impl->result_iterator = src->result_iterator;
+	impl->result_sun = src->result_sun;
+	impl->smooth_snapped = true;
+	// (last_position and sky_rays_uptodate exist only in the renderers' build of CROS_impl: the copy re-casts
+	// its sky rays one by one from the copied results, without a jump)
 }
 
 void script_attachment::SetParent(script_attachment* att)
