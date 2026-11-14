@@ -256,6 +256,17 @@ u32 gs_icon_cache_clear()
 	return gunsmith::icon_cache::clear();
 }
 
+// A gun section's stock build (its gs_default_build) as a part tree, as game_object:gs_get_tree() gives one; empty
+// for a section that isn't a full-mode gun. For previews of a section with no object (trader showcases).
+::luabind::object gs_default_tree_script(lua_State* L, LPCSTR section)
+{
+	if (!section || !pSettings->section_exist(section) || !gunsmith::is_full_mode(section))
+		return ::luabind::newtable(L);
+	gunsmith::CTree tree;
+	tree.build_default(section, 0);
+	return gunsmith::tree_to_lua(L, tree);
+}
+
 ::luabind::object gs_icon_section_script(lua_State* L, LPCSTR section)
 {
 	gunsmith::CPreview::SIcon icon;
@@ -403,6 +414,7 @@ void gunsmith_script_register(lua_State* L)
 		def("icon", &gs_icon_script, raw<1>()),
 		def("icon_token", &gs_icon_token),
 		def("icon_section", &gs_icon_section_script, raw<1>()),
+		def("default_tree", &gs_default_tree_script, raw<1>()),
 		def("preload_models", &gs_preload_models),
 		def("icon_cache_clear", &gs_icon_cache_clear),
 		def("preview_texture", &gs_preview_texture),

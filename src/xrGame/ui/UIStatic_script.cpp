@@ -79,7 +79,10 @@ void CUIStatic::script_register(lua_State* L)
 		.def("SetScale", &CUI3dStatic::SetScale)
 		.def("ProjectPoint", &CUI3dStatic::ProjectPoint)
 		.def("SetFixedFit", &CUI3dStatic::SetFixedFit)
-		.def("GetModelRect", &CUI3dStatic::GetModelRect),
+		.def("GetModelRect", &CUI3dStatic::GetModelRect)
+		.def("AddVisual", &CUI3dStatic::AddVisual)
+		.def("ClearVisuals", &CUI3dStatic::ClearVisuals)
+		.def("SetVisualBoneVisible", &CUI3dStatic::SetVisualBoneVisible),
 
 		class_<CUISleepStatic, CUIStatic>("CUISleepStatic")
 		.def(constructor<>())

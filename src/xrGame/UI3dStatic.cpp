@@ -94,6 +94,7 @@ CUI3dStatic::~CUI3dStatic()
 {
     ui_3d_statics.erase(std::remove(ui_3d_statics.begin(), ui_3d_statics.end(), this), ui_3d_statics.end());
 
+    ClearVisuals();
     if (m_pFakeVisual)
     {
         ::Render->model_Delete(m_pFakeVisual);
@@ -277,24 +278,129 @@ void CUI3dStatic::QueueVisuals(const Frect& target_rect, float target_width, flo
     // Icons have no scene renderable owner; queued meshes must not retain the previous one.
     ::Render->set_Object(nullptr);
 
-    if (ValidateCurrentItem())
-    {
-        IRenderVisual* visual = m_pCurrentItem->Visual();
-        CalculateVisualBones(visual);
-        for (auto pair : *m_pCurrentItem->GetAttachments())
-            if (pair.second->GetType() == eSA_World)
-                CalculateAttachmentBones(pair.second);
-        vis_data& visual_data = m_pCurrentItem->Visual()->getVisData();
+    IRenderVisual* visual;
+    Fbox box;
+    float radius;
+    if (!FitBox(visual, box, radius))
+        return;
 
-        Fmatrix matrix = DrawVisualIcon(visual, visual_data, target_rect,
-            target_width, target_height, target_aspect);
+    const Fmatrix matrix = DrawVisualIcon(visual, box, radius, target_rect, target_width, target_height, target_aspect);
+    if (m_pCurrentItem)
+    {
         for (auto pair : *m_pCurrentItem->GetAttachments())
             if (pair.second->GetType() == eSA_World)
                 DrawAttachmentIcon(pair.second, matrix, visual->dcast_PKinematics());
     }
-    else if (m_pFakeVisual)
-        DrawVisualIcon(m_pFakeVisual, m_pFakeVisual->getVisData(), target_rect,
-            target_width, target_height, target_aspect);
+    else
+    {
+        for (const SExtraVisual& e : m_extraVisuals)
+        {
+            Fmatrix m;
+            m.mul_43(matrix, e.local);
+            ::Render->set_Transform(&m);
+            ::Render->add_Visual(e.visual);
+        }
+    }
+}
+
+bool CUI3dStatic::FitBox(IRenderVisual*& visual, Fbox& box, float& radius)
+{
+    if (ValidateCurrentItem())
+    {
+        visual = m_pCurrentItem->Visual();
+        CalculateVisualBones(visual);
+        for (auto pair : *m_pCurrentItem->GetAttachments())
+            if (pair.second->GetType() == eSA_World)
+                CalculateAttachmentBones(pair.second);
+        box = visual->getVisData().box;
+        radius = visual->getVisData().sphere.R;
+        return true;
+    }
+    if (!m_pFakeVisual)
+        return false;
+    visual = m_pFakeVisual;
+    UpdateExtraVisuals();
+    box = visual->getVisData().box;
+    for (const SExtraVisual& e : m_extraVisuals)
+    {
+        Fbox b = e.visual->getVisData().box;
+        b.xform(e.local);
+        box.merge(b);
+    }
+    radius = m_extraVisuals.empty() ? visual->getVisData().sphere.R : box.getradius();
+    return true;
+}
+
+IRenderVisual* CUI3dStatic::ExtraParent(int parent) const
+{
+    if (parent < 0)
+        return m_pFakeVisual;
+    return parent < int(m_extraVisuals.size()) ? m_extraVisuals[parent].visual : nullptr;
+}
+
+// Each extra model's place in the SetVisual model's space: its parent's place times its parent's bone times its
+// offset (script_attachment: parent x BoneTransform x offset). Parents come first.
+void CUI3dStatic::UpdateExtraVisuals()
+{
+    CalculateVisualBones(m_pFakeVisual);
+    for (SExtraVisual& e : m_extraVisuals)
+    {
+        IRenderVisual* parent = ExtraParent(e.parent);
+        IKinematics* K = parent ? parent->dcast_PKinematics() : nullptr;
+        Fmatrix bone;
+        bone.identity();
+        if (K)
+        {
+            u16 id = e.bone.size() ? K->LL_BoneID(e.bone) : BI_NONE;
+            if (id == BI_NONE)
+                id = K->LL_GetBoneRoot();
+            bone = K->LL_GetTransform(id);
+        }
+        if (e.parent < 0)
+            e.local = bone;
+        else
+            e.local.mul_43(m_extraVisuals[e.parent].local, bone);
+        e.local.mulB_43(e.offset);
+        CalculateVisualBones(e.visual);
+    }
+}
+
+int CUI3dStatic::AddVisual(LPCSTR name, int parent, LPCSTR bone, const Fmatrix& offset)
+{
+    if (!m_pFakeVisual || !name || !xr_strlen(name) || parent >= int(m_extraVisuals.size()))
+        return -1;
+    IRenderVisual* visual = ::Render->model_Create(name);
+    if (!visual)
+        return -1;
+    if (IKinematics* kinematics = visual->dcast_PKinematics())
+        kinematics->CalculateBones(TRUE);
+    SExtraVisual e;
+    e.visual = visual;
+    e.parent = parent < 0 ? -1 : parent;
+    e.bone = bone ? bone : "";
+    e.offset = offset;
+    e.local.identity();
+    m_extraVisuals.push_back(e);
+    return int(m_extraVisuals.size()) - 1;
+}
+
+void CUI3dStatic::ClearVisuals()
+{
+    for (SExtraVisual& e : m_extraVisuals)
+        ::Render->model_Delete(e.visual);
+    m_extraVisuals.clear();
+}
+
+void CUI3dStatic::SetVisualBoneVisible(int index, LPCSTR bone, bool visible)
+{
+    IRenderVisual* visual = index < 0 ? m_pFakeVisual : ExtraParent(index);
+    IKinematics* K = visual ? visual->dcast_PKinematics() : nullptr;
+    const u16 id = K && bone ? K->LL_BoneID(bone) : BI_NONE;
+    if (id == BI_NONE)
+        return;
+    K->LL_SetBoneVisible(id, visible ? TRUE : FALSE, TRUE);
+    K->CalculateBones_Invalidate();
+    K->CalculateBones(TRUE);
 }
 
 bool CUI3dStatic::ValidateCurrentItem()
@@ -326,14 +432,14 @@ bool CUI3dStatic::ValidateCurrentItem()
     return false;
 }
 
-Fmatrix CUI3dStatic::DrawVisualIcon(IRenderVisual* visual, vis_data& vis_data, const Frect& target_rect,
+Fmatrix CUI3dStatic::DrawVisualIcon(IRenderVisual* visual, const Fbox& box, float radius, const Frect& target_rect,
     float target_width, float target_height, float target_aspect)
 {
     Fmatrix camera_matrix;
     camera_matrix = Device.mView;
     camera_matrix.invert();
 
-    Fmatrix matrix = ItemTransform(vis_data, target_rect, target_width, target_height, target_aspect);
+    Fmatrix matrix = ItemTransform(box, radius, target_rect, target_width, target_height, target_aspect);
     matrix.mulA_43(camera_matrix);
 
     ::Render->set_Transform(&matrix);
@@ -346,16 +452,17 @@ Fvector2 CUI3dStatic::ProjectPoint(const Fvector& pos)
 {
     Fvector2 res;
     res.set(-1.f, -1.f);
-    IRenderVisual* visual = ValidateCurrentItem() ? m_pCurrentItem->Visual() : m_pFakeVisual;
-    if (!visual)
+    IRenderVisual* visual;
+    Fbox box;
+    float radius;
+    if (!FitBox(visual, box, radius))
         return res;
-    CalculateVisualBones(visual);
 
     // As the direct path draws it (the atlas draws the same picture into this rectangle)
     Frect rect;
     GetAbsoluteRect(rect);
     const float target_width = 1024.f, target_height = 768.f, target_aspect = Device.fASPECT;
-    const Fmatrix matrix = ItemTransform(visual->getVisData(), rect, target_width, target_height, target_aspect);
+    const Fmatrix matrix = ItemTransform(box, radius, rect, target_width, target_height, target_aspect);
     Fvector p;
     matrix.transform_tiny(p, pos);
 
@@ -372,12 +479,10 @@ Frect CUI3dStatic::GetModelRect()
 {
     Frect res;
     res.set(-1.f, -1.f, -1.f, -1.f);
-    IRenderVisual* visual = ValidateCurrentItem() ? m_pCurrentItem->Visual() : m_pFakeVisual;
-    if (!visual)
-        return res;
-    CalculateVisualBones(visual);
-    Fbox box = visual->getVisData().box;
-    if (!box.is_valid())
+    IRenderVisual* visual;
+    Fbox box;
+    float radius;
+    if (!FitBox(visual, box, radius) || !box.is_valid())
         return res;
     for (u32 i = 0; i < 8; ++i)
     {
@@ -397,7 +502,7 @@ Frect CUI3dStatic::GetModelRect()
     return res;
 }
 
-Fmatrix CUI3dStatic::ItemTransform(vis_data& vis_data, const Frect& target_rect, float target_width,
+Fmatrix CUI3dStatic::ItemTransform(const Fbox& box, float radius, const Frect& target_rect, float target_width,
     float target_height, float target_aspect)
 {
     float x1, y1, x2, y2;
@@ -409,7 +514,7 @@ Fmatrix CUI3dStatic::ItemTransform(vis_data& vis_data, const Frect& target_rect,
     const float available_height = _abs(y2 - y1);
 
     Fvector box_center;
-    vis_data.box.getcenter(box_center);
+    box.getcenter(box_center);
 
     Fmatrix fit_transform;
     fit_transform.translate(-box_center.x, -box_center.y, -box_center.z);
@@ -419,7 +524,7 @@ Fmatrix CUI3dStatic::ItemTransform(vis_data& vis_data, const Frect& target_rect,
     // these projected X/Y extents makes m_scale == 1 fill the available icon
     // rectangle while preserving the model's aspect ratio.
     Fbox rotated_box;
-    rotated_box.xform(vis_data.box, fit_transform);
+    rotated_box.xform(box, fit_transform);
     Fvector rotated_size;
     Fvector rotated_center;
     rotated_box.getsize(rotated_size);
@@ -427,11 +532,11 @@ Fmatrix CUI3dStatic::ItemTransform(vis_data& vis_data, const Frect& target_rect,
 
     float scale;
     if (m_fixedFit)
-        scale = _min(available_width, available_height) / _max(vis_data.sphere.R * 2.f, EPS_S) * m_scale;
+        scale = _min(available_width, available_height) / _max(radius * 2.f, EPS_S) * m_scale;
     else if (rotated_size.x > EPS_S && rotated_size.y > EPS_S)
         scale = _min(available_width / rotated_size.x, available_height / rotated_size.y) * m_scale;
     else
-        scale = _min(available_width, available_height) / _max(vis_data.sphere.R * 2.f, EPS_S) * m_scale;
+        scale = _min(available_width, available_height) / _max(radius * 2.f, EPS_S) * m_scale;
 
     // Numerical and asymmetric-box offsets are removed after rotation so the
     // fitted projected bounds are centered in the UI rectangle.
@@ -470,6 +575,7 @@ void CUI3dStatic::DrawAttachmentIcon(script_attachment* att, const Fmatrix& matr
 
 void CUI3dStatic::SetObject(CScriptGameObject* obj)
 {
+    ClearVisuals();
     if (m_pFakeVisual)
     {
         ::Render->model_Delete(m_pFakeVisual);
@@ -502,6 +608,7 @@ void CUI3dStatic::SetVisual(LPCSTR name)
         m_currentItemId = u16(-1);
     }
 
+    ClearVisuals();
     if (m_pFakeVisual)
     {
         ::Render->model_Delete(m_pFakeVisual);
