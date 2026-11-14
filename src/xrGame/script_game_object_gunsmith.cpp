@@ -328,6 +328,23 @@ void set_hud_round_slots_script(CScriptGameObject* self, LPCSTR chambers, LPCSTR
 	return t;
 }
 
+// A fitted part's first-person frame as the engine places it, in the gun's HUD model space (times
+// player_hud:get_item_transform(0) for HUD space), or nil: the gun not in the hands, no such node, the part not
+// placed. Phase 3's script attachments are only the drawn copy; this is the placement aim and the grip use.
+::luabind::object gs_hud_part_frame_script(lua_State* L, CScriptGameObject* self, int node)
+{
+	CWeapon* weapon = gs_weapon(self, "gs_hud_part_frame");
+	if (!weapon || node < 1 || node >= int(weapon->gs_tree().size()))
+		return ::luabind::object();
+	attachable_hud_item* hi = weapon->HudItemData();
+	if (!hi || !hi->m_model)
+		return ::luabind::object();
+	Fmatrix m;
+	if (!weapon->gs_visuals().part_frame(gunsmith::CVisuals::eHud, hi->m_model, u8(node), m))
+		return ::luabind::object();
+	return ::luabind::object(L, m);
+}
+
 // Sight modes: the sight aimed through's mode, { mode, count, zoom, sight } (mode from 0; zoom
 // its magnification, 1 = none; sight: which of the part's sights, from 0), or nil without a sight.
 ::luabind::object gs_sight_mode_script(lua_State* L, CScriptGameObject* self)
@@ -547,6 +564,7 @@ void gs_hud_bone_visible_script(CScriptGameObject* self, LPCSTR bone, bool visib
 		.def("gs_sight_mode", &gs_sight_mode_script, raw<1>())
 		.def("gs_hud_sight_point", &gs_hud_sight_point_script, raw<1>())
 		.def("gs_attachment_mounts", &gs_attachment_mounts_script, raw<1>())
+		.def("gs_hud_part_frame", &gs_hud_part_frame_script, raw<1>())
 		.def("gs_sights", &gs_sights_script, raw<1>())
 		.def("gs_sight_node", &gs_sight_node_script, raw<1>())
 		.def("gs_sight_set", &gs_sight_set_script, raw<1>())
