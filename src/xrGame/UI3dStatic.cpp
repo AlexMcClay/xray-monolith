@@ -397,7 +397,9 @@ Fmatrix CUI3dStatic::ItemTransform(vis_data& vis_data, const Frect& target_rect,
     rotated_box.getcenter(rotated_center);
 
     float scale;
-    if (rotated_size.x > EPS_S && rotated_size.y > EPS_S)
+    if (m_fixedFit)
+        scale = _min(available_width, available_height) / _max(vis_data.sphere.R * 2.f, EPS_S) * m_scale;
+    else if (rotated_size.x > EPS_S && rotated_size.y > EPS_S)
         scale = _min(available_width / rotated_size.x, available_height / rotated_size.y) * m_scale;
     else
         scale = _min(available_width, available_height) / _max(vis_data.sphere.R * 2.f, EPS_S) * m_scale;
