@@ -1,4 +1,4 @@
---[[
+--[=[
 	HUD hand IK for scripts (ships with the engine, like gunsmith_callbacks.script; not Gunsmith-specific).
 
 	Puts a first-person hand on a target with upstream's arm IK (level.set_hand_target_transform /
@@ -29,7 +29,7 @@
 
 	Gunsmith Docs research/44, phase 4 (14 Nov 2026): this replaces player_hud:set_ik_target and the other player_hud
 	hand IK calls, which the engine no longer has.
---]]
+--]=]
 
 local IK_BLEND = 4                       -- a target's weight moves at most this much a second
 local HAND_BONE = { [0] = "r_hand", [1] = "l_hand" }
