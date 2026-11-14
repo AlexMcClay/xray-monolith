@@ -40,6 +40,8 @@ end
 local sources = {}                       -- { { name, fn } } in the order added
 local ours = { [0] = false, [1] = false } -- upstream's arm IK switched on here
 local last_t
+local runs = 0                           -- hook calls since the load (status)
+local last_info = "no hand target yet"
 local failed = false                     -- an error in update: logged once, then the hook stays quiet
 
 -- ---------------------------------------------------------------- matrices
@@ -252,6 +254,8 @@ local function update()
 			s.weight = 0
 		end
 		if target and w and w > 0 then
+			last_info = string.format("hand %d on a target, weight %.2f, at %.3f %.3f %.3f (animated %.3f %.3f %.3f)",
+				hand, w, target.c.x, target.c.y, target.c.z, a.c.x, a.c.y, a.c.z)
 			hud_adjust.set_hand_target_transform(hand, blend(a, target, math.min(w, 1)))
 			if not hud_adjust.get_arm_ik_enabled(hand) then
 				hud_adjust.set_arm_ik_enabled(hand, true)
@@ -279,6 +283,10 @@ local function hook()
 	if failed then
 		return
 	end
+	runs = runs + 1
+	if runs == 1 then
+		printf("- hud_hand_ik: running (%s sources)", #sources)
+	end
 	local ok, err = pcall(update)
 	if not ok then
 		failed = true
@@ -292,6 +300,18 @@ local function hook()
 	end
 end
 
+-- run_string hud_hand_ik.status()
+function status()
+	local names = {}
+	for _, s in ipairs(sources) do
+		names[#names + 1] = s.name
+	end
+	printf("- hud_hand_ik: hook %s, %s calls since the load%s, sources: %s; left arm IK %s, right %s; %s",
+		_G.COnHudIKTarget == hook and "installed" or "NOT installed (another script replaced it)", runs,
+		failed and " (stopped after an error)" or "", table.concat(names, ", "),
+		tostring(hud_adjust.get_arm_ik_enabled(1)), tostring(hud_adjust.get_arm_ik_enabled(0)), last_info)
+end
+
 function on_game_start()
 	if _G.COnHudIKTarget ~= hook then
 		prev_hook = _G.COnHudIKTarget
@@ -300,6 +320,7 @@ function on_game_start()
 	RegisterScriptCallback("on_game_load", function()
 		last_t = nil
 		failed = false
+		runs = 0
 		for h = 0, 1 do
 			state[h] = { set = false, want = 1, weight = 0 }
 			ours[h] = false
