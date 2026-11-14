@@ -328,6 +328,31 @@ void set_hud_round_slots_script(CScriptGameObject* self, LPCSTR chambers, LPCSTR
 	return t;
 }
 
+// The slots' points of the gun's world build (CVisuals::slot_points: the middle of a fitted part, or where an empty
+// slot would mount), in its world model's space: { {node, slot, pos}, ... }. For markers on a 3D view of the gun.
+::luabind::object gs_slot_points_script(lua_State* L, CScriptGameObject* self)
+{
+	::luabind::object t = ::luabind::newtable(L);
+	CWeapon* weapon = gs_weapon(self, "gs_slot_points");
+	IKinematics* K = weapon && weapon->Visual() ? weapon->Visual()->dcast_PKinematics() : nullptr;
+	if (!K)
+		return t;
+	weapon->gs_visuals().ensure(gunsmith::CVisuals::eWorld, K, weapon->gs_tree(), weapon->cNameSect().c_str(), nullptr, true);
+	xr_vector<gunsmith::CVisuals::SSlotPoint> pts;
+	weapon->gs_visuals().slot_points(gunsmith::CVisuals::eWorld, K, weapon->gs_tree(), weapon->cNameSect().c_str(), nullptr,
+	                                 pts);
+	int i = 1;
+	for (const gunsmith::CVisuals::SSlotPoint& p : pts)
+	{
+		::luabind::object r = ::luabind::newtable(L);
+		r["node"] = int(p.node);
+		r["slot"] = int(p.slot);
+		r["pos"] = p.pos;
+		t[i++] = r;
+	}
+	return t;
+}
+
 // A fitted part's first-person frame as the engine places it, in the gun's HUD model space (times
 // player_hud:get_item_transform(0) for HUD space), or nil: the gun not in the hands, no such node, the part not
 // placed. Phase 3's script attachments are only the drawn copy; this is the placement aim and the grip use.
@@ -565,6 +590,7 @@ void gs_hud_bone_visible_script(CScriptGameObject* self, LPCSTR bone, bool visib
 		.def("gs_hud_sight_point", &gs_hud_sight_point_script, raw<1>())
 		.def("gs_attachment_mounts", &gs_attachment_mounts_script, raw<1>())
 		.def("gs_hud_part_frame", &gs_hud_part_frame_script, raw<1>())
+		.def("gs_slot_points", &gs_slot_points_script, raw<1>())
 		.def("gs_sights", &gs_sights_script, raw<1>())
 		.def("gs_sight_node", &gs_sight_node_script, raw<1>())
 		.def("gs_sight_set", &gs_sight_set_script, raw<1>())

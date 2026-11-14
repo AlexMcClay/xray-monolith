@@ -23,9 +23,16 @@ public:
     void SetObject(CScriptGameObject* obj);
     void SetVisual(LPCSTR name);
 
+    // Where a point in the shown model's space (the object's or the visual's) is drawn, in UI coordinates (as
+    // GetAbsoluteRect), for markers on the model. (-1, -1) with nothing shown.
+    Fvector2 ProjectPoint(const Fvector& pos);
+
     virtual void Draw();
 
 protected:
+    // The model's transform in item space (the camera's view space, before the camera), fitted to target_rect.
+    Fmatrix ItemTransform(vis_data& vis_data, const Frect& target_rect, float target_width, float target_height,
+        float target_aspect);
     Fvector m_angle;
     float dist, m_scale;
     bool m_bFirstUpdate;

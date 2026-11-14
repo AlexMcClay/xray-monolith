@@ -308,6 +308,47 @@ bool CUI3dStatic::ValidateCurrentItem()
 Fmatrix CUI3dStatic::DrawVisualIcon(IRenderVisual* visual, vis_data& vis_data, const Frect& target_rect,
     float target_width, float target_height, float target_aspect)
 {
+    Fmatrix camera_matrix;
+    camera_matrix = Device.mView;
+    camera_matrix.invert();
+
+    Fmatrix matrix = ItemTransform(vis_data, target_rect, target_width, target_height, target_aspect);
+    matrix.mulA_43(camera_matrix);
+
+    ::Render->set_Transform(&matrix);
+    ::Render->add_Visual(visual);
+
+    return matrix;
+}
+
+Fvector2 CUI3dStatic::ProjectPoint(const Fvector& pos)
+{
+    Fvector2 res;
+    res.set(-1.f, -1.f);
+    IRenderVisual* visual = ValidateCurrentItem() ? m_pCurrentItem->Visual() : m_pFakeVisual;
+    if (!visual)
+        return res;
+
+    // As the direct path draws it (the atlas draws the same picture into this rectangle)
+    Frect rect;
+    GetAbsoluteRect(rect);
+    const float target_width = 1024.f, target_height = 768.f, target_aspect = Device.fASPECT;
+    const Fmatrix matrix = ItemTransform(visual->getVisData(), rect, target_width, target_height, target_aspect);
+    Fvector p;
+    matrix.transform_tiny(p, pos);
+
+    // FromTargetToItem, inverted
+    const float halfwidth = target_width * 0.5f;
+    const float halfheight = target_height * 0.5f;
+    const float half_view_height = UI_3D_ICON_ORTHO_HEIGHT * 0.5f;
+    const float half_view_width = half_view_height / target_aspect;
+    res.set(p.x * halfwidth / half_view_width + halfwidth, halfheight - p.y * halfheight / half_view_height);
+    return res;
+}
+
+Fmatrix CUI3dStatic::ItemTransform(vis_data& vis_data, const Frect& target_rect, float target_width,
+    float target_height, float target_aspect)
+{
     float x1, y1, x2, y2;
 
     FromTargetToItem(target_rect.left, target_rect.top, target_width, target_height, target_aspect, x1, y1);
@@ -348,19 +389,9 @@ Fmatrix CUI3dStatic::DrawVisualIcon(IRenderVisual* visual, vis_data& vis_data, c
         (target_rect.top + target_rect.bottom) * 0.5f, target_width, target_height, target_aspect,
         right_item_offset, up_item_offset);
 
-    Fmatrix camera_matrix;
-    camera_matrix.identity();
-    camera_matrix = Device.mView;
-    camera_matrix.invert();
-
     Fmatrix matrix = fit_transform;
     matrix.mulA_43(Fmatrix().scale(scale, scale, scale));
     matrix.mulA_43(Fmatrix().translate(right_item_offset, up_item_offset, dist));
-    matrix.mulA_43(camera_matrix);
-
-    ::Render->set_Transform(&matrix);
-    ::Render->add_Visual(visual);
-
     return matrix;
 }
 
