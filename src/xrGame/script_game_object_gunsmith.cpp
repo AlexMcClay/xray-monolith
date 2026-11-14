@@ -271,7 +271,7 @@ void set_hud_round_slots_script(CScriptGameObject* self, LPCSTR chambers, LPCSTR
 	return ::luabind::object(L, p);
 }
 
-// Prototype (research/44 phase 2): the weapon's drawn parts as script attachments would need them, first person
+// Debug (research/44): the weapon's drawn parts as script attachments need them, as the engine places them, first person
 // (hud true, needs the weapon in the hands) or world: { node, section, parent (row number in this list, 0 = the
 // weapon's own model), model, bone, pos, rot (degrees, as script_attachment:set_rotation), scale, hidden = { bone
 // names }, follow }. Empty when the weapon has no drawn parts.

@@ -11,9 +11,12 @@
 #include "../Include/xrRender/KinematicsAnimated.h"
 #include "../Include/xrRender/RenderVisual.h"
 
-// gs_part_draw (console): 1 the part models are drawn here (default); 0 they are placed but not drawn, for the
-// attachments prototype (research/44 phase 2), which draws them as script attachments instead
-int g_gs_part_draw = 1;
+// gs_part_draw (console): who draws the part models (Gunsmith Docs research/44, phase 3).
+//   0 (default): the Framework draws them as upstream's script attachments (gunsmith_part_models.script); here only
+//      the parts with gs_follow_bones (launchers' moving tube and sights) and the parts mounted on them are drawn.
+//   1: every part model is drawn here, as before phase 3 (a fallback; the Framework script then draws nothing).
+// Either way every part is placed here: aim, the eye point, the fire point, devices, the grip and rounds read it.
+int g_gs_part_draw = 0;
 
 namespace gunsmith
 {
@@ -691,9 +694,17 @@ namespace gunsmith
 		if (c.children.empty() || c.root != root)
 			return;
 		update_local(c, root);
-		const bool draw = g_gs_part_draw != 0;
+		// drawn here: everything (gs_part_draw 1), else parts with follow bones and what hangs on them (children
+		// come after their parents in the list)
+		const bool all = g_gs_part_draw != 0;
+		xr_vector<u8> here;
+		here.resize(c.children.size(), all ? 1 : 0);
+		for (u32 n = 0; !all && n < c.children.size(); ++n)
+			here[n] = (!c.children[n].follow.empty() || (c.children[n].parent >= 0 && here[c.children[n].parent])) ? 1 : 0;
+		u32 idx = 0;
 		for (SChild& ch : c.children)
 		{
+			const bool draw = here[idx++] != 0;
 			IKinematicsAnimated* ka = ch.visual->dcast_PKinematicsAnimated();
 			if (draw && ka)
 				ka->UpdateTracks();
