@@ -868,6 +868,24 @@ void script_attachment::SetOrigin(float x, float y, float z)
 	RecalcOffset();
 }
 
+// A new attachment starts with its own lighting cache empty and fades in over about a second. Start it from the
+// lighting of what it hangs on instead (the same fields SetParentLevel copies from the actor).
+void script_attachment::CopyLighting(IRenderable* to, IRenderable* from)
+{
+	CROS_impl* impl = to ? smart_cast<CROS_impl*>(to->renderable_ROS()) : nullptr;
+	CROS_impl* src = from ? smart_cast<CROS_impl*>(from->renderable_ROS()) : nullptr;
+	if (!impl || !src)
+		return;
+	impl->dwFrameSmooth = src->dwFrameSmooth;
+	impl->hemi_value = src->hemi_value;
+	impl->hemi_smooth = src->hemi_smooth;
+	impl->sun_value = src->sun_value;
+	impl->sun_smooth = src->sun_smooth;
+	impl->approximate = src->approximate;
+	CopyMemory(impl->hemi_cube, src->hemi_cube, sizeof(impl->hemi_cube));
+	CopyMemory(impl->hemi_cube_smooth, src->hemi_cube_smooth, sizeof(impl->hemi_cube_smooth));
+}
+
 void script_attachment::SetParent(script_attachment* att)
 {
 	if (!att)
@@ -898,6 +916,7 @@ void script_attachment::SetParent(script_attachment* att)
 	m_parent_attachment->AddChild(GetName(), this);
 	SetTopLevelParent(m_parent_attachment->GetTopLevelParent());
 	OnParentCreatePhysicsShell();
+	CopyLighting(this, att);
 }
 
 void script_attachment::SetParent(CGameObject* obj)
@@ -931,6 +950,7 @@ void script_attachment::SetParent(CGameObject* obj)
 	m_parent_object->add_attachment(GetName(), this);
 	SetTopLevelParent(m_parent_object);
 	OnParentCreatePhysicsShell();
+	CopyLighting(this, obj);
 }
 
 void script_attachment::SetParent(CScriptGameObject* obj)
@@ -1252,6 +1272,8 @@ void script_attachment::SetType(u16 type)
 	m_type = new_type;
 	RefreshVisBoxChain(old_type);
 	RefreshVisBoxChain(new_type);
+	if (new_type == eSA_HUD && g_actor)
+		CopyLighting(this, g_actor);
 }
 
 void script_attachment::IterateAttachments(::luabind::functor<bool> functor)

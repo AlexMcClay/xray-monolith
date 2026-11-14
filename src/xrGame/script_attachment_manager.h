@@ -210,6 +210,8 @@ public:
 
 	void SetParent(script_attachment* att);
 	void SetParent(CGameObject* obj);
+	// Starts `to`'s lighting cache from `from`'s (a member: CROS_impl lets script_attachment at its fields)
+	static void CopyLighting(IRenderable* to, IRenderable* from);
 	void SetParent(CScriptGameObject* obj);
 	void SetParentLevel();
 	::luabind::object GetParent();
