@@ -193,8 +193,6 @@ protected:
 	virtual void gs_set_launcher(const shared_str& part, bool live) {}
 
 public:
-	// The left hand may take the fitted grip (grip IK; the grenade launcher's mode lets the animation have it).
-	virtual bool gs_grip_ik_allowed() const { return true; }
 	// The second fire point (the grenade launcher's): the fitted launcher part's `fire_point2`, if any.
 	virtual bool hud_fire_point2(IKinematics* model, const Fmatrix& xform, Fvector& pos);
 

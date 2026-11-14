@@ -1,4 +1,4 @@
--- Hand IK test: player_hud:set_ik_target and friends.
+-- Hand IK test: hud_hand_ik.set_target and friends (the engine's helper, gamedata/scripts/hud_hand_ik.script).
 -- Install this folder as its own mod. Hold any gun, then:
 --   NUMPAD7  left hand pinned to the gun FORWARD_CM further along the gun's Z axis than it is now (matrix form)
 --   NUMPAD8  left hand pinned to the gun's bone BONE where it is now (bone form; no jump expected)
@@ -34,26 +34,26 @@ local function on_key_press(dik)
 		return
 	end
 	if dik == DIK_keys.DIK_NUMPAD7 then
-		local h = hud:get_ik_hand(1)
-		hud:set_ik_target(1, moved(h, 0, 0, FORWARD_CM / 100))
+		local h = hud_hand_ik.get_hand(1)
+		hud_hand_ik.set_target(1, moved(h, 0, 0, FORWARD_CM / 100))
 		say(string.format("left hand: %d cm forward (hand at %.3f %.3f %.3f in the gun)", FORWARD_CM, h.c.x, h.c.y, h.c.z))
 	elseif dik == DIK_keys.DIK_NUMPAD8 then
-		local h = hud:get_ik_hand(1, 0, BONE)
-		hud:set_ik_target(1, h, 0, BONE)
+		local h = hud_hand_ik.get_hand(1, 0, BONE)
+		hud_hand_ik.set_target(1, h, 0, BONE)
 		say(string.format("left hand: pinned to bone %s (hand at %.3f %.3f %.3f in the bone)", BONE, h.c.x, h.c.y, h.c.z))
 	elseif dik == DIK_keys.DIK_NUMPAD9 then
-		local h = hud:get_ik_hand(0)
-		hud:set_ik_target(0, moved(h, 0, UP_CM / 100, 0))
+		local h = hud_hand_ik.get_hand(0)
+		hud_hand_ik.set_target(0, moved(h, 0, UP_CM / 100, 0))
 		say(string.format("right hand: %d cm up", UP_CM))
 	elseif dik == DIK_keys.DIK_NUMPAD4 then
 		half = not half
-		hud:set_ik_weight(1, half and 0.5 or 1)
-		say(string.format("left weight %.1f (now %.2f)", half and 0.5 or 1, hud:get_ik_weight(1)))
+		hud_hand_ik.set_weight(1, half and 0.5 or 1)
+		say(string.format("left weight %.1f (now %.2f)", half and 0.5 or 1, hud_hand_ik.get_weight(1)))
 	elseif dik == DIK_keys.DIK_NUMPAD0 then
-		hud:clear_ik_target(0)
-		hud:clear_ik_target(1)
+		hud_hand_ik.clear_target(0)
+		hud_hand_ik.clear_target(1)
 		half = false
-		say(string.format("cleared (weights now %.2f, %.2f)", hud:get_ik_weight(0), hud:get_ik_weight(1)))
+		say(string.format("cleared (weights now %.2f, %.2f)", hud_hand_ik.get_weight(0), hud_hand_ik.get_weight(1)))
 	end
 end
 

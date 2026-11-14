@@ -14,6 +14,6 @@ extern int g_gs_debug;
 enum
 {
 	eGsDebugPreview = 1, // the builder's preview and icons
-	eGsDebugGrip = 2, // the left hand's grip IK
+	// 2: was the grip IK's log (the grip is Lua since 14 Nov 2026: gunsmith_grip.debug())
 	eGsDebugAim = 4, // the sight calibration
 };

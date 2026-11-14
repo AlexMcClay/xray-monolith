@@ -180,31 +180,6 @@ namespace gunsmith
 			for (int i = 0, n = _GetItemCount(list); i < n; ++i)
 				v.round_mounts.push_back(_Trim(_GetItem(list, i, item)));
 		}
-		v.grip_priority = section ? READ_IF_EXISTS(pSettings, r_s32, section, "grip_priority", 1) : 1;
-		v.grip_type = section ? READ_IF_EXISTS(pSettings, r_s32, section, "grip_type", 0) : 0;
-		clamp(v.grip_type, 0, 1);
-		for (int t = 0; t < 2; ++t)
-		{
-			v.has_grip[t] = false;
-			string32 hand_key, fingers_key;
-			xr_sprintf(hand_key, "grip_hand_%d", t);
-			xr_sprintf(fingers_key, "grip_fingers_%d", t);
-			if (!section || !pSettings->line_exist(section, hand_key) || !pSettings->line_exist(section, fingers_key))
-				continue;
-			LPCSTR h = pSettings->r_string(section, hand_key), f = pSettings->r_string(section, fingers_key);
-			if (_GetItemCount(h) < 6 || _GetItemCount(f) < 45)
-				continue;
-			string64 item;
-			float hv[6];
-			for (int i = 0; i < 6; ++i)
-				hv[i] = (float)atof(_GetItem(h, i, item));
-			v.grip_hand[t] = make_xform(Fvector().set(hv[0], hv[1], hv[2]), Fvector().set(hv[3], hv[4], hv[5]));
-			for (int i = 0; i < 15; ++i)
-				v.grip_fingers[t][i].set(deg2rad((float)atof(_GetItem(f, i * 3, item))),
-										 deg2rad((float)atof(_GetItem(f, i * 3 + 1, item))),
-										 deg2rad((float)atof(_GetItem(f, i * 3 + 2, item))));
-			v.has_grip[t] = true;
-		}
 		// sight modes (of the first sight) and further sights
 		if (section && READ_IF_EXISTS(pSettings, r_u32, section, "gs_sight_modes", 1) > 1)
 		{

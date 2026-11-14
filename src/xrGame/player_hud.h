@@ -7,11 +7,6 @@
 #include "player_hud_legs.h"
 #include "hud_hand_ik.h"
 
-namespace gunsmith
-{
-	class CGripIK;
-}
-
 #define SCOPE_ATTACH_IDX 2
 
 class player_hud;
@@ -484,37 +479,14 @@ private:
 public:
 	IKinematicsAnimated* m_model;
 	IKinematicsAnimated* m_model_2;
-	gunsmith::CGripIK* m_gs_grip = nullptr; // the left hand on the fitted handguard or foregrip: a target for m_hand_ik[1]
-
-	// Hand IK (hud_hand_ik.h). Hand 0 is the right arm (m_model), 1 the left arm (m_model_2), as m_attached_items.
-	// A script target (set_ik_target) takes its hand while set or blending out; otherwise Gunsmith's grip IK may
-	// take the left hand. Cleared by default.
+	// Finger poses on the hands (hud_hand_ik.h): hand 0 is the right arm (m_model), 1 the left arm (m_model_2). The
+	// arms' IK is upstream's (solve_hand_ik), driven from Lua (hud_hand_ik.script).
 	CHudHandIK m_hand_ik[2];
-	struct SScriptIK
-	{
-		bool set = false;   // cleared: the hand blends back to the animation, then the target is dropped
-		Fmatrix offset;     // the hand bone's frame in the HUD item's model space, or in its bone's
-		u8 item = 0;        // m_attached_items index
-		shared_str bone;    // empty: the item's model space
-		float want = 1.f;   // set_ik_weight
-		float weight = 0.f; // now: moves toward want (0 when cleared) at most IK_BLEND a second
-	};
-	SScriptIK m_script_ik[2];
-	Fmatrix m_ik_anim_hand[2]; // each hand as animated this frame (before any IK), in its arm model's space
-	bool m_ik_anim_ok[2];
-	void update_hand_ik();
-	void free_hand_ik(); // hud_hand_ik.cpp, as the methods below
-	// the HUD item `item`'s model space (or its bone `bone`) in hand `hand`'s arm model space
-	bool ik_item_frame(u8 hand, u8 item, const shared_str& bone, Fmatrix& out);
-
-	// script (player_hud:...): hand 0 right, 1 left; item 0 the main item, 1 the left hand's (detector)
-	void set_ik_target(u32 hand, const Fmatrix& m);
-	void set_ik_target_bone(u32 hand, const Fmatrix& m, u32 item, LPCSTR bone);
-	void clear_ik_target(u32 hand);
-	void set_ik_weight(u32 hand, float weight);
-	float get_ik_weight(u32 hand);
-	Fmatrix get_ik_hand(u32 hand);
-	Fmatrix get_ik_hand_bone(u32 hand, u32 item, LPCSTR bone);
+	// script (player_hud:...): hand 0 right, 1 left (hud_hand_ik.cpp)
+	void set_ik_fingers(u32 hand, LPCSTR pose, float weight);
+	Fmatrix get_arm_transform(u32 hand);
+	bool item_attached(u32 item);
+	Fmatrix get_item_transform(u32 item);
 	// script (player_hud:...): animation layers on HUD item `item`'s model (attachable_hud_item::layer_play)
 	bool play_item_layer(u32 item, LPCSTR part, LPCSTR anm, float speed, bool loop);
 	void stop_item_layer(u32 item, LPCSTR part);

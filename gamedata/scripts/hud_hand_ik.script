@@ -1,0 +1,307 @@
+--[[
+	HUD hand IK for scripts (ships with the engine, like gunsmith_callbacks.script; not Gunsmith-specific).
+
+	Puts a first-person hand on a target with upstream's arm IK (level.set_hand_target_transform /
+	set_arm_ik_enabled, solved in player_hud::solve_hand_ik), and a finger pose on the left hand
+	(player_hud:set_ik_fingers). Everything here runs from upstream's per-frame IK hook, _G.COnHudIKTarget (chained:
+	another script's hook still runs first), where the hands' bones are calculated right after.
+
+	hand: 0 the right hand, 1 the left. item: 0 the main item in the hands, 1 the left hand's (a detector), 2 the scope.
+	Matrices are engine matrices (matrix()).
+
+	  hud_hand_ik.set_target(hand, m [, item [, bone]])   the hand bone on m, a frame in the item's model space (or in
+	                                                      its HUD model bone's); the weight blends in at 4 a second
+	  hud_hand_ik.set_target_world(hand, m)               the hand bone on m, a world frame (shown as the HUD sees it)
+	  hud_hand_ik.clear_target(hand)                      blends back to the animation at 4 a second, then lets go
+	  hud_hand_ik.set_weight(hand, w)                     how far onto the target (0..1, default 1)
+	  hud_hand_ik.get_weight(hand)                        the weight now
+	  hud_hand_ik.get_hand(hand [, item [, bone]])        the hand as animated (before any IK), in the item's space
+	  hud_hand_ik.get_hand_world(hand)                    the same in the world
+	  hud_hand_ik.set_fingers(hand, pose [, weight])      a finger pose with the target (the left hand): 45 numbers, h p b
+	                                                      in degrees of the 15 fingers (a string or a table), as
+	                                                      Gunsmith's grip_fingers_<type> keys; held until clear_fingers
+	  hud_hand_ik.clear_fingers(hand)
+	  hud_hand_ik.add_source(name, fn)                    fn(hand, anim, arm) -> target, weight [, fingers, finger_weight]:
+	                                                      asked every frame for a hand no target above holds (anim: the
+	                                                      hand as animated and target: in the arm model's space; arm: the
+	                                                      arm model's HUD transform). The first that answers wins.
+	  hud_hand_ik.remove_source(name)
+
+	Gunsmith Docs research/44, phase 4 (14 Nov 2026): this replaces player_hud:set_ik_target and the other player_hud
+	hand IK calls, which the engine no longer has.
+--]]
+
+local IK_BLEND = 4                       -- a target's weight moves at most this much a second
+local HAND_BONE = { [0] = "r_hand", [1] = "l_hand" }
+
+local state = {}
+for h = 0, 1 do
+	state[h] = { set = false, want = 1, weight = 0 }
+end
+local sources = {}                       -- { { name, fn } } in the order added
+local ours = { [0] = false, [1] = false } -- upstream's arm IK switched on here
+local bone_ids = {}
+local last_t
+
+-- ---------------------------------------------------------------- matrices
+local function copy(m)
+	return matrix():set(m)
+end
+
+local function mul(a, b)
+	return matrix():mul_43(a, b)
+end
+
+local function inv(m)
+	return matrix():invert(m)
+end
+
+-- Fmatrix::rotation(quaternion) (xrCore vector.h), the translation from `c`
+local function from_quat(q, c)
+	local xx, yy, zz = q.x * q.x, q.y * q.y, q.z * q.z
+	local xy, xz, yz = q.x * q.y, q.x * q.z, q.y * q.z
+	local wx, wy, wz = q.w * q.x, q.w * q.y, q.w * q.z
+	local m = matrix():identity()
+	m.i = vector():set(1 - 2 * (yy + zz), 2 * (xy - wz), 2 * (xz + wy))
+	m.j = vector():set(2 * (xy + wz), 1 - 2 * (xx + zz), 2 * (yz - wx))
+	m.k = vector():set(2 * (xz - wy), 2 * (yz + wx), 1 - 2 * (xx + yy))
+	m.c = vector():set(c)
+	return m
+end
+
+-- `a` moved toward `b` by t: rotation slerped, position lerped
+local function blend(a, b, t)
+	if t >= 1 then
+		return copy(b)
+	end
+	local qa, qb = quaternion():set_from_mat(a), quaternion():set_from_mat(b)
+	local q = quaternion():slerp(qa, qb, t)
+	local c = vector():set(a.c):mad(vector():set(b.c):sub(a.c), t)
+	return from_quat(q, c)
+end
+
+local function pose_string(p)
+	if type(p) == "table" then
+		return table.concat(p, ",")
+	end
+	return p
+end
+
+-- ---------------------------------------------------------------- the hands
+local function hud()
+	return get_player_hud and get_player_hud() or nil
+end
+
+local function hand_bone(hand)
+	local id = bone_ids[hand]
+	if id == nil and db.actor then
+		id = db.actor:bone_id(HAND_BONE[hand], true)
+		bone_ids[hand] = id
+	end
+	return id
+end
+
+-- the hand as animated (before any IK), in its arm model's space
+local function anim_hand(hand)
+	local id = hand_bone(hand)
+	if not id or id == 65535 then
+		return nil
+	end
+	return level.hands_bone_anim_pos(id)
+end
+
+-- a HUD item's frame (its model space, or its HUD model bone's), in HUD space; nil without the item in the hands
+local function item_frame(item, bone)
+	local h = hud()
+	item = item or 0
+	if not (h and h:item_attached(item)) then
+		return nil
+	end
+	local f = h:get_item_transform(item)
+	if bone and bone ~= "" then
+		local obj = item == 0 and db.actor:active_item() or item == 1 and db.actor:active_detector() or nil
+		if not obj then
+			return nil
+		end
+		local id = obj:bone_id(bone, true)
+		if not id or id == 65535 then
+			return nil
+		end
+		return obj:bone_transform(id, true)          -- (HUD space: the item's transform times the bone's)
+	end
+	return f
+end
+
+-- ---------------------------------------------------------------- API
+function set_target(hand, m, item, bone)
+	local s = state[hand]
+	if not s then
+		return
+	end
+	s.set, s.world, s.offset, s.item, s.bone = true, false, copy(m), item or 0, bone
+end
+
+function set_target_world(hand, m)
+	local s = state[hand]
+	if not s then
+		return
+	end
+	s.set, s.world, s.offset, s.item, s.bone = true, true, copy(m), 0, nil
+end
+
+function clear_target(hand)
+	local s = state[hand]
+	if s then
+		s.set = false
+		s.want = 1
+	end
+end
+
+function set_weight(hand, w)
+	local s = state[hand]
+	if s then
+		s.want = math.max(0, math.min(1, w or 1))
+	end
+end
+
+function get_weight(hand)
+	return state[hand] and state[hand].weight or 0
+end
+
+function get_hand(hand, item, bone)
+	local h, a = hud(), anim_hand(hand)
+	local f = item_frame(item, bone)
+	if not (h and a and f) then
+		return matrix():identity()
+	end
+	return mul(inv(f), mul(h:get_arm_transform(hand), a))
+end
+
+function get_hand_world(hand)
+	local h, a = hud(), anim_hand(hand)
+	if not (h and a) then
+		return matrix():identity()
+	end
+	return mul(h:get_arm_transform(hand), a):hud_to_world()
+end
+
+function set_fingers(hand, pose, weight)
+	local s = state[hand]
+	if s then
+		s.fingers = pose_string(pose)
+		s.finger_want = math.max(0, math.min(1, weight or 1))
+	end
+end
+
+function clear_fingers(hand)
+	if state[hand] then
+		state[hand].fingers = nil
+	end
+end
+
+function add_source(name, fn)
+	remove_source(name)
+	sources[#sources + 1] = { name = name, fn = fn }
+end
+
+function remove_source(name)
+	for i = #sources, 1, -1 do
+		if sources[i].name == name then
+			table.remove(sources, i)
+		end
+	end
+end
+
+-- ---------------------------------------------------------------- per frame
+local function update()
+	local h = hud()
+	if not (h and db.actor) then
+		return
+	end
+	local now = time_global()
+	local dt = last_t and math.min(math.max((now - last_t) / 1000, 0), 0.1) or 0
+	last_t = now
+	for hand = 0, 1 do
+		local s = state[hand]
+		local want = s.set and s.want or 0
+		if s.weight < want then
+			s.weight = math.min(want, s.weight + IK_BLEND * dt)
+		else
+			s.weight = math.max(want, s.weight - IK_BLEND * dt)
+		end
+		local a = anim_hand(hand)
+		local arm = h:get_arm_transform(hand)
+		local target, w, fingers, fw
+		if a then
+			if s.set or s.weight > 0 then
+				-- a script's target holds this hand (also while it blends out)
+				if s.weight > 0 then
+					local frame
+					if s.world then
+						frame = copy(s.offset):world_to_hud()
+					else
+						local f = item_frame(s.item, s.bone)
+						frame = f and mul(f, s.offset)
+					end
+					if frame then
+						target, w = mul(inv(arm), frame), s.weight
+						if s.fingers then
+							fingers, fw = s.fingers, (s.finger_want or 1) * s.weight
+						end
+					end
+				end
+			else
+				for _, src in ipairs(sources) do
+					local ok, t, sw, f, sfw = pcall(src.fn, hand, a, arm)
+					if ok and t and sw and sw > 0 then
+						target, w, fingers, fw = t, sw, f, sfw
+						break
+					elseif not ok then
+						printf("! hud_hand_ik: source %s: %s", src.name, tostring(t))
+					end
+				end
+			end
+		elseif not s.set then
+			s.weight = 0
+		end
+		if target and w and w > 0 then
+			level.set_hand_target_transform(hand, blend(a, target, math.min(w, 1)))
+			if not level.get_arm_ik_enabled(hand) then
+				level.set_arm_ik_enabled(hand, true)
+				ours[hand] = true
+			end
+			if fingers and fw and fw > 0 then
+				h:set_ik_fingers(hand, pose_string(fingers), math.min(fw, 1))
+			end
+		elseif ours[hand] then
+			level.set_arm_ik_enabled(hand, false)
+			ours[hand] = false
+		end
+		if not s.set and s.weight <= 0 then
+			s.offset = nil
+		end
+	end
+end
+
+local prev_hook
+local function hook()
+	if prev_hook then
+		prev_hook()
+	end
+	update()
+end
+
+function on_game_start()
+	if _G.COnHudIKTarget ~= hook then
+		prev_hook = _G.COnHudIKTarget
+		_G.COnHudIKTarget = hook
+	end
+	RegisterScriptCallback("on_game_load", function()
+		bone_ids = {}
+		last_t = nil
+		for h = 0, 1 do
+			state[h] = { set = false, want = 1, weight = 0 }
+			ours[h] = false
+		end
+	end)
+end

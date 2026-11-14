@@ -836,7 +836,6 @@ player_hud::player_hud()
 	m_item_pos.identity();
 	script_override_arms = false;
 	script_anim_item_model = nullptr;
-	m_ik_anim_ok[0] = m_ik_anim_ok[1] = false;
 	override_hand_pose[0] = false;
 	override_hand_pose[1] = false;
 
@@ -898,7 +897,6 @@ player_hud::~player_hud()
 	delete_data(m_script_layers);
 	delete_data(m_movement_layers);
 	delete_data(m_bone_callback_params);
-	free_hand_ik();
 }
 
 void player_hud::FingerCallback(CBoneInstance* B)
@@ -1673,7 +1671,7 @@ void player_hud::update(const Fmatrix& cam_trans)
 	m_transform_2_prev = m_transform_2;
 	m_transform_2.mul(trans_2, m_attach_offset_2);
 
-	// the arms as animated; the hand IK below (update_hand_ik) changes them again
+	// this frame's finger poses are set from Lua (hud_hand_ik.script, upstream's IK hook)
 	m_hand_ik[0].begin_frame();
 	m_hand_ik[1].begin_frame();
 	for (int i = 0; i < 8; ++i)
@@ -1888,9 +1886,6 @@ void player_hud::update(const Fmatrix& cam_trans)
 
 	if (m_attached_items[SCOPE_ATTACH_IDX])
 		m_attached_items[SCOPE_ATTACH_IDX]->update(true);
-
-	// the hands on their IK targets, once the items are placed
-	update_hand_ik();
 
 	if (script_anim_item_attached && script_anim_item_model)
 		update_script_item();

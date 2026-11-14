@@ -74,14 +74,6 @@ namespace gunsmith
 		xr_vector<STacMode> tac_mode_data; // per mode
 		bool is_tactical() const { return !tac_modes.empty(); }
 
-		// The left hand on the part (grip IK, gunsmith_grip_ik.h), per Tarkov GripType 0 and 1: the left hand
-		// bone in the model's space and the fingers' rotations relative to their parents (grip_hand_<type>,
-		// grip_fingers_<type>, grip_priority, grip_type; see the Gunsmith config reference).
-		bool has_grip[2];
-		Fmatrix grip_hand[2];
-		Fvector grip_fingers[2][15]; // radians
-		int grip_priority;
-		int grip_type;
 		// gs_rounds: the part's round mounts (a magazine's patron_<n>, each a gs_mount_<name>_*), see SRoundShow
 		xr_vector<shared_str> round_mounts;
 		// The flags of mode `mode` (clamped to the last mode).

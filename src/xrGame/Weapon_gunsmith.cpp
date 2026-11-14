@@ -1155,11 +1155,6 @@ void CWeaponMagazinedWGrenade::gs_set_launcher(const shared_str& part, bool live
 	m_BriefInfo_CalcFrame = 0;
 }
 
-bool CWeaponMagazinedWGrenade::gs_grip_ik_allowed() const
-{
-	return !(m_bGrenadeMode && IsGrenadeLauncherAttached());
-}
-
 const xr_vector<CCartridge>& CWeaponMagazinedWGrenade::gs_round_magazine(shared_str& loaded_type) const
 {
 	if (!m_bGrenadeMode)

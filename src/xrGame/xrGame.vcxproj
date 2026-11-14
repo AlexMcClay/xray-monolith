@@ -1563,7 +1563,6 @@
     <ClInclude Include="gunsmith_script.h" />
     <ClInclude Include="gunsmith_visuals.h" />
     <ClInclude Include="gunsmith_tactical.h" />
-    <ClInclude Include="gunsmith_grip_ik.h" />
     <ClInclude Include="hud_hand_ik.h" />
     <ClInclude Include="gunsmith_preview.h" />
     <ClInclude Include="gunsmith_icon_cache.h" />
@@ -3495,7 +3494,6 @@
     </ClCompile>
     <ClCompile Include="gunsmith_visuals.cpp" />
     <ClCompile Include="gunsmith_tactical.cpp" />
-    <ClCompile Include="gunsmith_grip_ik.cpp" />
     <ClCompile Include="hud_hand_ik.cpp" />
     <ClCompile Include="hud_item_layers.cpp" />
     <ClCompile Include="gunsmith_preview.cpp" />
