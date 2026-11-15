@@ -271,63 +271,6 @@ void set_hud_round_slots_script(CScriptGameObject* self, LPCSTR chambers, LPCSTR
 	return ::luabind::object(L, p);
 }
 
-// Debug (research/44): the weapon's drawn parts as script attachments need them, as the engine places them, first person
-// (hud true, needs the weapon in the hands) or world: { node, section, parent (row number in this list, 0 = the
-// weapon's own model), model, bone, pos, rot (degrees, as script_attachment:set_rotation), scale, hidden = { bone
-// names }, follow }. Empty when the weapon has no drawn parts.
-::luabind::object gs_attachment_mounts_script(lua_State* L, CScriptGameObject* self, bool hud)
-{
-	::luabind::object t = ::luabind::newtable(L);
-	CWeapon* weapon = gs_weapon(self, "gs_attachment_mounts");
-	if (!weapon)
-		return t;
-	IKinematics* K = nullptr;
-	if (hud)
-	{
-		attachable_hud_item* hi = weapon->HudItemData();
-		K = hi && hi->m_model ? hi->m_model : nullptr;
-	}
-	else
-		K = weapon->Visual() ? weapon->Visual()->dcast_PKinematics() : nullptr;
-	if (!K)
-		return t;
-	const int ctx = hud ? gunsmith::CVisuals::eHud : gunsmith::CVisuals::eWorld;
-	weapon->gs_visuals().ensure(ctx, K, weapon->gs_tree(), weapon->cNameSect().c_str(),
-	                            hud ? weapon->HudSection().c_str() : nullptr, true);
-	xr_vector<gunsmith::CVisuals::SAttMount> rows;
-	weapon->gs_visuals().attachment_mounts(ctx, K, rows);
-	int i = 1;
-	for (const gunsmith::CVisuals::SAttMount& m : rows)
-	{
-		::luabind::object r = ::luabind::newtable(L);
-		r["node"] = int(m.node);
-		r["section"] = weapon->gs_tree().node(m.node).section.c_str();
-		r["parent"] = m.parent + 1;
-		r["model"] = m.model.c_str();
-		r["bone"] = m.bone.c_str();
-		// offset = [rotation | position] x uniform scale (script_attachment::RecalcOffset without an origin)
-		const float scale = m.offset.i.magnitude();
-		Fmatrix rot = m.offset;
-		rot.i.normalize_safe();
-		rot.j.normalize_safe();
-		rot.k.normalize_safe();
-		Fvector hpb;
-		rot.getHPB(hpb);
-		hpb.mul(180.f / PI);
-		r["pos"] = m.offset.c;
-		r["rot"] = hpb;
-		r["scale"] = scale;
-		::luabind::object hidden = ::luabind::newtable(L);
-		int h = 1;
-		for (const shared_str& b : m.hidden)
-			hidden[h++] = b.c_str();
-		r["hidden"] = hidden;
-		r["follow"] = m.follow;
-		t[i++] = r;
-	}
-	return t;
-}
-
 // The slots' points of the gun's world build (CVisuals::slot_points: the middle of a fitted part, or where an empty
 // slot would mount), in its world model's space: { {node, slot, pos}, ... }. For markers on a 3D view of the gun.
 ::luabind::object gs_slot_points_script(lua_State* L, CScriptGameObject* self)
@@ -588,7 +531,6 @@ void gs_hud_bone_visible_script(CScriptGameObject* self, LPCSTR bone, bool visib
 		.def("gs_sight_section", &gs_sight_section_script, raw<1>())
 		.def("gs_sight_mode", &gs_sight_mode_script, raw<1>())
 		.def("gs_hud_sight_point", &gs_hud_sight_point_script, raw<1>())
-		.def("gs_attachment_mounts", &gs_attachment_mounts_script, raw<1>())
 		.def("gs_hud_part_frame", &gs_hud_part_frame_script, raw<1>())
 		.def("gs_slot_points", &gs_slot_points_script, raw<1>())
 		.def("gs_sights", &gs_sights_script, raw<1>())

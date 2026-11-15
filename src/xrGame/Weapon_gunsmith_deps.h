@@ -13,7 +13,7 @@
 extern int g_gs_debug;
 enum
 {
-	eGsDebugPreview = 1, // the builder's preview and icons
-	// 2: was the grip IK's log (the grip is Lua since 14 Nov 2026: gunsmith_grip.debug())
+	// 1: was the old preview renderer's log (removed 15 Nov 2026); 2: was the grip IK's log (the grip is Lua since 14 Nov
+	// 2026: gunsmith_grip.set_debug)
 	eGsDebugAim = 4, // the sight calibration
 };

@@ -217,21 +217,6 @@ namespace gunsmith
 		u32 port_count() const { return u32(m_ctx[eHud].round_ports.size()); }
 		void render_rounds(IKinematics* root, const Fmatrix& root_xform, const SRoundShow& show);
 
-		// Debug (research/44): each drawn part as a script attachment needs it, from the engine's placement: its model, the part
-		// it hangs on (index in this list, -1 the root model), the parent model's bone and the offset on that bone's
-		// own transform (script_attachment: parent x bone x offset), and the bones it has hidden (sight modes). The
-		// offset is the bone's inverse bind pose times the mount, so it doesn't change as the bone moves.
-		struct SAttMount
-		{
-			u8 node = 0;
-			int parent = -1;
-			shared_str model, bone;
-			Fmatrix offset;
-			xr_vector<shared_str> hidden;
-			bool follow = false; // has gs_follow_bones (not carried over by the prototype)
-		};
-		void attachment_mounts(int ctx, IKinematics* root, xr_vector<SAttMount>& out) const;
-
 	private:
 		struct SRoundSlot
 		{

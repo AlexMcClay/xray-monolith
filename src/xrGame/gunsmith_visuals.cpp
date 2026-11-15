@@ -696,33 +696,6 @@ namespace gunsmith
 		}
 	}
 
-	void CVisuals::attachment_mounts(int ctx, IKinematics* root, xr_vector<SAttMount>& out) const
-	{
-		out.clear();
-		const SContext& c = m_ctx[ctx];
-		if (c.children.empty() || c.root != root)
-			return;
-		for (const SChild& ch : c.children)
-		{
-			IKinematics* parentK = ch.parent < 0 ? root : c.children[ch.parent].K;
-			SAttMount m;
-			m.node = ch.node;
-			m.parent = ch.parent;
-			m.model = ctx == eHud ? ch.pv->hud_visual : ch.pv->visual;
-			m.bone = parentK->LL_BoneName_dbg(ch.mount_bone);
-			// update_local: parent x (bone pose x inverse bind) x mount; an attachment: parent x bone pose x offset
-			Fmatrix inv, t;
-			inv.invert(parentK->LL_GetTransform(ch.mount_bone));
-			t.mul_43(parentK->LL_GetTransform_R(ch.mount_bone), ch.mount);
-			m.offset.mul_43(inv, t);
-			for (u16 b = 0; b < ch.K->LL_BoneCount(); ++b)
-				if (!ch.K->LL_GetBoneVisible(b))
-					m.hidden.push_back(ch.K->LL_BoneName_dbg(b));
-			m.follow = !ch.follow.empty();
-			out.push_back(m);
-		}
-	}
-
 	void CVisuals::slot_points(int ctx, IKinematics* root, const CTree& tree, LPCSTR receiver, LPCSTR hud_sect,
 							   xr_vector<SSlotPoint>& out)
 	{
