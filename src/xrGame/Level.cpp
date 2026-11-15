@@ -69,7 +69,6 @@
 #include "PHDebug.h"
 #include "debug_text_tree.h"
 #endif
-#include "gunsmith_preview.h"
 extern ENGINE_API bool g_dedicated_server;
 extern ENGINE_API BOOL	g_bootComplete;
 extern CUISequencer* g_tutorial;
@@ -296,7 +295,6 @@ CLevel::~CLevel()
 	ribbons_clear();
 	//crash_saving::save_impl = nullptr; // CLevel not available, disable crash save
 	xr_delete(g_player_hud);
-	gunsmith::CPreview::destroy();
 	delete_data(m_script_attachments);
 	delete_data(hud_zones_list);
 	hud_zones_list = nullptr;

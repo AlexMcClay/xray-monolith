@@ -5,8 +5,6 @@
 
 #include "pch_script.h"
 #include "gunsmith_script.h"
-#include "gunsmith_preview.h"
-#include "gunsmith_icon_cache.h"
 #include "inventory_item_object.h"
 #include "Level.h"
 #include "Weapon.h"
@@ -185,75 +183,43 @@ namespace gunsmith
 	}
 }
 
-namespace
-{
-	::luabind::object rect_to_lua(lua_State* L, bool ok, const Frect& r)
-	{
-		if (!ok)
-			return ::luabind::object();
-		::luabind::object t = ::luabind::newtable(L);
-		t["x1"] = r.x1;
-		t["y1"] = r.y1;
-		t["x2"] = r.x2;
-		t["y2"] = r.y2;
-		return t;
-	}
-}
-
-namespace
-{
-	int icon_token(const gunsmith::CPreview::SIcon& icon)
-	{
-		using gunsmith::CPreview;
-		if (icon.state == CPreview::eIconPending)
-			return -int(icon.cell + 1);
-		if (icon.state == CPreview::eIconReady)
-			return int(icon.cell + 1);
-		return 0;
-	}
-
-	::luabind::object icon_to_lua(lua_State* L, const gunsmith::CPreview::SIcon& icon)
-	{
-		using gunsmith::CPreview;
-		if (icon.state == CPreview::eIconNone)
-			return ::luabind::object();
-		::luabind::object t = ::luabind::newtable(L);
-		t["stock"] = icon.state == CPreview::eIconStock;
-		t["ready"] = icon.state == CPreview::eIconReady;
-		if (icon.state == CPreview::eIconStock)
-			return t;
-		t["token"] = icon_token(icon);
-		t["tex"] = icon.texture;
-		t["x1"] = icon.rect.x1;
-		t["y1"] = icon.rect.y1;
-		t["x2"] = icon.rect.x2;
-		t["y2"] = icon.rect.y2;
-		return t;
-	}
-}
-
-::luabind::object gs_icon_script(lua_State* L, u16 id, bool stock_static)
-{
-	gunsmith::CPreview::SIcon icon;
-	gunsmith::CPreview::instance().icon(id, stock_static, icon);
-	return icon_to_lua(L, icon);
-}
-
-int gs_icon_token(u16 id, bool stock_static)
-{
-	gunsmith::CPreview::SIcon icon;
-	gunsmith::CPreview::instance().icon(id, stock_static, icon);
-	return icon_token(icon);
-}
-
+// Loads the part models of every Gunsmith gun and part item carrying parts on the level (their world models), so
+// neither their icons nor their first sight in the world wait for files. For a loading screen. Returns how many objects.
 u32 gs_preload_models()
 {
-	return gunsmith::CPreview::instance().preload();
-}
-
-u32 gs_icon_cache_clear()
-{
-	return gunsmith::icon_cache::clear();
+	if (!g_pGameLevel)
+		return 0;
+	CTimer timer;
+	timer.Start();
+	u32 count = 0;
+	for (u32 i = 0, n = Level().Objects.o_count(); i < n; ++i)
+	{
+		CObject* O = Level().Objects.o_get_by_iterator(i);
+		if (!O || O->getDestroy() || !O->Visual())
+			continue;
+		IKinematics* K = O->Visual()->dcast_PKinematics();
+		if (!K)
+			continue;
+		if (CWeapon* weapon = smart_cast<CWeapon*>(O))
+		{
+			if (!weapon->gs_full_mode())
+				continue;
+			weapon->gs_visuals().ensure(gunsmith::CVisuals::eWorld, K, weapon->gs_tree(), weapon->cNameSect().c_str(),
+			                            nullptr, true);
+		}
+		else if (CInventoryItemObject* item = smart_cast<CInventoryItemObject*>(O))
+		{
+			if (!item->gs_carries_parts())
+				continue;
+			item->gs_part_visuals().ensure(gunsmith::CVisuals::eWorld, K, item->gs_subtree(), item->cNameSect().c_str(),
+			                               nullptr, true);
+		}
+		else
+			continue;
+		++count;
+	}
+	Msg("- [gunsmith] part models of %u guns and parts loaded in %.0f ms", count, timer.GetElapsed_sec() * 1000.f);
+	return count;
 }
 
 // A gun section's stock build (its gs_default_build) as a part tree, as game_object:gs_get_tree() gives one; empty
@@ -267,58 +233,6 @@ u32 gs_icon_cache_clear()
 	return gunsmith::tree_to_lua(L, tree);
 }
 
-::luabind::object gs_icon_section_script(lua_State* L, LPCSTR section)
-{
-	gunsmith::CPreview::SIcon icon;
-	gunsmith::CPreview::instance().icon(section, icon);
-	return icon_to_lua(L, icon);
-}
-
-::luabind::object gs_preview_size_script(lua_State* L)
-{
-	::luabind::object t = ::luabind::newtable(L);
-	t["w"] = int(gunsmith::CPreview::instance().view_width());
-	t["h"] = int(gunsmith::CPreview::instance().view_height());
-	return t;
-}
-
-LPCSTR gs_preview_texture() { return "$user$gs_view"; }
-bool gs_preview_available() { return gunsmith::CPreview::instance().available(); }
-void gs_preview_object(u16 id) { gunsmith::CPreview::instance().view_object(id); }
-void gs_preview_clear() { gunsmith::CPreview::instance().view_clear(); }
-void gs_preview_camera(float yaw, float pitch, float zoom, float pan_x, float pan_y, float aspect)
-{
-	gunsmith::CPreview::instance().view_camera(yaw, pitch, zoom, pan_x, pan_y, aspect);
-}
-
-::luabind::object gs_preview_bounds_script(lua_State* L)
-{
-	Frect r;
-	const bool ok = gunsmith::CPreview::instance().view_bounds(r);
-	return rect_to_lua(L, ok, r);
-}
-
-void gs_preview_resolution(u32 w, u32 h) { gunsmith::CPreview::instance().view_resolution(w, h); }
-
-::luabind::object gs_preview_slots_script(lua_State* L)
-{
-	::luabind::object t = ::luabind::newtable(L);
-	int count = 0;
-	xr_vector<gunsmith::CPreview::SViewSlot> slots;
-	gunsmith::CPreview::instance().view_slots(slots);
-	for (const auto& s : slots)
-	{
-		::luabind::object row = ::luabind::newtable(L);
-		row["node"] = int(s.node);
-		row["slot"] = int(s.slot);
-		row["u"] = s.u;
-		row["v"] = s.v;
-		row["visible"] = s.visible;
-		t[++count] = row;
-	}
-	return t;
-}
-void gs_preview_tick() { gunsmith::CPreview::instance().view_tick(); }
 bool gs_carries_parts(u16 id)
 {
 	CInventoryItemObject* item = g_pGameLevel ? smart_cast<CInventoryItemObject*>(Level().Objects.net_Find(id)) : nullptr;
@@ -339,11 +253,7 @@ void gs_refresh_stats_script()
 // [gunsmith_settings] values that can change while the game runs (gunsmith::set_setting). get: nil if unknown.
 bool gs_set_setting(LPCSTR name, float value)
 {
-	if (!name || !gunsmith::set_setting(name, value))
-		return false;
-	if (!strncmp(name, "icon_", 5))
-		gunsmith::CPreview::instance().redraw_icons();
-	return true;
+	return name && gunsmith::set_setting(name, value);
 }
 
 ::luabind::object gs_get_setting_script(lua_State* L, LPCSTR name)
@@ -411,22 +321,8 @@ void gunsmith_script_register(lua_State* L)
 	module(L, "gunsmith")
 		[
 		def("model_bones", &gs_model_bones_script, raw<1>()),
-		def("icon", &gs_icon_script, raw<1>()),
-		def("icon_token", &gs_icon_token),
-		def("icon_section", &gs_icon_section_script, raw<1>()),
 		def("default_tree", &gs_default_tree_script, raw<1>()),
 		def("preload_models", &gs_preload_models),
-		def("icon_cache_clear", &gs_icon_cache_clear),
-		def("preview_texture", &gs_preview_texture),
-		def("preview_size", &gs_preview_size_script, raw<1>()),
-		def("preview_available", &gs_preview_available),
-		def("preview_object", &gs_preview_object),
-		def("preview_clear", &gs_preview_clear),
-		def("preview_camera", &gs_preview_camera),
-		def("preview_tick", &gs_preview_tick),
-		def("preview_slots", &gs_preview_slots_script, raw<1>()),
-		def("preview_bounds", &gs_preview_bounds_script, raw<1>()),
-		def("preview_resolution", &gs_preview_resolution),
 		def("is_full_mode", &gs_is_full_mode),
 		def("set_setting", &gs_set_setting),
 		def("get_setting", &gs_get_setting_script, raw<1>()),

@@ -84,7 +84,7 @@ public:
 
 	// Gunsmith: a part item (class II_ATTCH) carrying the parts mounted on it, copied from
 	// its server object at spawn. Those parts are drawn on its world model, and its icon
-	// shows them (gunsmith_preview). The bodies are in gunsmith_item.cpp.
+	// shows them (gunsmith_ui3d). The bodies are in gunsmith_item.cpp.
 	bool gs_carries_parts() const;
 	const gunsmith::CTree& gs_subtree() const;
 	gunsmith::CVisuals& gs_part_visuals();

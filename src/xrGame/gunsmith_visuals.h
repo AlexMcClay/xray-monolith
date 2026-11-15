@@ -198,11 +198,6 @@ namespace gunsmith
 		// at its eyepiece) or the HUD section's gs_aim_eye_far. Null without a sight.
 		const SPartVisual* sight_eye(IKinematics* root, Fvector& eye, bool& has_eye);
 
-		// Appends each child's model and transform in the root model's space, children's bones
-		// recalculated, for drawing the build elsewhere (gunsmith_preview). The caller calculates
-		// the root's bones.
-		void draw_list(int ctx, IKinematics* root, xr_vector<std::pair<IRenderVisual*, Fmatrix>>& out);
-
 		// Every slot that has a mount_bone, on the root and on each drawn part, in the root model's
 		// space (workbench markers): the middle of the part in it, or where a part would mount when
 		// it is empty. Arguments as for ensure().

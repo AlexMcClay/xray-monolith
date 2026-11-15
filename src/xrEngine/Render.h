@@ -403,36 +403,6 @@ public:
 	virtual u32 active_phase() = 0; //Swartz: actor shadow
 	virtual void RenderToTarget(RRT target) = 0;
 
-	// Model previews (DX10/11; the others return false). Draws visuals[i] at xforms[i] with
-	// `view` and `proj` into the rect (x, y, w, h) of the named $user$ texture, created or resized
-	// to tw x th on demand. The rect is cleared to transparent first; UI shows it by that name.
-	// Flags: ePreviewSupersample draws at twice the size with MSAA and brings it down with clean
-	// edges (when 2w x 2h fits); ePreviewHalo adds a soft dark halo under the model (with
-	// supersampling only). `params` reaches the preview shaders as gs_preview_params (null: 1, 1, 1, 0) and
-	// `grade` as gs_preview_grade (null: 1, 1, 0, 0).
-	enum
-	{
-		ePreviewSupersample = 1 << 0,
-		ePreviewHalo = 1 << 1,
-	};
-	virtual bool PreviewRender(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const Fmatrix& view,
-							   const Fmatrix& proj, IRenderVisual* const* visuals, const Fmatrix* xforms, u32 count,
-							   u32 flags = 0, const Fvector4* params = nullptr, const Fvector4* grade = nullptr)
-	{
-		return false;
-	}
-	// A rect of a named $user$ preview texture (PreviewRender) to and from memory, 4 bytes a pixel in the texture's
-	// own layout, rows top-down (DX10/11; the others fail). PreviewReadBegin starts copying the rect back to the CPU
-	// and returns a ticket (0: failed); PreviewReadEnd gives its w * h * 4 bytes once the GPU has them: 1 done, 0 not
-	// yet (ask again on a later frame), -1 failed or unknown ticket; the ticket is freed unless it returns 0. A null
-	// `out` drops the ticket.
-	// PreviewWriteRect fills the rect, creating the texture at tw x th on demand (cleared to transparent).
-	virtual u32 PreviewReadBegin(LPCSTR target, u32 x, u32 y, u32 w, u32 h) { return 0; }
-	virtual int PreviewReadEnd(u32 ticket, void* out) { return -1; }
-	virtual bool PreviewWriteRect(LPCSTR target, u32 tw, u32 th, u32 x, u32 y, u32 w, u32 h, const void* pixels)
-	{
-		return false;
-	}
 	// Constructor/destructor
 	virtual ~IRender_interface();
 protected:
