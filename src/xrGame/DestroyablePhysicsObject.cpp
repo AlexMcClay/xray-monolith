@@ -45,6 +45,11 @@ CPhysicsShellHolder* CDestroyablePhysicsObject::PPhysicsShellHolder()
 
 void CDestroyablePhysicsObject::net_Destroy()
 {
+	// The shell goes before the model: CObject::net_Destroy deletes the model and then calls OnChangeVisual, which
+	// deactivates the shell, and deactivating walks the model's bones (ZeroCallbacks). A model the pool doesn't keep
+	// is freed by then, so that read a null bone list and crashed on a level change (16 Nov 2026).
+	if (m_pPhysicsShell)
+		deactivate_physics_shell();
 	inherited::net_Destroy();
 	CPHDestroyable::RespawnInit();
 	CPHCollisionDamageReceiver::Clear();
